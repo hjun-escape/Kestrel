@@ -1,38 +1,40 @@
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
+    --background: 210 18% 95%;
+    --foreground: 213 39% 13%;
     --card: 0 0% 100%;
     --card-foreground: 0 0% 3.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
+    --primary: 213 39% 13%;
+    --primary-foreground: 0 0% 100%;
     --secondary: 0 0% 96.1%;
     --secondary-foreground: 0 0% 9%;
     --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
+    --muted-foreground: 213 13% 40%;
     --accent: 0 0% 96.1%;
     --accent-foreground: 0 0% 9%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
+    --border: 213 16% 83%;
+    --input: 213 16% 78%;
+    --ring: 224 66% 51%;
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
-    --radius: 0.5rem;
-    --font-heading: ui-sans-serif, system-ui, sans-serif;
-    --font-body: ui-sans-serif, system-ui, sans-serif;
-    --font-display: ui-sans-serif, system-ui, sans-serif;
-    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    --radius: 0.25rem;
+    --font-heading: "Archivo", ui-sans-serif, system-ui, sans-serif;
+    --font-body: "Archivo", ui-sans-serif, system-ui, sans-serif;
+    --font-display: "Archivo", ui-sans-serif, system-ui, sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
     --sidebar-primary: 240 5.9% 10%;
@@ -41,6 +43,27 @@
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Early Warning risk palette. Red / amber / green are semantic only. */
+    --ew-ink: #14202e;
+    --ew-ink-soft: #3b4859;
+    --ew-muted: #5a6675;
+    --ew-paper: #eef1f4;
+    --ew-surface: #ffffff;
+    --ew-rule: #cdd3db;
+    --ew-rule-soft: #e3e7ec;
+    --ew-focus: #2d5bd7;
+    --ew-red: #b42318;
+    --ew-red-bg: #fdecea;
+    --ew-red-rule: #f3b8b1;
+    --ew-amber: #965006;
+    --ew-amber-bg: #fdf3e1;
+    --ew-amber-rule: #ecc98a;
+    --ew-green: #1d6b43;
+    --ew-green-bg: #e7f3eb;
+    --ew-green-rule: #a8d3b7;
+    --ew-none: #6b7684;
+    --ew-none-bg: #f1f3f5;
   }
 
   .dark {
@@ -88,5 +111,32 @@
 
   body {
     @apply bg-background text-foreground font-body;
+  }
+}
+
+@layer base {
+  html {
+    font-feature-settings: "ss01", "cv11";
+  }
+  .font-mono,
+  .tnum {
+    font-variant-numeric: tabular-nums slashed-zero;
+  }
+  .font-heading {
+    font-stretch: 85%;
+  }
+  :focus-visible {
+    outline: 2px solid var(--ew-focus);
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

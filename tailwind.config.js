@@ -11,6 +11,27 @@ module.exports = {
   			sm: 'calc(var(--radius) - 4px)'
   		},
   		colors: {
+  			ew: {
+  				ink: 'var(--ew-ink)',
+  				'ink-soft': 'var(--ew-ink-soft)',
+  				muted: 'var(--ew-muted)',
+  				paper: 'var(--ew-paper)',
+  				surface: 'var(--ew-surface)',
+  				rule: 'var(--ew-rule)',
+  				'rule-soft': 'var(--ew-rule-soft)',
+  				focus: 'var(--ew-focus)',
+  				red: 'var(--ew-red)',
+  				'red-bg': 'var(--ew-red-bg)',
+  				'red-rule': 'var(--ew-red-rule)',
+  				amber: 'var(--ew-amber)',
+  				'amber-bg': 'var(--ew-amber-bg)',
+  				'amber-rule': 'var(--ew-amber-rule)',
+  				green: 'var(--ew-green)',
+  				'green-bg': 'var(--ew-green-bg)',
+  				'green-rule': 'var(--ew-green-rule)',
+  				none: 'var(--ew-none)',
+  				'none-bg': 'var(--ew-none-bg)'
+  			},
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
   			card: {

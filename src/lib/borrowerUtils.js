@@ -1,4 +1,6 @@
 import { format, parseISO } from "date-fns";
+import { base44 } from "@/api/base44Client";
+import { SIGNAL_TYPES, SOURCES } from "@/lib/signalTypes";
 
 // Signal dates are "YYYY-MM-DD". new Date("2026-09-12") is UTC midnight, which
 // shows as Sep 11 in US time zones, so parse them as local dates instead.
@@ -60,4 +62,173 @@ export function formatRelative(dateStr) {
   } catch {
     return null;
   }
+}
+// ---------------------------------------------------------------------------
+// UI helpers (loan book + detail).
+// ---------------------------------------------------------------------------
+
+
+export const RECENT_DAYS = 90;
+export const POLL_INTERVAL_MS = 3000;
+
+// Status key used for display: "not_checked" until the first refresh lands.
+export function statusKey(borrower) {
+  if (!borrower?.last_refreshed) return "not_checked";
+  return borrower.status || "not_checked";
+}
+
+export function isAtRisk(borrower) {
+  const key = statusKey(borrower);
+  return key === "red" || key === "yellow";
+}
+
+// Counts per status and dollar totals for the summary strip.
+export function summarizeBook(borrowers) {
+  const counts = { red: 0, yellow: 0, green: 0, not_checked: 0 };
+  const exposure = { red: 0, yellow: 0, green: 0, not_checked: 0 };
+  (borrowers || []).forEach((b) => {
+    const key = statusKey(b);
+    counts[key] += 1;
+    exposure[key] += Number(b.loan_amount_usd) || 0;
+  });
+  const total = Object.values(exposure).reduce((a, n) => a + n, 0);
+  return { counts, exposure, total, atRisk: exposure.red + exposure.yellow };
+}
+
+export function formatUsdFull(n) {
+  if (n === null || n === undefined || n === "") return "—";
+  const num = Number(n);
+  if (Number.isNaN(num)) return "—";
+  return `$${num.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+}
+
+// Source (News / Legal / Jobs / Reviews) a signal came from.
+export function sourceOfSignal(signal) {
+  return SIGNAL_TYPES[signal?.type]?.source || null;
+}
+
+// Splits signals into the last N days (count toward status) and older ones.
+export function splitByRecency(signals, days = RECENT_DAYS) {
+  const recent = filterRecentSignals(signals, days);
+  const recentIds = new Set(recent.map((s) => s.id ?? `${s.type}-${s.date}-${s.title}`));
+  const older = (signals || []).filter(
+    (s) => !recentIds.has(s.id ?? `${s.type}-${s.date}-${s.title}`)
+  );
+  return { recent, older };
+}
+
+// Groups signals newest first into [{ key: "2026-09", label: "September 2026", items }].
+export function groupSignalsByMonth(signals) {
+  const sorted = [...(signals || [])].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  const groups = [];
+  sorted.forEach((s) => {
+    const key = (s.date || "").slice(0, 7);
+    const last = groups[groups.length - 1];
+    if (last && last.key === key) {
+      last.items.push(s);
+    } else {
+      let label = key || "Undated";
+      try {
+        label = format(parseSignalDate(s.date), "MMMM yyyy");
+      } catch {
+        // keep the raw key
+      }
+      groups.push({ key, label, items: [s] });
+    }
+  });
+  return groups;
+}
+
+// --- Sorting for the loan book table -------------------------------------
+
+const RISK_RANK = { red: 0, yellow: 1, green: 2, not_checked: 3 };
+
+const SORTERS = {
+  risk: null, // uses sortBorrowers
+  company: (a, b) => (a.borrower.name || "").localeCompare(b.borrower.name || ""),
+  stage: (a, b) => (a.borrower.stage || "").localeCompare(b.borrower.stage || ""),
+  signal: (a, b) => (a.topSignal?.date || "").localeCompare(b.topSignal?.date || ""),
+  amount: (a, b) => (Number(a.borrower.loan_amount_usd) || 0) - (Number(b.borrower.loan_amount_usd) || 0),
+  checked: (a, b) => (a.borrower.last_refreshed || "").localeCompare(b.borrower.last_refreshed || ""),
+  status: (a, b) => RISK_RANK[statusKey(a.borrower)] - RISK_RANK[statusKey(b.borrower)],
+};
+
+// rows: [{ borrower, topSignal }]. Returns a new sorted array.
+export function sortRows(rows, key, dir) {
+  if (!SORTERS[key]) {
+    const order = sortBorrowers(rows.map((r) => r.borrower));
+    const byId = new Map(rows.map((r) => [r.borrower.id, r]));
+    const sorted = order.map((b) => byId.get(b.id));
+    return dir === "desc" ? sorted.reverse() : sorted;
+  }
+  const factor = dir === "desc" ? -1 : 1;
+  return [...rows].sort((a, b) => factor * SORTERS[key](a, b));
+}
+
+// --- Refresh runs ----------------------------------------------------------
+// refreshBorrower can take minutes and saves progressively. Runs live in a
+// module-level registry so the "Screen new applicant" dialog can start one and
+// the detail page can pick it up after navigation.
+
+const activeRuns = new Map();
+
+export function getActiveRefresh(borrowerId) {
+  return activeRuns.get(borrowerId) || null;
+}
+
+// snapshot: { unavailableBefore: string[], signalIdsBefore: string[] }
+export function startRefresh(borrowerId, snapshot) {
+  const existing = activeRuns.get(borrowerId);
+  if (existing) return existing;
+  const run = {
+    borrowerId,
+    startedAt: Date.now(),
+    snapshot: {
+      unavailableBefore: snapshot?.unavailableBefore || [],
+      signalIdsBefore: snapshot?.signalIdsBefore || [],
+    },
+    promise: null,
+  };
+  run.promise = base44.functions
+    .invoke("refreshBorrower", { borrower_id: borrowerId })
+    .then(
+      (res) => ({ ok: true, data: res?.data }),
+      (e) => ({
+        ok: false,
+        error:
+          e?.response?.data?.error ||
+          e?.data?.error ||
+          e?.message ||
+          "Refresh failed. Try again.",
+      })
+    )
+    .finally(() => activeRuns.delete(borrowerId));
+  activeRuns.set(borrowerId, run);
+  return run;
+}
+
+// Per-source state for the source-status row:
+// "ok" | "unavailable" | "checking" | "not_checked".
+// While a run is active, a source counts as answered once a new signal from it
+// arrives or its entry in sources_unavailable changes; otherwise it is checking.
+export function deriveSourceStates(borrower, signals, run) {
+  const unavailableNow = new Set(borrower?.sources_unavailable || []);
+  const states = {};
+  SOURCES.forEach((src) => {
+    if (!run) {
+      if (!borrower?.last_refreshed) states[src] = "not_checked";
+      else states[src] = unavailableNow.has(src) ? "unavailable" : "ok";
+      return;
+    }
+    const before = new Set(run.snapshot.signalIdsBefore);
+    const wasUnavailable = run.snapshot.unavailableBefore.includes(src);
+    const hasNewSignal = (signals || []).some(
+      (s) => sourceOfSignal(s) === src && s.id && !before.has(s.id)
+    );
+    if (hasNewSignal) states[src] = "ok";
+    else if (unavailableNow.has(src) !== wasUnavailable) {
+      states[src] = unavailableNow.has(src) ? "unavailable" : "ok";
+    } else states[src] = "checking";
+  });
+  return states;
 }
