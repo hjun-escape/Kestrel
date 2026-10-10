@@ -45,7 +45,7 @@ export default function CompanyHeader({ borrower, sourceStates, running, refresh
         {facts.map((f) => (
           <div key={f.term} className="min-w-0">
             <dt className="text-xs text-ew-muted">{f.term}</dt>
-            <dd className={`mt-0.5 truncate text-sm font-medium text-ew-ink ${f.mono ? "font-mono text-[13px]" : ""}`}>
+            <dd title={typeof f.value === "string" ? f.value : undefined} className={`mt-0.5 truncate text-sm font-medium text-ew-ink ${f.mono ? "font-mono text-[13px]" : ""}`}>
               {f.value}
             </dd>
           </div>

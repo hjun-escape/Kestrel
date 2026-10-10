@@ -13,7 +13,7 @@ const COLUMNS = [
   { key: null, label: "Why", className: "" },
   { key: "signal", label: "Top signal", className: "w-[18%]" },
   { key: "amount", label: "Amount", className: "w-[96px]", align: "right" },
-  { key: "checked", label: "Last checked", className: "w-[118px]" },
+  { key: "checked", label: "Last checked", className: "w-[132px]" },
 ];
 
 const SKELETON_ROWS = 6;
@@ -82,7 +82,7 @@ function HeaderCell({ col, sort, onSort }) {
       <button
         type="button"
         onClick={() => onSort(col.key)}
-        className={`flex w-full items-center gap-1 px-3 py-2 text-xs font-semibold focus-visible:-outline-offset-2 ${
+        className={`flex w-full items-center gap-1 whitespace-nowrap px-3 py-2 text-xs font-semibold focus-visible:-outline-offset-2 ${
           alignRight ? "justify-end" : ""
         } ${active ? "text-ew-ink" : "text-ew-muted hover:text-ew-ink"}`}
       >

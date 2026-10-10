@@ -47,7 +47,7 @@ function isHttpUrl(value) {
 function validate(form) {
   if (!form.name.trim()) return "Enter the company name.";
   const domain = normalizeDomain(form.website_domain);
-  if (!domain || !domain.includes(".")) return "Enter a website domain such as northfieldpack.com.";
+  if (!domain || !domain.includes(".")) return "Enter a website domain such as harbortool.com.";
   if (form.loan_amount_usd !== "" && !(Number(form.loan_amount_usd) > 0)) {
     return "Loan amount must be a positive number of dollars.";
   }
@@ -106,7 +106,7 @@ export default function AddCompanyDialog({ open, onOpenChange, onCreated }) {
       setForm(EMPTY);
       onOpenChange(false);
       onCreated(created);
-    } catch (err) {
+    } catch {
       setError("Could not save the company. Check the fields and try again.");
     } finally {
       setSaving(false);
@@ -128,10 +128,10 @@ export default function AddCompanyDialog({ open, onOpenChange, onCreated }) {
 
           <div className="grid grid-cols-6 gap-x-4 gap-y-3 px-6 py-5">
             <Field id="name" label="Company name" className="col-span-6">
-              <Input id="name" required value={form.name} onChange={(e) => update("name", e.target.value)} placeholder="Northfield Packaging Co." />
+              <Input id="name" required value={form.name} onChange={(e) => update("name", e.target.value)} placeholder="Harbor Tool and Die Inc." />
             </Field>
             <Field id="domain" label="Website domain" className="col-span-3">
-              <Input id="domain" required value={form.website_domain} onChange={(e) => update("website_domain", e.target.value)} placeholder="northfieldpack.com" className="font-mono text-[13px]" />
+              <Input id="domain" required value={form.website_domain} onChange={(e) => update("website_domain", e.target.value)} placeholder="harbortool.com" className="font-mono text-[13px]" />
             </Field>
             <Field id="industry" label="Industry" className="col-span-3">
               <Input id="industry" value={form.industry} onChange={(e) => update("industry", e.target.value)} placeholder="Packaging" />

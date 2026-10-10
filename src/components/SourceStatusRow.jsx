@@ -20,7 +20,7 @@ export default function SourceStatusRow({ states, recentSignals, running }) {
         <h2 id="sources-heading" className="text-xs font-semibold text-ew-muted">
           Sources
         </h2>
-        <p aria-live="polite" className="font-mono text-xs text-ew-muted">
+        <p aria-live="polite" className="sr-only">
           {running ? `${answered} of ${SOURCES.length} answered` : ""}
         </p>
       </div>

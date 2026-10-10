@@ -16,7 +16,7 @@ export default function SummaryStrip({ borrowers, statusFilter, onStatusFilter, 
       className="grid grid-cols-[minmax(0,1fr)_auto] items-stretch border border-ew-rule bg-ew-surface"
     >
       <div className="flex min-w-0 flex-col">
-        <div className="flex min-w-0 divide-x divide-ew-rule-soft">
+        <div className="flex min-w-0 flex-1 divide-x divide-ew-rule-soft">
           {ORDER.map((key) => {
             const style = STATUS_STYLES[key];
             const active = statusFilter === key;
@@ -26,7 +26,7 @@ export default function SummaryStrip({ borrowers, statusFilter, onStatusFilter, 
                 type="button"
                 aria-pressed={active}
                 onClick={() => onStatusFilter(active ? null : key)}
-                className={`group flex min-w-0 flex-1 items-baseline justify-between gap-3 px-4 py-3 text-left transition-colors focus-visible:-outline-offset-2 ${
+                className={`group flex min-w-0 flex-1 items-center justify-between gap-3 px-4 py-4 text-left transition-colors focus-visible:-outline-offset-2 ${
                   active ? "bg-ew-paper" : "hover:bg-ew-hover"
                 }`}
               >

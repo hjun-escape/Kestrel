@@ -33,7 +33,7 @@ const STATES = {
 
 const DETAIL = {
   ok: (n) => (n === 0 ? "No signals in 90 days" : `${n} signal${n === 1 ? "" : "s"} in 90 days`),
-  unavailable: () => "Source did not answer. Earlier signals kept.",
+  unavailable: () => "Did not answer on the last check",
   checking: () => "Waiting for results",
   not_checked: () => "Runs on first check",
 };

@@ -49,7 +49,7 @@ export default function LoanBook() {
       ]);
       setBorrowers(items);
       setSignalsByBorrower(groupSignals(sigRes.items));
-    } catch (e) {
+    } catch {
       setBorrowers([]);
       setLoadError("Could not load the loan book. Check your connection and reload.");
     } finally {
@@ -62,7 +62,7 @@ export default function LoanBook() {
     (async () => {
       try {
         await ensureSeedData();
-      } catch (e) {
+      } catch {
         // seeding failed: still load whatever is in the database
       }
       await loadData();

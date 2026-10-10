@@ -92,7 +92,6 @@ export default function CompanyDetail() {
       else if (searchParams.get("checking") === "1" && !data.borrower.last_refreshed) handleRefresh(data);
       if (searchParams.has("checking")) setSearchParams({}, { replace: true });
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   // refreshBorrower saves after each source, so poll while it runs and the
@@ -103,7 +102,6 @@ export default function CompanyDetail() {
       loadData().catch(() => {});
     }, POLL_INTERVAL_MS);
     return () => clearInterval(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [run, id]);
 
   if (loading) return <DetailShell><DetailSkeleton /></DetailShell>;
