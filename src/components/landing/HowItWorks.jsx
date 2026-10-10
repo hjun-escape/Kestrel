@@ -1,20 +1,18 @@
 import React from "react";
-import { BAND, Frame, MATTE, SURFACE_A, SectionHeader, matte } from "./Frame";
+import { Frame, SectionHeader, matte } from "./Frame";
 import { CheckDemo, DecideDemo, RaceBars, ScreenDemo } from "./showScenes";
-import { GrowBand, Reveal } from "./reveal";
+import { Reveal } from "./reveal";
 
 // How a check runs, in the hero's framed style: the race against reading by hand, then one sample
 // applicant through Screen, Check and Decide, with a run summary along the bottom.
 export default function HowItWorks() {
   return (
-    <section aria-labelledby="how-heading" data-ascii-fade-top={BAND} className="pb-20 text-ew-ink" style={matte}>
-      {/* The white opens out of the dark hero: it grows from the centre as you scroll in. */}
-      <GrowBand base={SURFACE_A} grow={MATTE} height={BAND} />
-      <div className="mx-auto max-w-[1200px] px-4 pt-6 sm:px-8">
-        <Reveal>
+    <section aria-labelledby="how-heading" className="pb-16 pt-24 text-ew-ink" style={matte}>
+      <div className="mx-auto max-w-[1200px] px-4 sm:px-8">
+        <Reveal from="left">
           <SectionHeader kicker="How a check runs" title="One applicant, end to end." id="how-heading" />
         </Reveal>
-        <Reveal delay={120} className="mt-8 rounded-sm border border-ew-rule bg-white px-5 py-6 shadow-[0_14px_40px_-30px_rgba(20,32,46,0.45)]">
+        <Reveal from="right" delay={120} className="mt-8 rounded-sm border border-ew-rule bg-white px-5 py-6 shadow-[0_14px_40px_-30px_rgba(20,32,46,0.45)]">
           <RaceBars />
         </Reveal>
         <Reveal delay={240}>

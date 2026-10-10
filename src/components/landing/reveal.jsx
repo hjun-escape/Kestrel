@@ -83,24 +83,3 @@ export function useScrollProgress({ start = 0.85, end = 0.35 } = {}) {
   }, [start, end]);
   return [ref, p];
 }
-
-/**
- * A band where one colour expands from the centre over another: `grow` fills `base`. It plays once, on its own
- * (about 0.8 s), when the band scrolls into view, so it is never left half-grown. Used to open the white
- * sections out of the dark hero and to close them back into the dark footer.
- */
-export function GrowBand({ base, grow, height = 150 }) {
-  const [ref, seen] = useInViewOnce(0.35);
-  return (
-    <div ref={ref} aria-hidden="true" className="relative" style={{ height, background: base }}>
-      <div
-        className="absolute inset-0"
-        style={{
-          background: grow,
-          clipPath: seen ? "inset(0 0 0 0 round 0)" : "inset(0 50% 0 50% round 0)",
-          transition: "clip-path 800ms cubic-bezier(.65,0,.35,1)",
-        }}
-      />
-    </div>
-  );
-}

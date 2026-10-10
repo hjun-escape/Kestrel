@@ -4,6 +4,7 @@ import HowItWorks from "@/components/landing/HowItWorks";
 import ProofStrip from "@/components/landing/ProofStrip";
 import TrustPrinciples from "@/components/landing/TrustPrinciples";
 import LandingFooter from "@/components/landing/LandingFooter";
+import WhiteSheet from "@/components/landing/WhiteSheet";
 
 // Public welcome page at /welcome. Lazy-loaded from App.jsx so animejs stays
 // out of the main bundle.
@@ -27,9 +28,12 @@ export default function Landing() {
       <LandingNav />
       <main id="main">
         <HeroSection />
-        <HowItWorks />
-        <ProofStrip />
-        <TrustPrinciples />
+        {/* One white sheet that widens out of the hero and narrows back to reveal the footer. */}
+        <WhiteSheet>
+          <HowItWorks />
+          <ProofStrip />
+          <TrustPrinciples />
+        </WhiteSheet>
       </main>
       <LandingFooter />
     </div>

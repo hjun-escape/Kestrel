@@ -1,10 +1,9 @@
 import React from "react";
 
-// Below the hero every section sits on one soft matte off-white. It opens out of the dark hero with a white
-// shape growing from the centre, and closes back into the dark footer the same way (GrowBand in reveal.jsx).
+// Below the hero every section sits on one soft matte off-white sheet (WhiteSheet.jsx) that widens out of the
+// dark hero and narrows back to reveal the dark footer.
 export const SURFACE_A = "#14202e"; // the hero's ink (--ew-ink)
 export const MATTE = "#eceeea";
-export const BAND = 150; // height of the opening and closing bands
 export const matte = { backgroundColor: MATTE };
 
 // The hero's framed-panel language, in light: a thin-bordered white frame split into
