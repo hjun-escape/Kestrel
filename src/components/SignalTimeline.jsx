@@ -2,6 +2,7 @@ import React from "react";
 import { ExternalLink } from "lucide-react";
 import { format } from "date-fns";
 import { SIGNAL_TYPES } from "@/lib/signalTypes";
+import { parseSignalDate } from "@/lib/borrowerUtils";
 
 // Signal timeline, newest first.
 // Each item: date, type label, severity (Strong/Weak), title, snippet (in
@@ -35,7 +36,7 @@ export default function SignalTimeline({ signals, neverRefreshed }) {
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <span className="text-sm font-medium text-gray-900">
-                  {format(new Date(s.date), "MMM d, yyyy")}
+                  {format(parseSignalDate(s.date), "MMM d, yyyy")}
                 </span>
                 <span className="text-gray-300">·</span>
                 <span className="text-sm text-gray-700">{type.label}</span>
