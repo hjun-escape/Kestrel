@@ -30,9 +30,12 @@ export const AuthProvider = ({ children }) => {
         if (appParams.token) {
           await checkUserAuth();
         } else {
+          // No session token: every route requires sign-in, even if the app
+          // is configured as public. AuthenticatedApp redirects on this.
           setIsLoadingAuth(false);
           setIsAuthenticated(false);
           setAuthChecked(true);
+          setAuthError({ type: 'auth_required', message: 'Authentication required' });
         }
         setIsLoadingPublicSettings(false);
       } catch (appError) {
@@ -92,13 +95,12 @@ export const AuthProvider = ({ children }) => {
       setIsAuthenticated(false);
       setAuthChecked(true);
       
-      // If user auth fails, it might be an expired token
-      if (error.status === 401 || error.status === 403) {
-        setAuthError({
-          type: 'auth_required',
-          message: 'Authentication required'
-        });
-      }
+      // Any failure to resolve the user means we cannot treat them as signed
+      // in (expired token, revoked session, network). Require sign-in again.
+      setAuthError({
+        type: 'auth_required',
+        message: 'Authentication required'
+      });
     }
   };
 
@@ -108,7 +110,7 @@ export const AuthProvider = ({ children }) => {
     
     if (shouldRedirect) {
       // Use the SDK's logout method which handles token cleanup and redirect
-      base44.auth.logout(window.location.href);
+      base44.auth.logout(window.location.origin + '/');
     } else {
       // Just remove the token without redirect
       base44.auth.logout();
@@ -120,9 +122,24 @@ export const AuthProvider = ({ children }) => {
     base44.auth.redirectToLogin(window.location.href);
   };
 
+  // Identity helpers for headers and menus. Base44 users expose
+  // full_name and email; fall back gracefully if either is missing.
+  const email = user?.email ?? '';
+  const displayName = (user?.full_name || user?.name || email || 'Signed in').trim();
+  const initials = displayName
+    .split(/[\s@.]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0].toUpperCase())
+    .join('') || '?';
+
   return (
     <AuthContext.Provider value={{ 
       user, 
+      displayName,
+      email,
+      initials,
+      signOut: logout,
       isAuthenticated, 
       isLoadingAuth,
       isLoadingPublicSettings,

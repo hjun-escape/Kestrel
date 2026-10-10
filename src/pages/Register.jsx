@@ -2,12 +2,13 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { UserPlus, Mail, Lock, Loader2 } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { Label } from "@/components/ui/label";
 import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
+import FormError from "@/components/auth/FormError";
+import { FormField, PasswordField } from "@/components/auth/FormField";
+import SubmitButton, { linkClass } from "@/components/auth/SubmitButton";
 import { toast } from "@/components/ui/use-toast";
 import { safeReturnTo } from "@/lib/authReturnTo";
 
@@ -19,12 +20,13 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [showOtp, setShowOtp] = useState(false);
   const [otpCode, setOtpCode] = useState("");
+  const returnTo = safeReturnTo();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     if (password !== confirmPassword) {
-      setError("Passwords do not match");
+      setError("The two passwords do not match. Re-enter them and try again.");
       return;
     }
     setLoading(true);
@@ -32,13 +34,14 @@ export default function Register() {
       await base44.auth.register({ email, password });
       setShowOtp(true);
     } catch (err) {
-      setError(err.message || "Registration failed");
+      setError(err.message || "We could not create the account. Check the details and try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleVerify = async () => {
+  const handleVerify = async (e) => {
+    e?.preventDefault();
     setError("");
     setLoading(true);
     try {
@@ -46,9 +49,9 @@ export default function Register() {
       if (result?.access_token) {
         base44.auth.setToken(result.access_token);
       }
-      window.location.href = safeReturnTo();
+      window.location.href = returnTo;
     } catch (err) {
-      setError(err.message || "Invalid verification code");
+      setError(err.message || "That code is not valid. Check it or request a new one.");
     } finally {
       setLoading(false);
     }
@@ -63,170 +66,122 @@ export default function Register() {
         description: "Check your email for the new code.",
       });
     } catch (err) {
-      setError(err.message || "Failed to resend code");
+      setError(err.message || "We could not send a new code. Try again in a minute.");
     }
   };
 
   const handleGoogle = () => {
-    base44.auth.loginWithProvider("google", safeReturnTo());
+    base44.auth.loginWithProvider("google", returnTo);
   };
 
   if (showOtp) {
     return (
       <AuthLayout
-        icon={Mail}
         title="Verify your email"
-        subtitle={`We sent a code to ${email}`}
+        subtitle={`Enter the 6-digit code we sent to ${email}.`}
+        footer={
+          <>
+            No code yet?{" "}
+            <button type="button" onClick={handleResend} className={linkClass}>
+              Send a new code
+            </button>
+          </>
+        }
       >
-        {error && (
-          <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
-            {error}
+        <FormError message={error} />
+        <form onSubmit={handleVerify} className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="otp" className="text-sm font-medium text-slate-900">Verification code</Label>
+            <InputOTP
+              id="otp"
+              maxLength={6}
+              value={otpCode}
+              onChange={setOtpCode}
+              autoFocus
+              autoComplete="one-time-code"
+              aria-invalid={error ? "true" : undefined}
+            >
+              <InputOTPGroup>
+                {[0, 1, 2, 3, 4, 5].map((i) => (
+                  <InputOTPSlot key={i} index={i} className="h-11 w-11 border-slate-400" />
+                ))}
+              </InputOTPGroup>
+            </InputOTP>
           </div>
-        )}
-        <div className="flex justify-center mb-6">
-          <InputOTP
-            maxLength={6}
-            value={otpCode}
-            onChange={setOtpCode}
-            autoFocus
-            autoComplete="one-time-code"
-          >
-            <InputOTPGroup>
-              <InputOTPSlot index={0} />
-              <InputOTPSlot index={1} />
-              <InputOTPSlot index={2} />
-              <InputOTPSlot index={3} />
-              <InputOTPSlot index={4} />
-              <InputOTPSlot index={5} />
-            </InputOTPGroup>
-          </InputOTP>
-        </div>
-        <Button
-          className="w-full h-12 font-medium"
-          onClick={handleVerify}
-          disabled={loading || otpCode.length < 6}
-        >
-          {loading ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Verifying...
-            </>
-          ) : (
-            "Verify"
-          )}
-        </Button>
-        <p className="text-center text-sm text-muted-foreground mt-4">
-          Didn't receive the code?{" "}
-          <button onClick={handleResend} className="text-primary font-medium hover:underline">
-            Resend
-          </button>
-        </p>
+          <SubmitButton loading={loading} loadingLabel="Verifying" disabled={loading || otpCode.length < 6}>
+            Verify email
+          </SubmitButton>
+        </form>
       </AuthLayout>
     );
   }
 
   return (
     <AuthLayout
-      icon={UserPlus}
-      title="Create your account"
-      subtitle="Sign up to get started"
+      title="Request an account"
+      subtitle="Create credentials with your work email. Access is limited to authorized staff."
       footer={
         <>
           Already have an account?{" "}
           <Link
-            to={"/login" + (safeReturnTo() !== "/" ? "?returnTo=" + encodeURIComponent(safeReturnTo()) : "")}
-            className="text-primary font-medium hover:underline"
+            to={"/login" + (returnTo !== "/" ? "?returnTo=" + encodeURIComponent(returnTo) : "")}
+            className={linkClass}
           >
-            Log in
+            Sign in
           </Link>
         </>
       }
     >
-      <Button
-        variant="outline"
-        className="w-full h-12 text-sm font-medium mb-6"
-        onClick={handleGoogle}
-      >
-        <GoogleIcon className="w-5 h-5 mr-2" />
-        Continue with Google
-      </Button>
+      <FormError message={error} />
 
-      <div className="relative mb-6">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-border" />
-        </div>
-        <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-card px-3 text-muted-foreground">or</span>
-        </div>
+      <form onSubmit={handleSubmit} className="space-y-5" aria-describedby="form-error">
+        <FormField
+          id="email"
+          label="Work email"
+          type="email"
+          autoComplete="email"
+          autoFocus
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+        <PasswordField
+          id="password"
+          label="Password"
+          autoComplete="new-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
+        <PasswordField
+          id="confirm"
+          label="Confirm password"
+          autoComplete="new-password"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          invalid={!!error && password !== confirmPassword}
+          required
+        />
+        <SubmitButton loading={loading} loadingLabel="Creating account">
+          Create account
+        </SubmitButton>
+      </form>
+
+      <div className="my-6 flex items-center gap-3 text-xs text-slate-600" role="separator" aria-label="or">
+        <span className="h-px flex-1 bg-slate-200" />
+        <span aria-hidden="true">or</span>
+        <span className="h-px flex-1 bg-slate-200" />
       </div>
 
-      {error && (
-        <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
-          {error}
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
-          <div className="relative">
-            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
-            <Input
-              id="email"
-              type="email"
-              autoComplete="email"
-              autoFocus
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="pl-10 h-12"
-              required
-            />
-          </div>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
-          <div className="relative">
-            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
-            <Input
-              id="password"
-              type="password"
-              autoComplete="new-password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="pl-10 h-12"
-              required
-            />
-          </div>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="confirm">Confirm Password</Label>
-          <div className="relative">
-            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
-            <Input
-              id="confirm"
-              type="password"
-              autoComplete="new-password"
-              placeholder="••••••••"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="pl-10 h-12"
-              required
-            />
-          </div>
-        </div>
-        <Button type="submit" className="w-full h-12 font-medium" disabled={loading}>
-          {loading ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Creating account...
-            </>
-          ) : (
-            "Create account"
-          )}
-        </Button>
-      </form>
+      <Button
+        type="button"
+        variant="outline"
+        className="h-11 w-full rounded-md border-slate-400 font-medium text-slate-900 focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
+        onClick={handleGoogle}
+      >
+        <GoogleIcon className="mr-2 h-5 w-5" />
+        Continue with Google
+      </Button>
     </AuthLayout>
   );
 }
