@@ -6,7 +6,15 @@ import { LeadTimeline } from "./showScenes";
 // (How Kestrel decides is covered by the hero pipeline and "How a check runs", so it is not repeated here.)
 export default function TrustPrinciples() {
   return (
-    <section aria-labelledby="lead-heading" className="bg-ew-ink pb-20 pt-16 text-white sm:pb-24">
+    <section
+      aria-labelledby="lead-heading"
+      className="bg-[#141634] pb-20 pt-16 text-white sm:pb-24"
+      // Deep indigo with a teal glow behind the timeline: a different colour from the sections above.
+      style={{
+        backgroundImage:
+          "radial-gradient(900px 380px at 50% 100%, rgba(45,212,191,0.14), transparent 70%), radial-gradient(700px 320px at 0% 0%, rgba(129,140,248,0.16), transparent 70%)",
+      }}
+    >
       <div className="mx-auto max-w-[1200px] px-4 sm:px-8">
         <SectionHeader kicker="Lead time" title="Flags land before the quarterly financials." id="lead-heading" />
         <div className="mt-8 rounded-sm border border-white/10 bg-black/15">

@@ -6,7 +6,15 @@ import { CheckDemo, DecideDemo, RaceBars, ScreenDemo } from "./showScenes";
 // applicant through Screen, Check and Decide, with a run summary along the bottom.
 export default function HowItWorks() {
   return (
-    <section aria-labelledby="how-heading" className="border-t border-white/10 bg-ew-ink py-20 text-white sm:py-24">
+    <section
+      aria-labelledby="how-heading"
+      className="border-t border-white/10 bg-[#0d1726] py-20 text-white sm:py-24"
+      // Soft glows in the pipeline's source colours so the section isn't a flat block.
+      style={{
+        backgroundImage:
+          "radial-gradient(900px 420px at 8% 0%, rgba(56,189,248,0.16), transparent 70%), radial-gradient(800px 420px at 100% 100%, rgba(192,132,252,0.13), transparent 70%)",
+      }}
+    >
       <div className="mx-auto max-w-[1200px] px-4 sm:px-8">
         <SectionHeader kicker="How a check runs" title="One applicant, end to end." id="how-heading" />
         <div className="mt-8 rounded-sm border border-white/10 bg-black/15 px-5 py-6">
