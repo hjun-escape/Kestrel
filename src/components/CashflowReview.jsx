@@ -3,10 +3,6 @@ import { format } from "date-fns";
 import { ChevronRight, FileUp, Loader2 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
-import {
-  formatTimeToFlag,
-  timeToFirstFlag,
-} from "@/lib/timeToFlag.ts";
 
 // Cash-flow document check. The officer uploads a bank or cash-flow statement;
 // analyzeCashflow extracts the transaction lines and plain code finds every
@@ -48,7 +44,6 @@ function itemsOf(res) {
 export default function CashflowReview({ borrower, onReviewChange }) {
   const borrowerId = borrower?.id;
   const [review, setReview] = useState(null);
-  const [signals, setSignals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [phase, setPhase] = useState(null); // null | "uploading" | "analyzing"
   const [error, setError] = useState(null);
@@ -56,12 +51,8 @@ export default function CashflowReview({ borrower, onReviewChange }) {
   const loadLatest = useCallback(async () => {
     if (!borrowerId) return;
     try {
-      const [reviews, sigs] = await Promise.all([
-        base44.entities.CashflowReview.filter({ borrower_id: borrowerId }, { limit: 1, sort: "-created_at" }),
-        base44.entities.Signal.filter({ borrower_id: borrowerId }, { limit: 200, sort: "-date" }),
-      ]);
+      const reviews = await base44.entities.CashflowReview.filter({ borrower_id: borrowerId }, { limit: 1, sort: "-created_at" });
       setReview(itemsOf(reviews)[0] || null);
-      setSignals(itemsOf(sigs));
     } catch {
       setReview(null);
     } finally {
@@ -116,9 +107,6 @@ export default function CashflowReview({ borrower, onReviewChange }) {
     }
   }
 
-  const minutes = timeToFirstFlag(borrower, signals, review ? [review] : []);
-  const flagLine = formatTimeToFlag(minutes);
-
   return (
     <section aria-labelledby="cashflow-heading" className="border border-ew-rule bg-ew-surface">
       <header className="flex flex-wrap items-start justify-between gap-3 border-b border-ew-rule-soft px-5 py-4">
@@ -131,11 +119,6 @@ export default function CashflowReview({ borrower, onReviewChange }) {
             rules; every evidence row is a line from the statement.
           </p>
         </div>
-        {flagLine && (
-          <p className="shrink-0 border border-ew-red-rule bg-ew-red-bg px-2 py-1 font-mono text-xs font-medium text-ew-red">
-            {flagLine}
-          </p>
-        )}
       </header>
 
       <div className="space-y-5 px-5 py-4">
@@ -227,7 +210,7 @@ function ReviewBody({ review }) {
   return (
     <div className="space-y-5">
       <div>
-        <p className="font-mono text-[11px] uppercase tracking-wide text-ew-muted">
+        <p className="text-xs text-ew-muted">
           Statement {shortDate(review.period_start)} to {shortDate(review.period_end)}
           {review.transaction_count ? ` · ${review.transaction_count} lines` : ""}
         </p>
@@ -240,7 +223,7 @@ function ReviewBody({ review }) {
             const s = SEVERITY[f.severity] || SEVERITY.weak;
             return (
               <li key={i} className="flex items-start gap-2 text-sm text-ew-ink">
-                <span className={`mt-0.5 inline-flex shrink-0 items-center gap-1.5 border px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${s.className}`}>
+                <span className={`mt-0.5 inline-flex shrink-0 items-center gap-1.5 border px-1.5 py-0.5 text-[11px] font-semibold ${s.className}`}>
                   <span className={`h-1.5 w-1.5 ${s.glyph}`} aria-hidden="true" />
                   {s.label}
                 </span>
@@ -297,7 +280,7 @@ function LendersTable({ lenders }) {
       <table className="w-full min-w-[560px] border-collapse text-sm">
         <caption className="mb-1.5 text-left text-xs font-semibold text-ew-muted">Lenders paid from this account</caption>
         <thead>
-          <tr className="border-b border-ew-rule text-left text-[11px] uppercase tracking-wide text-ew-muted">
+          <tr className="border-b border-ew-rule text-left text-xs text-ew-muted">
             <th scope="col" className="py-1.5 pr-3 font-semibold">Lender</th>
             <th scope="col" className="px-3 py-1.5 text-right font-semibold">Payments</th>
             <th scope="col" className="px-3 py-1.5 text-right font-semibold">Typical amount</th>
@@ -369,7 +352,7 @@ function EvidenceTable({ rows }) {
   return (
     <table className="w-full text-xs">
       <thead>
-        <tr className="text-left text-[10px] uppercase tracking-wide text-ew-muted">
+        <tr className="text-left text-[11px] text-ew-muted">
           <th scope="col" className="py-1 pr-3 font-semibold">Date</th>
           <th scope="col" className="py-1 pr-3 font-semibold">Statement line</th>
           <th scope="col" className="py-1 pr-3 text-right font-semibold">Amount</th>
@@ -406,7 +389,7 @@ function Exceptions({ lines }) {
             <span className="text-ew-ink-soft">{l.date}</span>
             <span className="flex-1 text-ew-ink">{l.description}</span>
             <span className="text-ew-ink">{money(l.amount, true)}</span>
-            <span className="font-sans text-[11px] font-semibold uppercase text-ew-red">{l.kind === "nsf" ? "NSF" : "Late fee"}</span>
+            <span className="font-sans text-[11px] font-semibold text-ew-red">{l.kind === "nsf" ? "NSF" : "Late fee"}</span>
           </li>
         ))}
       </ul>

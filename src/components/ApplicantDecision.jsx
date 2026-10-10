@@ -23,10 +23,10 @@ import {
 // The lender check never changes the company's status.
 
 const DECISIONS = [
-  { value: "request_documents", label: "Request documents", className: "border-amber-300 bg-amber-50 text-amber-900" },
-  { value: "proceed", label: "Proceed", className: "border-emerald-300 bg-emerald-50 text-emerald-900" },
-  { value: "watchlist", label: "Watchlist", className: "border-sky-300 bg-sky-50 text-sky-900" },
-  { value: "decline", label: "Decline", className: "border-red-300 bg-red-50 text-red-900" },
+  { value: "request_documents", label: "Request documents", className: "border-ew-rule bg-ew-surface text-ew-ink" },
+  { value: "proceed", label: "Proceed", className: "border-ew-rule bg-ew-surface text-ew-ink" },
+  { value: "watchlist", label: "Watchlist", className: "border-ew-rule bg-ew-surface text-ew-ink" },
+  { value: "decline", label: "Decline", className: "border-ew-rule bg-ew-surface text-ew-ink" },
 ];
 const DECISION_BY_VALUE = Object.fromEntries(DECISIONS.map((d) => [d.value, d]));
 
@@ -74,7 +74,7 @@ function formatWhen(iso) {
 
 function SectionLabel({ id, children }) {
   return (
-    <h3 id={id} className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+    <h3 id={id} className="text-sm font-semibold text-ew-ink">
       {children}
     </h3>
   );
@@ -299,7 +299,7 @@ function DecisionForm({ saving, onSave }) {
             type="button"
             disabled={saving}
             onClick={() => submit(d.value)}
-            className={`rounded border px-3 py-1.5 text-sm font-medium transition-colors hover:brightness-95 active:brightness-90 disabled:cursor-not-allowed disabled:opacity-50 ${d.className} ${focusRing}`}
+            className={`rounded border px-3 py-1.5 text-sm font-medium transition-colors hover:border-ew-ink-soft hover:bg-ew-hover active:bg-ew-rule-soft disabled:cursor-not-allowed disabled:opacity-50 ${d.className} ${focusRing}`}
           >
             {d.label}
           </button>
@@ -447,7 +447,13 @@ export default function ApplicantDecision({ borrower, signals }) {
 
         <div className="space-y-3" aria-busy={loading || running}>
           <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-            <p className="text-2xl font-semibold tabular-nums text-gray-900">
+            <p
+              className={
+                count === null || loading
+                  ? "text-sm font-semibold text-ew-ink"
+                  : "font-heading text-2xl font-bold tabular-nums text-ew-ink"
+              }
+            >
               Other lenders: {loading ? "…" : count === null ? "not checked" : count}
             </p>
             {check?.created_at && <p className="text-xs text-gray-500">Checked {formatWhen(check.created_at)}</p>}
