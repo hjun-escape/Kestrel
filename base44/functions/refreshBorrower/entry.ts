@@ -26,7 +26,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 // TODO (P2, P3): once your function is deployed and tested on one company,
 // set enabled: true on its line. That is the only change needed here.
 const SIGNAL_FUNCTIONS = [
-  { name: 'newsSignals',   owner: 'P2', enabled: false, sources: { exec_departure: 'News', legal_layoffs: 'Legal' } },
+  { name: 'newsSignals',   owner: 'P2', enabled: true,  sources: { exec_departure: 'News', legal_layoffs: 'Legal' } },
   { name: 'hiringSignal',  owner: 'P3', enabled: false, sources: { hiring_drop: 'Jobs' } },
   { name: 'reviewSignals', owner: 'P3', enabled: false, sources: { review_distress: 'Reviews' } },
 ];
