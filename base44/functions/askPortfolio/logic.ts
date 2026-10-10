@@ -15,6 +15,7 @@ import { dispatchTool, TOOL_NAMES } from './tools.ts';
 import type { DataLayer, PendingAction } from './tools.ts';
 import { evidenceFromToolResult, verifyCitations } from './citations.ts';
 import type { Citation, Evidence } from './citations.ts';
+import { buildFallbackAnswer } from './fallback.ts';
 
 export { dispatchTool } from './tools.ts';
 export { verifyCitations } from './citations.ts';
@@ -22,6 +23,9 @@ export type { DataLayer, PendingAction } from './tools.ts';
 export type { Citation } from './citations.ts';
 
 export const MAX_TOOL_STEPS = 5;
+// Hard cap on LLM calls per question (tool steps + malformed replies + final pass).
+export const MAX_LLM_CALLS = MAX_TOOL_STEPS + 3;
+export const MAX_CONSECUTIVE_REPEATS = 2;
 export const BUDGET_MS = 60_000;
 export const MAX_HISTORY = 10;
 const MAX_MESSAGE_CHARS = 2_000;
@@ -61,6 +65,8 @@ export interface AgentInput {
   // Optional hint from the UI: the company the user has pinned. Only used if
   // it is a well-formed id of a company in the book; it never grants access.
   contextCompanyId?: unknown;
+  // Log sink for the one-line-per-step trace (defaults to console.log).
+  log?: (line: string) => void;
 }
 
 export interface AgentBody {
@@ -104,6 +110,13 @@ export const RESPONSE_SCHEMA = {
     },
   },
   required: ['action'],
+};
+
+// Used when no tools are allowed any more: the model can only answer.
+export const FINAL_RESPONSE_SCHEMA = {
+  ...RESPONSE_SCHEMA,
+  properties: { ...RESPONSE_SCHEMA.properties, action: { type: 'string', enum: ['final'] } },
+  required: ['action', 'answer'],
 };
 
 export function normalizeMessages(raw: unknown): ChatMessage[] {
@@ -252,6 +265,48 @@ function finish(answer: string, extra: Partial<AgentBody> = {}): AgentResult {
   };
 }
 
+function stableJson(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(stableJson).join(',')}]`;
+  if (v && typeof v === 'object') {
+    const o = v as Record<string, unknown>;
+    return `{${Object.keys(o).sort().map((k) => `${JSON.stringify(k)}:${stableJson(o[k])}`).join(',')}}`;
+  }
+  return JSON.stringify(v) ?? 'null';
+}
+
+const callKey = (tool: string, args: unknown) => `${tool}|${stableJson(args)}`;
+const safeToken = (s: string) => s.replace(/[^A-Za-z0-9_.-]/g, '_').slice(0, 40);
+
+// Describes the shape of a malformed reply without logging its content.
+function describeRaw(raw: unknown): string {
+  if (Array.isArray(raw)) return 'type=array';
+  if (raw && typeof raw === 'object') {
+    return `type=object keys=${Object.keys(raw).slice(0, 10).map(safeToken).join(',')}`;
+  }
+  return `type=${raw === null ? 'null' : typeof raw}`;
+}
+
+// If exactly one borrower is named in the last user message (or one is pinned),
+// returns it so its data can be fetched before the first LLM call.
+async function pickPrefetchTarget(
+  messages: ChatMessage[],
+  pinned: { id: string; name: string } | null,
+  data: DataLayer,
+): Promise<{ id: string; name: string } | null> {
+  const text = ` ${messages[messages.length - 1].content.toLowerCase().replace(/[^a-z0-9]+/g, ' ')} `;
+  try {
+    const named = (await data.listBorrowers()).filter((b) => {
+      const n = typeof b.name === 'string' ? b.name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim() : '';
+      return n !== '' && text.includes(` ${n} `);
+    });
+    if (named.length === 1) return { id: named[0].id, name: named[0].name };
+    if (named.length > 1) return null;
+  } catch {
+    return pinned;
+  }
+  return pinned;
+}
+
 export async function runAgent(input: AgentInput): Promise<AgentResult> {
   let messages: ChatMessage[];
   try {
@@ -261,6 +316,7 @@ export async function runAgent(input: AgentInput): Promise<AgentResult> {
   }
 
   const now = input.now ?? Date.now;
+  const log = input.log ?? ((line: string) => console.log(line));
   const budgetMs = input.budgetMs ?? BUDGET_MS;
   const start = now();
   const today = new Date(start).toISOString().slice(0, 10);
@@ -268,20 +324,59 @@ export async function runAgent(input: AgentInput): Promise<AgentResult> {
   const evidence: Evidence[] = [];
   const pending: PendingAction[] = [];
   const toolErrors: { tool: string; error: string }[] = [];
+  const called = new Set<string>();
   let toolSteps = 0;
+  let repeatRun = 0;
+  let forceFinal = false;
   let lastProblem = STEP_LIMIT_REPLY;
   const partial = () => ({ pending_actions: [...pending], tool_errors: [...toolErrors] });
   const pinned = await resolvePinned(input.contextCompanyId, input.data);
 
-  for (let call = 0; call <= MAX_TOOL_STEPS; call++) {
+  const runTool = async (tool: string, args: Record<string, unknown>, dispatchArgs = args): Promise<boolean> => {
+    called.add(callKey(tool, args));
+    try {
+      const result = await dispatchTool(tool, dispatchArgs, { data: input.data, nowMs: now() });
+      transcript.push({ tool, args, result });
+      evidence.push(...evidenceFromToolResult(result));
+      if (result && typeof result === 'object' && 'pending_action' in result) {
+        pending.push((result as { pending_action: PendingAction }).pending_action);
+      }
+      return true;
+    } catch (error) {
+      const message = (error as Error).message || 'tool failed';
+      toolErrors.push({ tool, error: message });
+      transcript.push({ tool, args, error: message });
+      return false;
+    }
+  };
+
+  // Shortcut: a question about one company usually needs no tool step.
+  const target = await pickPrefetchTarget(messages, pinned, input.data);
+  if (target) {
+    const t0 = now();
+    const ok = await runTool('get_company', { name_or_id: target.name }, { name_or_id: target.id });
+    log(`askPortfolio step=0 action=tool tool=get_company ok=${ok} ms=${now() - t0} prefetch=true`);
+  }
+
+  const fallback = (): AgentResult => {
+    const built = buildFallbackAnswer(transcript);
+    if (!built) return finish(lastProblem, partial());
+    return finish(built.answer.slice(0, MAX_ANSWER_CHARS), {
+      citations: verifyCitations(built.citations, evidence),
+      ...partial(),
+    });
+  };
+
+  for (let call = 1; call <= MAX_LLM_CALLS; call++) {
     const remaining = budgetMs - (now() - start);
     if (remaining <= 0) return finish(TIME_LIMIT_REPLY, partial());
 
-    const toolsAllowed = call < MAX_TOOL_STEPS && toolSteps < MAX_TOOL_STEPS;
+    const toolsAllowed = !forceFinal && toolSteps < MAX_TOOL_STEPS && call < MAX_LLM_CALLS;
     const prompt = buildPrompt({ messages, transcript, today, toolsAllowed, pinned });
+    const t0 = now();
     let raw: unknown;
     try {
-      raw = await withTimeout(input.llm(prompt, RESPONSE_SCHEMA), remaining);
+      raw = await withTimeout(input.llm(prompt, toolsAllowed ? RESPONSE_SCHEMA : FINAL_RESPONSE_SCHEMA), remaining);
     } catch {
       return { status: 502, body: { error: LLM_UNAVAILABLE } };
     }
@@ -289,13 +384,16 @@ export async function runAgent(input: AgentInput): Promise<AgentResult> {
 
     const parsed = parseLlmReply(raw);
     if (!parsed.ok) {
+      log(`askPortfolio step=${call} action=malformed tool=- ok=false ms=${now() - t0} ${describeRaw(raw)}`);
       lastProblem = MALFORMED_REPLY;
+      if (!toolsAllowed) break;
       transcript.push({ note: `Your previous reply was not valid (${parsed.error}). Reply with one JSON object in the required format.` });
       continue;
     }
     const reply = parsed.reply;
 
     if (reply.action === 'final') {
+      log(`askPortfolio step=${call} action=final tool=- ok=true ms=${now() - t0}`);
       if (reply.out_of_scope) return finish(OUT_OF_SCOPE_REPLY);
       return finish(reply.answer.slice(0, MAX_ANSWER_CHARS), {
         citations: verifyCitations(reply.citations, evidence),
@@ -303,22 +401,26 @@ export async function runAgent(input: AgentInput): Promise<AgentResult> {
       });
     }
 
-    if (!toolsAllowed) return finish(STEP_LIMIT_REPLY, partial());
+    const toolToken = safeToken(reply.tool);
+    if (!toolsAllowed) {
+      // Final pass still asked for a tool: keep what was fetched.
+      log(`askPortfolio step=${call} action=tool tool=${toolToken} ok=false ms=${now() - t0}`);
+      break;
+    }
+
+    if (called.has(callKey(reply.tool, reply.args))) {
+      log(`askPortfolio step=${call} action=tool tool=${toolToken} ok=false ms=${now() - t0} repeat=true`);
+      transcript.push({ note: `You already called ${reply.tool} with these arguments; its result is above. Use it, or give the final answer.` });
+      repeatRun += 1;
+      if (repeatRun >= MAX_CONSECUTIVE_REPEATS) forceFinal = true;
+      continue;
+    }
+    repeatRun = 0;
     toolSteps += 1;
     lastProblem = STEP_LIMIT_REPLY;
-    try {
-      const result = await dispatchTool(reply.tool, reply.args, { data: input.data, nowMs: now() });
-      transcript.push({ tool: reply.tool, args: reply.args, result });
-      evidence.push(...evidenceFromToolResult(result));
-      if (result && typeof result === 'object' && 'pending_action' in result) {
-        pending.push((result as { pending_action: PendingAction }).pending_action);
-      }
-    } catch (error) {
-      const message = (error as Error).message || 'tool failed';
-      toolErrors.push({ tool: reply.tool, error: message });
-      transcript.push({ tool: reply.tool, args: reply.args, error: message });
-    }
+    const ok = await runTool(reply.tool, reply.args);
+    log(`askPortfolio step=${call} action=tool tool=${toolToken} ok=${ok} ms=${now() - t0}`);
   }
 
-  return finish(lastProblem, partial());
+  return fallback();
 }

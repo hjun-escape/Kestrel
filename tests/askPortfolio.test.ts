@@ -10,6 +10,8 @@ import {
   normalizeMessages,
   OUT_OF_SCOPE_REPLY,
   MAX_TOOL_STEPS,
+  MAX_LLM_CALLS,
+  FINAL_RESPONSE_SCHEMA,
 } from '../base44/functions/askPortfolio/logic.ts';
 import { validateAction, executeAction } from '../base44/functions/confirmAction/logic.ts';
 
@@ -204,10 +206,13 @@ describe('askPortfolio agent loop', () => {
 
   test('stops after the step limit with a fallback answer', async () => {
     const { data } = fakeData();
-    const { llm, calls } = fakeLlm([{ action: 'tool', tool: 'list_companies', args: {} }]);
-    const res = await runAgent({ messages: user('Loop forever'), llm, data, now: clock });
+    // Unknown tool: every call errors, so there are never any tool results.
+    const { llm, calls } = fakeLlm([
+      ...Array.from({ length: 8 }, (_, i) => ({ action: 'tool', tool: 'nope', args: { i } })),
+    ]);
+    const res = await runAgent({ messages: user('Loop forever'), llm, data, now: clock, log: () => {} });
     assert.equal(res.status, 200);
-    assert.ok(calls() <= MAX_TOOL_STEPS + 1, `llm called ${calls()} times`);
+    assert.ok(calls() <= MAX_LLM_CALLS, `llm called ${calls()} times`);
     assert.match(res.body.answer, /step limit/i);
     assert.deepEqual(res.body.citations, []);
   });
@@ -330,6 +335,148 @@ describe('askPortfolio agent loop', () => {
     const none = fakeLlm([{ action: 'final', answer: 'ok', citations: [] }]);
     await runAgent({ messages: user('Any news?'), llm: none.llm, data, now: clock });
     assert.doesNotMatch(none.prompts[0], /pinned/i);
+  });
+});
+
+// Fixture plus a Rivian borrower with three signals (four, to test the cap of three).
+function rivianData() {
+  const base = fakeData().data;
+  const rivian = {
+    id: 'b_rivian', name: 'Rivian', stage: 'borrower', status: 'red',
+    why: 'Layoffs announced and CFO departure.', loan_amount_usd: 9000000, last_refreshed: '2026-10-08T10:00:00Z',
+  };
+  const sig = (id: string, date: string, n: number) => ({
+    id, borrower_id: 'b_rivian', date, title: `Rivian headline ${n}`, snippet: `Snippet ${n}`,
+    source_name: `Wire ${n}`, source_url: `https://example.com/rivian/${n}`,
+  });
+  const signals = [sig('r1', '2026-09-01', 1), sig('r2', '2026-10-05', 2), sig('r3', '2026-09-20', 3), sig('r4', '2026-08-01', 4)];
+  return {
+    ...base,
+    listBorrowers: async () => [...(await base.listBorrowers()), rivian],
+    getBorrower: async (id: string) => (id === 'b_rivian' ? rivian : base.getBorrower(id)),
+    listSignals: async (id: string) => (id === 'b_rivian' ? signals : base.listSignals(id)),
+  };
+}
+
+describe('askPortfolio step-limit resilience', () => {
+  const rivianCall = { action: 'tool', tool: 'get_company', args: { name_or_id: 'Rivian' } };
+
+  test('model calling get_company six times still yields a deterministic summary with citations', async () => {
+    const data = rivianData();
+    // Distinct args each time so the repeat guard does not short-circuit the steps.
+    const calls = ['Rivian', 'rivian', 'RIVIAN', 'Rivian ', 'b_rivian', 'Rivian Inc'].map((n) => ({
+      action: 'tool', tool: 'get_company', args: { name_or_id: n },
+    }));
+    const { llm } = fakeLlm(calls);
+    const res = await runAgent({ messages: user('Tell me about the borrower'), llm, data, now: clock, log: () => {} });
+    assert.equal(res.status, 200);
+    assert.doesNotMatch(res.body.answer ?? '', /step limit/i);
+    assert.match(res.body.answer ?? '', /Rivian \(borrower\): Red \u2014 Layoffs announced and CFO departure\. Last checked 2026-10-08\./);
+    assert.match(res.body.answer ?? '', /- Rivian headline 2 \(2026-10-05, Wire 2\)/);
+    assert.doesNotMatch(res.body.answer ?? '', /headline 4/);
+    assert.equal(res.body.citations?.length, 3);
+    assert.equal(res.body.citations?.[0].source_url, 'https://example.com/rivian/2');
+  });
+
+  test('final pass uses the final-only schema; a tool call there falls back to the summary', async () => {
+    const data = rivianData();
+    const schemas: object[] = [];
+    const llm = async (_p: string, schema: object) => { schemas.push(schema); return { action: 'tool', tool: 'portfolio_summary', args: { n: schemas.length } }; };
+    const res = await runAgent({ messages: user('How are we doing?'), llm, data, now: clock, log: () => {} });
+    assert.equal(schemas.filter((s) => s === FINAL_RESPONSE_SCHEMA).length, 1);
+    assert.deepEqual((FINAL_RESPONSE_SCHEMA.properties.action as { enum: string[] }).enum, ['final']);
+    assert.ok(FINAL_RESPONSE_SCHEMA.required.includes('answer'));
+    assert.match(res.body.answer ?? '', /^Portfolio: 2 red, 1 yellow, 2 green\. Exposure at risk: \$15,500,000\.$/);
+    assert.match(res.body.answer ?? '', /Exposure at risk/);
+  });
+
+  test('malformed final pass also falls back instead of giving up', async () => {
+    const data = rivianData();
+    const { llm } = fakeLlm([
+      { action: 'tool', tool: 'get_company', args: { name_or_id: 'Rivian' } },
+      ...Array.from({ length: 8 }, () => 'garbage'),
+    ]);
+    const res = await runAgent({ messages: user('Tell me about the borrower'), llm, data, now: clock, log: () => {} });
+    assert.match(res.body.answer ?? '', /Rivian \(borrower\): Red/);
+  });
+
+  test('a repeated identical call is not run again or counted as a step', async () => {
+    const data = rivianData();
+    let runs = 0;
+    const counting = { ...data, listSignals: async (id: string) => { runs += 1; return data.listSignals(id); } };
+    const { llm, prompts } = fakeLlm([
+      rivianCall, rivianCall,
+      { action: 'tool', tool: 'portfolio_summary', args: {} },
+      { action: 'final', answer: 'Done.', citations: [] },
+    ]);
+    const res = await runAgent({ messages: user('Tell me about the borrower'), llm, data: counting, now: clock, log: () => {} });
+    assert.equal(res.body.answer, 'Done.');
+    assert.equal(runs, 1);
+    assert.match(prompts[2], /You already called get_company with these arguments; its result is above\. Use it, or give the final answer\./);
+  });
+
+  test('two consecutive repeats force the final pass', async () => {
+    const data = rivianData();
+    const schemas: object[] = [];
+    let n = 0;
+    const llm = async (_p: string, schema: object) => {
+      schemas.push(schema); n += 1;
+      return n <= 3 ? rivianCall : { action: 'final', answer: 'From the result.', citations: [] };
+    };
+    const res = await runAgent({ messages: user('Tell me about the borrower'), llm, data, now: clock, log: () => {} });
+    assert.equal(res.body.answer, 'From the result.');
+    assert.equal(n, 4);
+    assert.equal(schemas[3], FINAL_RESPONSE_SCHEMA);
+  });
+
+  test('naming one company prefetches it so a summary needs a single LLM call', async () => {
+    const data = rivianData();
+    const { llm, prompts, calls } = fakeLlm([
+      (p: string) => {
+        assert.match(p, /Layoffs announced and CFO departure/);
+        return {
+          action: 'final', answer: 'Rivian is red: layoffs and a CFO departure.',
+          citations: [{ company_id: 'b_rivian', signal_id: 'r2', source_url: 'https://example.com/rivian/2' }],
+        };
+      },
+    ]);
+    const res = await runAgent({ messages: user('give me a summary on Rivian'), llm, data, now: clock, log: () => {} });
+    assert.equal(calls(), 1);
+    assert.equal(prompts.length, 1);
+    assert.equal(res.body.citations?.length, 1);
+  });
+
+  test('a pinned company is prefetched when the message names none; two named companies are not', async () => {
+    const data = rivianData();
+    const pinned = fakeLlm([{ action: 'final', answer: 'ok', citations: [] }]);
+    await runAgent({ messages: user('Any news?'), contextCompanyId: 'b_rivian', llm: pinned.llm, data, now: clock, log: () => {} });
+    assert.match(pinned.prompts[0], /Layoffs announced/);
+    const both = fakeLlm([{ action: 'final', answer: 'ok', citations: [] }]);
+    await runAgent({ messages: user('Compare Rivian and Northfield Packaging Co.'), llm: both.llm, data, now: clock, log: () => {} });
+    assert.match(both.prompts[0], /no tool calls yet/);
+  });
+
+  test('no tool results plus exhaustion still gives STEP_LIMIT_REPLY', async () => {
+    const { data } = fakeData();
+    const { llm } = fakeLlm([{ action: 'tool', tool: 'nope', args: {} }]);
+    const res = await runAgent({ messages: user('Loop'), llm, data, now: clock, log: () => {} });
+    assert.match(res.body.answer ?? '', /step limit/i);
+  });
+
+  test('logs one compact line per step without leaking reply content', async () => {
+    const data = rivianData();
+    const lines: string[] = [];
+    const { llm } = fakeLlm([
+      { secret_key: 'top secret customer text' },
+      { action: 'tool', tool: 'portfolio_summary', args: {} },
+      { action: 'final', answer: 'Done.', citations: [] },
+    ]);
+    await runAgent({ messages: user('How are we doing?'), llm, data, now: clock, log: (l) => lines.push(l) });
+    assert.equal(lines.length, 3);
+    assert.match(lines[0], /^askPortfolio step=1 action=malformed tool=- ok=false ms=\d+ type=object keys=secret_key$/);
+    assert.match(lines[1], /^askPortfolio step=2 action=tool tool=portfolio_summary ok=true ms=\d+$/);
+    assert.match(lines[2], /^askPortfolio step=3 action=final tool=- ok=true ms=\d+$/);
+    assert.ok(!lines.join('\n').includes('top secret'));
   });
 });
 
