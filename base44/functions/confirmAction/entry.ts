@@ -2,7 +2,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { executeAction } from './logic.ts';
 import type { ConfirmDeps } from './logic.ts';
 
-// confirmAction({ action }). Runs one pending action from Ask Early Warning
+// confirmAction({ action }). Runs one pending action from Ask Kestrel
 // after the user clicks Confirm. The action is re-validated in logic.ts;
 // only screen, refresh and deep_check are allowed.
 export default async function(req: Request): Promise<Response> {

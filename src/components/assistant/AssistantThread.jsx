@@ -87,7 +87,7 @@ function AssistantMessage() {
         EW
       </span>
       <div className="min-w-0 flex-1">
-        <span className="sr-only">Early Warning replied: </span>
+        <span className="sr-only">Kestrel replied: </span>
         <MessagePrimitive.Parts components={PART_COMPONENTS} unstable_showEmptyOnNonTextEnd={false} />
         <StoppedNote />
         <MessagePrimitive.Error>

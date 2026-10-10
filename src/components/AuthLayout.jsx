@@ -2,7 +2,7 @@ import React from "react";
 import BrandMark from "@/components/auth/BrandMark";
 import SignalRuler from "@/components/auth/SignalRuler";
 
-export const PRODUCT_NAME = "Early Warning";
+export const PRODUCT_NAME = "Kestrel";
 export const TAGLINE =
   "Public warning signs on the companies you lend to, before the financials show them.";
 

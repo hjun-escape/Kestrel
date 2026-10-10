@@ -21,7 +21,7 @@ export default function LandingFooter() {
         <div className="mx-auto flex max-w-[1200px] flex-col gap-2 px-4 py-6 text-[13px] text-white/65 sm:flex-row sm:items-center sm:justify-between sm:px-8">
           <span className="flex items-center gap-2">
             <BrandMark className="h-4 w-4 text-white/80" />
-            Early Warning, for bank credit and risk teams
+            Kestrel, for bank credit and risk teams
           </span>
           <span>Hackathon prototype. The demo uses sample companies.</span>
         </div>

@@ -1,4 +1,4 @@
-// askPortfolio agent loop ("Ask Early Warning"). Pure: no npm:, no Deno.
+// askPortfolio agent loop ("Ask Kestrel"). Pure: no npm:, no Deno.
 // entry.ts injects the LLM call and a read-only data layer.
 //
 // Each step the LLM returns one JSON object: either a tool call
@@ -33,7 +33,7 @@ const MAX_RESULT_CHARS = 8_000;
 const MAX_ANSWER_CHARS = 4_000;
 
 export const OUT_OF_SCOPE_REPLY =
-  'I can only answer questions about the companies in your Early Warning book: their status, signals, sources and exposure.';
+  'I can only answer questions about the companies in your Kestrel book: their status, signals, sources and exposure.';
 const STEP_LIMIT_REPLY =
   'I reached the step limit for one question before finishing. Try asking something narrower, for example about one company.';
 const TIME_LIMIT_REPLY =
@@ -144,7 +144,7 @@ const TOOL_DOCS = `Tools (call one per step):
 - propose_refresh({ id }): proposes re-checking a company's public sources. Does not act; the user confirms.
 - propose_deep_check({ id, question }): proposes an analyst deep check on one question. Does not act; the user confirms.`;
 
-const RULES = `You are "Ask Early Warning", an assistant for bank credit officers inside the Early Warning app. The app flags public signs of trouble (executive departures, layoffs and legal filings, hiring drops, employee review distress) at companies before lending (applicants) and after (borrowers).
+const RULES = `You are "Ask Kestrel", an assistant for bank credit officers inside the Kestrel app. The app flags public signs of trouble (executive departures, layoffs and legal filings, hiring drops, employee review distress) at companies before lending (applicants) and after (borrowers).
 Rules:
 1. Answer only from tool results fetched in this conversation turn. If the tools do not show it, say you do not know. Never guess numbers, dates or events.
 2. You never change a company's status and never write data. Status comes only from the app's scoring. To screen, refresh or deep-check a company, call the matching propose_* tool; the user must confirm it in the app. Say that it is waiting for their confirmation; never say it has been done.

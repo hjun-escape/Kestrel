@@ -1,6 +1,6 @@
 // confirmAction logic. Pure: no npm:, no Deno. entry.ts injects the SDK.
 //
-// Runs a pending action from Ask Early Warning after the user confirms it.
+// Runs a pending action from Ask Kestrel after the user confirms it.
 // The action comes from the browser, so it is re-validated here from scratch:
 // only 'screen', 'refresh' and 'deep_check' are allowed, and only whitelisted
 // fields are passed on. Nothing here ever sets status on an existing company.

@@ -95,7 +95,7 @@ export default function LoanBook() {
   }, [loading, isLoadingAuth, location.search, me, borrowers, loadError]);
 
   useEffect(() => {
-    document.title = "Loan book | Early Warning";
+    document.title = "Loan book | Kestrel";
   }, []);
 
   useEffect(() => {

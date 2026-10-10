@@ -10,7 +10,7 @@ import LandingFooter from "@/components/landing/LandingFooter";
 export default function Landing() {
   useEffect(() => {
     const previous = document.title;
-    document.title = "Early Warning: screen private companies before you lend";
+    document.title = "Kestrel: screen private companies before you lend";
     return () => {
       document.title = previous;
     };

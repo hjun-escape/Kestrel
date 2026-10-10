@@ -123,7 +123,7 @@ function Workspace() {
   );
 
   useEffect(() => {
-    document.title = "Assistant | Early Warning";
+    document.title = "Assistant | Kestrel";
     function onKeyDown(e) {
       if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "k") {
         e.preventDefault();
