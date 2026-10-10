@@ -1,0 +1,29 @@
+{
+  "general": { "search_engine": "google", "query": "fixture" },
+  "news": [
+    {
+      "title": "Acme Widgets files WARN notice for Dayton plant",
+      "link": "https://warn.example.gov/acme-2026",
+      "source": "Ohio Jobs Example",
+      "description": "Acme Widgets filed a WARN notice covering 120 workers.",
+      "date": "Sep 20, 2026",
+      "rank": 1
+    },
+    {
+      "title": "Customer sues Acme Widgets over injury",
+      "link": "https://court.example.com/acme-suit",
+      "source": "Court Example",
+      "description": "A customer sued Acme Widgets in Montgomery County over a shelf collapse.",
+      "date": "2 weeks ago",
+      "rank": 2
+    },
+    {
+      "title": "Acme Widgets CFO resigns after two years",
+      "link": "https://news.example.com/acme-cfo-resigns/",
+      "source": "Dayton Daily Example",
+      "description": "The Dayton manufacturer said its chief financial officer is leaving...",
+      "date": "3 days ago",
+      "rank": 3
+    }
+  ]
+}
