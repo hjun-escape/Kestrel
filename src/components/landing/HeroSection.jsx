@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import BrandMark from "@/components/auth/BrandMark";
 import LandingCtas, { SIGN_IN_PATH } from "./LandingCtas";
 import SignalFile from "./SignalFile";
+import CheckSwarm from "./CheckSwarm";
+import SourceTicker from "./SourceTicker";
 
 // Faint ledger ruling behind the hero: the paper a credit file is kept on.
 const LEDGER =
@@ -30,9 +32,11 @@ export function LandingNav() {
 export default function HeroSection() {
   return (
     <div className={`relative overflow-hidden bg-ew-ink text-white ${LEDGER}`}>
+      {/* Thousands of checkers working in parallel behind the hero (decorative). */}
+      <CheckSwarm className="absolute inset-0 h-full w-full" />
       <section
         aria-labelledby="hero-heading"
-        className="mx-auto grid max-w-[1200px] items-center gap-14 px-4 pb-20 pt-10 sm:px-8 sm:pb-24 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-16 lg:pb-28 lg:pt-16"
+        className="relative mx-auto grid max-w-[1200px] items-center gap-14 px-4 pb-20 pt-10 sm:px-8 sm:pb-24 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-16 lg:pb-28 lg:pt-16"
       >
         <div>
           <h1
@@ -46,6 +50,7 @@ export default function HeroSection() {
             every flag with a source.
           </p>
           <LandingCtas tone="dark" className="mt-9" />
+          <SourceTicker className="mt-6" />
           <p className="mt-4 text-[13px] text-white/65">
             Built for bank credit officers. Sign-in is optional; the demo opens a sample loan book.
           </p>
