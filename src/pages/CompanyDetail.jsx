@@ -13,6 +13,8 @@ import { formatTimeToFlag, timeToFirstFlag } from "@/lib/timeToFlag.ts";
 import AnalystBrief from "@/components/AnalystBrief";
 import CheckTrace from "@/components/CheckTrace";
 import WarningScore from "@/components/WarningScore";
+import { useAuth } from "@/lib/AuthContext";
+import { canSeeCompany, normalizeEmail } from "@/lib/ownership";
 import {
   POLL_INTERVAL_MS,
   deriveSourceStates,
@@ -31,14 +33,23 @@ async function fetchCompany(id) {
   return { borrower, signals: sigRes.items || [], checkRun: runRes?.items?.[0] || null };
 }
 
+// Thrown by loadData when the company belongs to someone else (or, signed in,
+// to the shared demo book): the page shows "no access" and keeps no data.
+const NO_ACCESS = "no_access";
+
 export default function CompanyDetail() {
   const { id } = useParams();
+  const { email, isAuthenticated, isLoadingAuth } = useAuth();
+  const me = isAuthenticated ? normalizeEmail(email) : "";
+  const meRef = useRef(me);
+  meRef.current = me;
   const [searchParams, setSearchParams] = useSearchParams();
   const idRef = useRef(id);
   const [borrower, setBorrower] = useState(null);
   const [signals, setSignals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [noAccess, setNoAccess] = useState(false);
   const [run, setRun] = useState(null);
   const [refreshError, setRefreshError] = useState(null);
   const [cashflowReview, setCashflowReview] = useState(null);
@@ -48,6 +59,7 @@ export default function CompanyDetail() {
     const requestedId = id;
     const data = await fetchCompany(requestedId);
     if (idRef.current !== requestedId) return null;
+    if (!canSeeCompany(data.borrower, meRef.current)) throw new Error(NO_ACCESS);
     setBorrower(data.borrower);
     setSignals(data.signals);
     setCheckRun(data.checkRun);
@@ -82,17 +94,22 @@ export default function CompanyDetail() {
     idRef.current = id;
     setLoading(true);
     setNotFound(false);
+    setNoAccess(false);
     setBorrower(null);
     setSignals([]);
     setRun(null);
     setRefreshError(null);
     setCashflowReview(null);
+    if (isLoadingAuth) return;
     (async () => {
       let data = null;
       try {
         data = await loadData();
-      } catch {
-        if (idRef.current === id) setNotFound(true);
+      } catch (error) {
+        if (idRef.current === id) {
+          if (error?.message === NO_ACCESS) setNoAccess(true);
+          else setNotFound(true);
+        }
       } finally {
         if (idRef.current === id) setLoading(false);
       }
@@ -103,7 +120,7 @@ export default function CompanyDetail() {
       else if (searchParams.get("checking") === "1" && !data.borrower.last_refreshed) handleRefresh(data);
       if (searchParams.has("checking")) setSearchParams({}, { replace: true });
     })();
-  }, [id]);
+  }, [id, isLoadingAuth, me]);
 
   // refreshBorrower saves after each source, so poll while it runs and the
   // source row and timeline fill in as sources answer.
@@ -116,6 +133,24 @@ export default function CompanyDetail() {
   }, [run, id]);
 
   if (loading) return <DetailShell><DetailSkeleton /></DetailShell>;
+
+  if (noAccess) {
+    return (
+      <DetailShell>
+        <div role="alert" className="border border-ew-rule bg-ew-surface px-6 py-10">
+          <p className="font-heading text-lg font-semibold text-ew-ink">Company not found</p>
+          <p className="mt-1 text-sm text-ew-muted">
+            {me
+              ? "This company is not in your loan book. You can only open companies you added."
+              : "This company is not in the shared demo book. Sign in with the account that added it."}
+          </p>
+          <Link to="/" className="mt-3 inline-block rounded-sm text-sm font-medium text-ew-ink underline underline-offset-2">
+            Back to loan book
+          </Link>
+        </div>
+      </DetailShell>
+    );
+  }
 
   if (notFound || !borrower) {
     return (
@@ -158,30 +193,20 @@ export default function CompanyDetail() {
           stale={!!run && !!checkRun && Date.parse(checkRun.started_at) < run.startedAt - 5000}
         />
         {flagLine && (
-          <p className="border-t border-ew-rule-soft px-5 py-2 font-mono text-xs text-ew-ink-soft">{flagLine}</p>
+          <p className="border-t border-ew-rule-soft px-5 py-2 text-xs text-ew-ink-soft">{flagLine}</p>
         )}
       </div>
 
-      {isApplicant && (
-        <section aria-labelledby="applicant-review-heading" className="mt-6">
-          <h2 id="applicant-review-heading" className="mb-3 font-heading text-xl font-bold tracking-tight text-ew-ink">
-            Applicant review
-          </h2>
-          <div className="flex flex-col gap-4">
-            <CashflowReview borrower={borrower} onReviewChange={setCashflowReview} />
-            <ApplicantDecision borrower={borrower} signals={signals} />
-          </div>
-        </section>
-      )}
-
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_380px]">
+      {/* Evidence first: the signals behind the status, each with its source and
+          what to ask. Next steps (decision, other lenders, analyst) sit beside it. */}
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_400px]">
         <section aria-labelledby="evidence-heading" className="min-w-0">
           <div className="mb-3 flex items-baseline justify-between gap-4">
             <h2 id="evidence-heading" className="font-heading text-xl font-bold tracking-tight text-ew-ink">
               Evidence
             </h2>
-            <p className="font-mono text-xs text-ew-muted">
-              {recentSignals.length} in last 90 days{olderCount > 0 ? `, ${olderCount} older` : ""}
+            <p className="text-xs tabular-nums text-ew-muted">
+              {recentSignals.length} in the last 90 days{olderCount > 0 ? `, ${olderCount} older` : ""}
             </p>
           </div>
           <SignalTimeline
@@ -190,7 +215,11 @@ export default function CompanyDetail() {
             checking={running}
             newIds={newIds}
           />
-          {!isApplicant && (
+          {isApplicant ? (
+            <div className="mt-6">
+              <CashflowReview borrower={borrower} onReviewChange={setCashflowReview} />
+            </div>
+          ) : (
             <Collapsible className="mt-6 border border-ew-rule bg-ew-surface">
               <CollapsibleTrigger className="group flex w-full items-center gap-2 px-4 py-3 text-left font-heading text-sm font-bold text-ew-ink">
                 <ChevronRight aria-hidden="true" className="h-4 w-4 transition-transform group-data-[state=open]:rotate-90" />
@@ -203,10 +232,10 @@ export default function CompanyDetail() {
           )}
         </section>
 
-        <aside aria-label="Analysis and decision" className="flex min-w-0 flex-col gap-4">
+        <aside aria-label="Next steps" className="flex min-w-0 flex-col gap-4">
+          <ApplicantDecision key={borrower.id} borrower={borrower} signals={signals} />
           <AnalystBrief borrower={borrower} />
           <CompanyLinks borrower={borrower} />
-          {!isApplicant && <ApplicantDecision key={borrower.id} borrower={borrower} signals={signals} />}
         </aside>
       </div>
     </DetailShell>

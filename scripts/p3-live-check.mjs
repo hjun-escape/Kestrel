@@ -41,10 +41,11 @@ async function check(label, file, run) {
 
 const jobs = await check("jobs", "../base44/functions/hiringSignal/entry.ts", (m) => m.fetchJobs(borrower, key));
 if (jobs) {
-  const mine = jobs.records.filter((j) => jobs.mod.isSameCompany(j, borrower));
-  console.log(`same-company postings: ${mine.length}`);
-  console.log("counts:", jobs.mod.countPostings(mine, today));
-  console.log("signals:", JSON.stringify(jobs.mod.hiringSignalFromJobs(borrower, jobs.records, today), null, 2));
+  const company = await jobs.mod.fetchCompany(borrower, key);
+  const employees = jobs.mod.employeeCount(company);
+  console.log(`company page: ${employees} employees, industry "${company.industries}"`);
+  console.log("gap:", jobs.mod.hiringGap(jobs.mod.openPostings(jobs.records, borrower), employees, company.industries));
+  console.log("signals:", JSON.stringify(jobs.mod.hiringSignalFromData(borrower, jobs.records, company, today), null, 2));
 }
 
 const reviews = await check("reviews", "../base44/functions/reviewSignals/entry.ts", (m) => m.fetchReviews(borrower, key));

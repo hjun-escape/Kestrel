@@ -56,12 +56,12 @@ test("future-dated and malformed signals are ignored", () => {
 test("why line matches the CLAUDE.md example", () => {
   const s = [
     sig("strong", "2026-09-12", "CFO departure", "exec_departure"),
-    sig("strong", "2026-10-10", "Job postings down 62% in 30 days", "hiring_drop"),
+    sig("strong", "2026-10-10", "Job postings 84% below normal for company size", "hiring_drop"),
   ];
   // Strong first, then newest: the hiring drop (Oct 10) comes before the CFO departure (Sep 12).
   assert.deepEqual(scoreBorrower(s, TODAY), {
     status: "red",
-    why: "Red: Job postings down 62% in 30 days + CFO departure (Sep 12).",
+    why: "Red: Job postings 84% below normal for company size + CFO departure (Sep 12).",
   });
 });
 

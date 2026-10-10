@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
+import { canAccessCompany } from './access.ts';
 
 // refreshBorrower(borrower_id). Owner: P1. See docs/PLAN.md §2 and CLAUDE.md "Refresh flow".
 //
@@ -32,8 +33,8 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 // set enabled: true on its line. Scoring must already be on. P1 merges.
 const SIGNAL_FUNCTIONS = [
   { name: 'newsSignals',   owner: 'P2', enabled: true,  sources: { exec_departure: 'News', legal_layoffs: 'Legal' } },
-  { name: 'hiringSignal',  owner: 'P3', enabled: false, sources: { hiring_drop: 'Jobs' } },
-  { name: 'reviewSignals', owner: 'P3', enabled: false, sources: { review_distress: 'Reviews' } },
+  { name: 'hiringSignal',  owner: 'P3', enabled: true,  sources: { hiring_drop: 'Jobs' } },
+  { name: 'reviewSignals', owner: 'P3', enabled: true,  sources: { review_distress: 'Reviews' } },
 ];
 
 // scoreBorrower (P3) takes { signals, today: 'YYYY-MM-DD' } and returns
@@ -81,6 +82,25 @@ export default async function(req: Request): Promise<Response> {
     const base44 = createClientFromRequest(req);
     const db = base44.asServiceRole.entities;
     const borrower = await db.Borrower.get(borrowerId);
+
+    // Per-user companies (added by the ownership change; access.ts): a
+    // signed-in caller may refresh only their own companies; a signed-out
+    // caller only the unowned shared demo book (as before for Sense testers).
+    // App admins pass too, so refreshAll (admin-only) can refresh every company.
+    const caller = await base44.auth.me().catch(() => null);
+    if (!canAccessCompany(borrower, caller) && caller?.role !== 'admin') {
+      return Response.json({ error: 'You do not have access to this company.' }, { status: 403 });
+    }
+
+    // Sample companies (src/lib/seedData.js) have made-up names, profile URLs and
+    // signals on the reserved .example domain. A live check would find nothing,
+    // delete their sample signals and mark them Green, so they are never refreshed.
+    if (/\.example$/i.test(String(borrower.website_domain || '').trim())) {
+      return Response.json(
+        { error: 'Sample company with made-up data, so it is not checked live. Screen a real company to see live checks.' },
+        { status: 409 },
+      );
+    }
 
     const enabled = SIGNAL_FUNCTIONS.filter((f) => f.enabled);
     if (enabled.length === 0) {

@@ -47,6 +47,7 @@ Borrower:
 - last_refreshed: ISO timestamp, empty until the first refresh that actually checked something
 - sources_unavailable: list of strings, only these values: News | Legal | Jobs | Reviews
 - pending_snapshots: internal, written only by refreshBorrower. Bright Data snapshot_id per signal function that is still building.
+- owner_email: email of the signed-in user who added the company (set on create, never from client input in backend functions). Empty = the shared demo book, which only signed-out visitors (Sense testers) see; signed-in users see and can use only their own companies, and backend functions enforce this (`access.ts` in each function folder).
 
 Signal:
 - borrower_id
@@ -54,7 +55,7 @@ Signal:
 - severity: strong | weak
 - date: YYYY-MM-DD
 - title: short headline
-- snippet: exact quote from the source, or a computed fact like "14 postings in last 30 days vs 37/month before"
+- snippet: exact quote from the source, or a computed fact like "4 open postings vs ~25 expected for 490 employees (Financial activities: 5.1% openings rate, BLS)"
 - source_name, source_url
 
 Every signal function is a Base44 backend function.
@@ -64,7 +65,7 @@ Every signal function is a Base44 backend function.
 - It never writes status.
 
 ## Signal rules
-1. hiring_drop: job postings dated in the last 30 days vs the prior 60 days (normalized per 30 days). Drop ≥50% = strong, 25–50% = weak. Skip (no signal) if the prior 60 days had 0 postings.
+1. hiring_drop: open job postings on LinkedIn now vs what a company of this size and industry normally has open. Expected = employees (LinkedIn company page) × the industry's job-openings rate (BLS JOLTS, table in `base44/functions/hiringSignal/entry.ts`). ≥75% below expected = strong, 50–75% below = weak. Skip (no signal) if fewer than 5 openings would be expected. (Changed 2026-10-10 from "last 30 days vs prior 60": LinkedIn only lists open postings, so the earlier window was always empty.)
 2. review_distress: Glassdoor. Any review in the last 90 days mentioning layoffs, furloughs, late or missed pay, or closing = strong. 90-day average rating ≥0.5 below the prior 12 months = weak.
 3. exec_departure: Google News via Bright Data SERP API: `"<name>" (CEO OR CFO OR president OR founder) (resigns OR "steps down" OR departs)`, last 180 days. CEO/CFO = strong, other senior roles = weak.
 4. legal_layoffs: Google News: `"<name>" (lawsuit OR sued OR lien OR "WARN notice" OR layoffs OR bankruptcy)`, last 180 days. WARN notice, bankruptcy, or a lender/supplier lawsuit = strong; others = weak.
@@ -81,7 +82,7 @@ Count signals from the last 90 days only.
 - YELLOW: 1 strong, or 2+ weak
 - GREEN: otherwise
 
-Build the "why" line from the rules, e.g. "Red: CFO departure (Sep 12) + job postings down 62% in 30 days."
+Build the "why" line from the rules, e.g. "Red: CFO departure (Sep 12) + Job postings 84% below normal for company size."
 
 ## Refresh flow
 refreshBorrower(borrower_id):

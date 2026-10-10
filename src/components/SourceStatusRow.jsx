@@ -39,7 +39,7 @@ export default function SourceStatusRow({ states, recentSignals, running, starte
       </div>
       {running && (
         <div className="px-5 pb-3">
-          <div className="mb-1 flex justify-between font-mono text-xs text-ew-ink-soft">
+          <div className="mb-1 flex justify-between text-xs tabular-nums text-ew-ink-soft">
             <span>
               Checking sources: {answered} of {SOURCES.length} answered
             </span>

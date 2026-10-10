@@ -63,7 +63,7 @@ function errorText(e) {
 
 function SectionLabel({ children }) {
   return (
-    <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+    <h3 className="text-sm font-semibold text-ew-ink">
       {children}
     </h3>
   );

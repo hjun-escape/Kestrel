@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { base44 } from "@/api/base44Client";
 import { startRefresh } from "@/lib/borrowerUtils";
+import { useAuth } from "@/lib/AuthContext";
+import { ownerEmailFor } from "@/lib/ownership";
 
 const EMPTY = {
   name: "",
@@ -60,7 +62,9 @@ function validate(form) {
   return null;
 }
 
-function buildPayload(form) {
+// ownerEmail: the signed-in user's email (the company is theirs), or undefined
+// when signed out (the company joins the shared demo book).
+function buildPayload(form, ownerEmail) {
   const payload = {
     name: form.name.trim(),
     website_domain: normalizeDomain(form.website_domain),
@@ -73,6 +77,7 @@ function buildPayload(form) {
     sources_unavailable: [],
     // last_refreshed omitted: the company shows "Not checked" until the first check lands.
   };
+  if (ownerEmail) payload.owner_email = ownerEmail;
   if (form.loan_amount_usd !== "") payload.loan_amount_usd = Number(form.loan_amount_usd);
   if (form.linkedin_url.trim()) payload.linkedin_url = form.linkedin_url.trim();
   if (form.glassdoor_url.trim()) payload.glassdoor_url = form.glassdoor_url.trim();
@@ -82,10 +87,16 @@ function buildPayload(form) {
 // "Screen new applicant": saves the company, starts the first check right away
 // (refreshBorrower), then the caller opens the detail page in checking mode.
 // LinkedIn and Glassdoor URLs feed the Jobs and Reviews checks.
-export default function AddCompanyDialog({ open, onOpenChange, onCreated }) {
+// initialStage: "applicant" (Screen new applicant) or "borrower" (Add a company).
+export default function AddCompanyDialog({ open, onOpenChange, onCreated, initialStage = "applicant" }) {
+  const { email } = useAuth();
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (open) setForm((f) => ({ ...f, stage: initialStage }));
+  }, [open, initialStage]);
 
   function update(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -101,7 +112,7 @@ export default function AddCompanyDialog({ open, onOpenChange, onCreated }) {
     setSaving(true);
     setError(null);
     try {
-      const created = await base44.entities.Borrower.create(buildPayload(form));
+      const created = await base44.entities.Borrower.create(buildPayload(form, ownerEmailFor(email)));
       startRefresh(created.id, { unavailableBefore: [], signalIdsBefore: [] });
       setForm(EMPTY);
       onOpenChange(false);
@@ -119,7 +130,7 @@ export default function AddCompanyDialog({ open, onOpenChange, onCreated }) {
         <form onSubmit={handleSave} noValidate>
           <DialogHeader className="border-b border-ew-rule px-6 py-4 text-left">
             <DialogTitle className="font-heading text-lg font-bold tracking-tight text-ew-ink">
-              Screen new applicant
+              {initialStage === "borrower" ? "Add a company" : "Screen new applicant"}
             </DialogTitle>
             <DialogDescription className="text-sm text-ew-muted">
               Saving starts the first check on news, court filings, hiring and employee reviews.

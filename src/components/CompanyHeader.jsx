@@ -4,7 +4,7 @@ import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import StatusBadge from "@/components/StatusBadge";
 import { SOURCES } from "@/lib/signalTypes";
-import { formatRelative, formatUsdFull } from "@/lib/borrowerUtils";
+import { formatRelative, formatUsdFull, isSampleCompany, reasonText } from "@/lib/borrowerUtils";
 
 // Detail header: identity, status with the reason, key facts, and the Refresh
 // control with per-source progress.
@@ -12,12 +12,12 @@ export default function CompanyHeader({ borrower, sourceStates, running, refresh
   const hq = [borrower.hq_city, borrower.hq_state].filter(Boolean).join(", ");
   const isApplicant = borrower.stage === "applicant";
   const facts = [
-    { term: "Domain", value: borrower.website_domain, mono: true },
+    { term: "Domain", value: borrower.website_domain },
     { term: "Headquarters", value: hq || "—" },
     { term: "Industry", value: borrower.industry || "—" },
     { term: "Stage", value: isApplicant ? "Applicant" : "Borrower" },
-    { term: isApplicant ? "Amount requested" : "Loan amount", value: formatUsdFull(borrower.loan_amount_usd), mono: true },
-    { term: "Last refreshed", value: <LastRefreshed value={borrower.last_refreshed} />, mono: true },
+    { term: isApplicant ? "Amount requested" : "Loan amount", value: formatUsdFull(borrower.loan_amount_usd), numeric: true },
+    { term: "Last refreshed", value: <LastRefreshed value={borrower.last_refreshed} /> },
   ];
 
   return (
@@ -27,25 +27,31 @@ export default function CompanyHeader({ borrower, sourceStates, running, refresh
           <h1 className="font-heading text-[32px] font-bold leading-[1.05] tracking-tight text-ew-ink">
             {borrower.name}
           </h1>
+          {isSampleCompany(borrower) && (
+            <p className="mt-2 flex items-center gap-2 text-xs text-ew-muted">
+              <span className="rounded-sm border border-ew-rule bg-ew-surface px-1.5 text-[11px] font-semibold leading-[18px] text-ew-muted">Sample</span>
+              Made-up company and signals, shown so the screens have something in them. It is not checked live.
+            </p>
+          )}
           <div className="mt-3 flex items-start gap-3">
             <StatusBadge status={borrower.status} lastRefreshed={borrower.last_refreshed} size="lg" />
             <p className="max-w-[68ch] pt-0.5 text-[15px] leading-snug text-ew-ink-soft">
               {borrower.last_refreshed
-                ? borrower.why || "No warning signs in the last 90 days."
+                ? reasonText(borrower.why) || "No warning signs in the last 90 days."
                 : running
                   ? "First check in progress. Status is set when it finishes."
                   : "Not checked yet. Refresh to run the first check."}
             </p>
           </div>
         </div>
-        <RefreshControl sourceStates={sourceStates} running={running} error={refreshError} onRefresh={onRefresh} />
+        <RefreshControl sourceStates={sourceStates} running={running} error={refreshError} onRefresh={onRefresh} sample={isSampleCompany(borrower)} />
       </div>
 
       <dl className="mt-5 grid grid-cols-3 gap-x-6 gap-y-3 border-t border-ew-rule-soft pt-4 xl:grid-cols-6">
         {facts.map((f) => (
           <div key={f.term} className="min-w-0">
             <dt className="text-xs text-ew-muted">{f.term}</dt>
-            <dd title={typeof f.value === "string" ? f.value : undefined} className={`mt-0.5 truncate text-sm font-medium text-ew-ink ${f.mono ? "font-mono text-[13px]" : ""}`}>
+            <dd title={typeof f.value === "string" ? f.value : undefined} className={`mt-0.5 truncate text-sm font-medium text-ew-ink ${f.numeric ? "tabular-nums" : ""}`}>
               {f.value}
             </dd>
           </div>
@@ -64,14 +70,19 @@ function LastRefreshed({ value }) {
   );
 }
 
-function RefreshControl({ sourceStates, running, error, onRefresh }) {
+function RefreshControl({ sourceStates, running, error, onRefresh, sample }) {
   const answered = SOURCES.filter((s) => sourceStates[s] !== "checking").length;
   return (
     <div className="flex w-[220px] shrink-0 flex-col items-stretch gap-2">
       <Button
         onClick={onRefresh}
-        disabled={running}
-        className="h-9 rounded-sm bg-ew-ink hover:bg-ew-ink-soft disabled:opacity-100 disabled:bg-ew-ink-soft"
+        disabled={running || sample}
+        title={sample ? "Sample companies are not checked live" : undefined}
+        className={
+          sample
+            ? "h-9 rounded-sm border border-ew-rule bg-ew-surface text-ew-muted disabled:opacity-100"
+            : "h-9 rounded-sm bg-ew-ink hover:bg-ew-ink-soft disabled:opacity-100 disabled:bg-ew-ink-soft"
+        }
       >
         <RefreshCw aria-hidden="true" className={running ? "animate-spin" : ""} />
         {running ? "Checking sources…" : "Refresh"}
@@ -94,7 +105,7 @@ function RefreshControl({ sourceStates, running, error, onRefresh }) {
               />
             ))}
           </div>
-          <p className="mt-1 text-right font-mono text-[11px] text-ew-muted">
+          <p className="mt-1 text-right text-[11px] tabular-nums text-ew-muted">
             {answered} of {SOURCES.length} sources answered
           </p>
         </div>

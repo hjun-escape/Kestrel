@@ -61,6 +61,10 @@
         ]
       }
     },
+    "owner_email": {
+      "type": "string",
+      "description": "Email of the signed-in user who added the company. Empty = the shared demo book, shown only to signed-out visitors. Signed-in users see and use only their own companies. Set on create (client: AddCompanyDialog; server: confirmAction from auth.me()); never changed afterwards."
+    },
     "pending_snapshots": {
       "type": "object",
       "description": "Written only by refreshBorrower: Bright Data snapshot_id per signal function that is still building, passed back on the next refresh. Not shown on screens.",

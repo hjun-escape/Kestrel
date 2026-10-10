@@ -4,6 +4,19 @@ import { SIGNAL_TYPES, SOURCES } from "@/lib/signalTypes";
 
 // Signal dates are "YYYY-MM-DD". new Date("2026-09-12") is UTC midnight, which
 // shows as Sep 11 in US time zones, so parse them as local dates instead.
+// The stored why line starts with the status ("Red: CFO departure ..."). Screens
+// show it next to the status badge, so drop the repeated word there.
+export function reasonText(why) {
+  const text = (why || "").replace(/^(red|yellow|green)\s*:\s*/i, "").trim();
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : "";
+}
+
+// Seeded sample companies use the reserved .example domain (src/lib/seedData.js).
+// refreshBorrower refuses to check them live; screens tag them "Sample".
+export function isSampleCompany(borrower) {
+  return /\.example$/i.test(String(borrower?.website_domain || "").trim());
+}
+
 export function parseSignalDate(dateStr) {
   return parseISO(dateStr);
 }

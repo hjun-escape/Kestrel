@@ -10,8 +10,8 @@
 //   weak:   90-day average rating >= 0.5 below the prior 12 months (needs MIN_REVIEWS in each window).
 //
 // The strong case is matched with keywords, and the snippet is the matching sentence copied exactly from the
-// review. When P2's tagItem is deployed, set TAG_ITEM_ENABLED to have it confirm each match (CLAUDE.md:
-// the LLM only tags; the snippet guard still applies). Glassdoor pages belong to one company, so
+// review. With TAG_ITEM_ENABLED, P2's tagItem confirms each match (CLAUDE.md: the LLM only tags; the snippet
+// guard still applies). If tagItem itself fails, the keyword match stands, so an LLM outage never drops Reviews. Glassdoor pages belong to one company, so
 // same-company matching is not needed here.
 //
 // Dataset and fields confirmed 2026-10-10 with scripts/brightdata-datasets.mjs: date is rating_date,
@@ -50,7 +50,7 @@ export const GLASSDOOR_REVIEWS_DATASET_ID = "gd_l7j1po0921hbu0ri1z"; // "Glassdo
 const POLL_BUDGET_MS = 50_000;
 const POLL_EVERY_MS = 10_000;
 export const MIN_REVIEWS = 3;
-const TAG_ITEM_ENABLED = false;
+const TAG_ITEM_ENABLED = true;
 
 // ---------- pure logic (tested) ----------
 
@@ -234,11 +234,18 @@ export async function reviewSignalsFromReviews(b: Borrower, raw: Record<string, 
     if (!hit) continue;
     let snippet = hit.snippet;
     if (tag) {
-      const t = await tag(r.texts.join("\n"), r.url ?? pageUrl);
-      if (!t?.relevant || t.signal_type !== "review_distress") continue;
+      let t: Awaited<ReturnType<Tagger>> | undefined;
+      try {
+        t = await tag(r.texts.join("\n"), r.url ?? pageUrl);
+      } catch (error) {
+        console.error(`tagItem failed, keeping the keyword match: ${(error as Error).message}`);
+      }
+      // No answer (error or empty reply) keeps the keyword match; an answer can veto it. The prompt files layoffs
+      // and closures under legal_layoffs, so either distress type confirms an employee review.
+      if (t && (!t.relevant || (t.signal_type !== "review_distress" && t.signal_type !== "legal_layoffs"))) continue;
       // Snippet guard: the model's quote is used only to locate text in the review, and what we store is the
       // review's own text. A quote that is not in the review keeps our keyword sentence.
-      const quote = t.snippet ? sourceQuote(t.snippet, r.texts) : null;
+      const quote = t?.snippet ? sourceQuote(t.snippet, r.texts) : null;
       if (quote) snippet = quote;
     }
     out.push({
@@ -368,7 +375,9 @@ export async function fetchReviews(b: Borrower, apiKey: string, snapshotId?: unk
 }
 
 // Base44 backend function. Reads the BRIGHTDATA_API_KEY secret.
-// A snapshot that is still building returns 503 with its snapshot_id, so a later call can pass it back.
+// A snapshot that is still building returns 503 with its snapshot_id. refreshBorrower saves it in
+// Borrower.pending_snapshots and passes it back on the next refresh. Glassdoor takes ~6 min, so the first
+// refresh of a company shows Reviews as unavailable and a refresh a few minutes later collects the result.
 declare const Deno: { env: { get(k: string): string | undefined } };
 
 export default async function (req: Request): Promise<Response> {
@@ -382,10 +391,13 @@ export default async function (req: Request): Promise<Response> {
 
     let tag: Tagger | undefined;
     if (TAG_ITEM_ENABLED) {
-      // Loaded only when tagging is on, so the tests (Node) never import the Deno-only SDK URL.
-      const { createClientFromRequest } = await import("npm:@base44/sdk@0.8.52");
-      const base44 = createClientFromRequest(req);
-      tag = async (text, url) => (await base44.asServiceRole.functions.invoke("tagItem", { text, url, borrower }))?.data ?? null;
+      // tagItem input: { text, borrower, kind }. Without kind it would read the review as a news article.
+      // The SDK loads only when a review needs tagging (and Node tests, which cannot load npm: URLs, fall back).
+      tag = async (text) => {
+        const { createClientFromRequest } = await import("npm:@base44/sdk@0.8.52");
+        const base44 = createClientFromRequest(req);
+        return (await base44.asServiceRole.functions.invoke("tagItem", { text, borrower, kind: "employee review" }))?.data ?? null;
+      };
     }
 
     const raw = await fetchReviews(borrower, apiKey, body.snapshot_id);

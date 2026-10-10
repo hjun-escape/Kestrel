@@ -11,6 +11,8 @@ import LoanBookTable from "@/components/LoanBookTable";
 import { STATUS_STYLES } from "@/components/StatusBadge";
 import { getTopSignal, filterRecentSignals, sortRows, statusKey } from "@/lib/borrowerUtils";
 import { ensureSeedData } from "@/lib/seed";
+import { useAuth } from "@/lib/AuthContext";
+import { normalizeEmail, visibleCompanies } from "@/lib/ownership";
 
 const TABS = [
   { value: "all", label: "All" },
@@ -30,24 +32,30 @@ function groupSignals(items) {
 
 export default function LoanBook() {
   const navigate = useNavigate();
+  const { email, isAuthenticated, isLoadingAuth, navigateToLogin } = useAuth();
+  const me = isAuthenticated ? normalizeEmail(email) : "";
   const [borrowers, setBorrowers] = useState(null);
   const [signalsByBorrower, setSignalsByBorrower] = useState({});
   const [tab, setTab] = useState("all");
   const [statusFilter, setStatusFilter] = useState(null);
   const [sort, setSort] = useState(DEFAULT_SORT);
   const [addOpen, setAddOpen] = useState(false);
+  const [addStage, setAddStage] = useState("applicant");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
 
+  // Signed in: only the user's own companies. Signed out: only the unowned
+  // shared demo book. The backend functions enforce the same rule.
   async function loadData() {
     setLoading(true);
     setLoadError(null);
     try {
+      const query = me ? { owner_email: me } : {};
       const [{ items }, sigRes] = await Promise.all([
-        base44.entities.Borrower.filter({}, { limit: 500, sort: "-created_date" }),
+        base44.entities.Borrower.filter(query, { limit: 500, sort: "-created_date" }),
         base44.entities.Signal.filter({}, { limit: 500, sort: "-date" }),
       ]);
-      setBorrowers(items);
+      setBorrowers(visibleCompanies(items, me));
       setSignalsByBorrower(groupSignals(sigRes.items));
     } catch {
       setBorrowers([]);
@@ -59,6 +67,10 @@ export default function LoanBook() {
 
   useEffect(() => {
     document.title = "Loan book | Early Warning";
+  }, []);
+
+  useEffect(() => {
+    if (isLoadingAuth) return;
     (async () => {
       try {
         await ensureSeedData();
@@ -67,7 +79,12 @@ export default function LoanBook() {
       }
       await loadData();
     })();
-  }, []);
+  }, [isLoadingAuth, me]);
+
+  function openAdd(stage) {
+    setAddStage(stage);
+    setAddOpen(true);
+  }
 
   const tabCounts = useMemo(() => {
     const list = borrowers || [];
@@ -109,12 +126,28 @@ export default function LoanBook() {
       <main className="mx-auto max-w-[1360px] px-6 pb-16 pt-6">
         <div className="mb-5 flex items-end justify-between gap-4">
           <div>
-            <h1 className="font-heading text-[28px] font-bold leading-none tracking-tight">Loan book</h1>
+            <h1 className="font-heading text-[28px] font-bold leading-none tracking-tight">
+              {me ? "My companies" : "Loan book"}
+            </h1>
             <p className="mt-2 text-sm text-ew-muted">
-              Public warning signs for every applicant and borrower, worst first. Status counts only the last 90 days.
+              {me
+                ? "Public warning signs for the applicants and borrowers you added, worst first."
+                : "Shared demo book: public warning signs for every applicant and borrower, worst first."}{" "}
+              Status counts only the last 90 days.
             </p>
+            {!me && !isLoadingAuth && (
+              <p className="mt-1 text-xs text-ew-muted">
+                <button
+                  type="button"
+                  onClick={navigateToLogin}
+                  className="rounded-sm font-medium text-ew-ink-soft underline underline-offset-2 hover:text-ew-ink"
+                >
+                  Sign in to keep your own companies
+                </button>
+              </p>
+            )}
           </div>
-          <Button onClick={() => setAddOpen(true)} className="h-9 rounded-sm bg-ew-ink px-3.5 hover:bg-ew-ink-soft">
+          <Button onClick={() => openAdd("applicant")} className="h-9 rounded-sm bg-ew-ink px-3.5 hover:bg-ew-ink-soft">
             <Plus aria-hidden="true" />
             Screen new applicant
           </Button>
@@ -161,11 +194,24 @@ export default function LoanBook() {
 
         {isBookEmpty && (
           <div className="border border-dashed border-ew-rule bg-ew-surface px-6 py-14 text-center">
-            <p className="font-heading text-lg font-semibold">No companies in the loan book</p>
-            <p className="mt-1 text-sm text-ew-muted">Screen an applicant to run the first check on news, court filings, hiring and reviews.</p>
-            <Button onClick={() => setAddOpen(true)} className="mt-4 h-9 rounded-sm bg-ew-ink hover:bg-ew-ink-soft">
-              Screen new applicant
-            </Button>
+            <p className="font-heading text-lg font-semibold">
+              {me ? "You have not added any companies yet" : "No companies in the loan book"}
+            </p>
+            <p className="mx-auto mt-1 max-w-[520px] text-sm text-ew-muted">
+              {me
+                ? "Screen a new applicant before you lend, or add a company you already lend to. Only you will see the companies you add."
+                : "Screen an applicant to run the first check on news, court filings, hiring and reviews."}
+            </p>
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
+              <Button onClick={() => openAdd("applicant")} className="h-9 rounded-sm bg-ew-ink hover:bg-ew-ink-soft">
+                Screen a new applicant
+              </Button>
+              {me && (
+                <Button variant="outline" onClick={() => openAdd("borrower")} className="h-9 rounded-sm">
+                  Add a company
+                </Button>
+              )}
+            </div>
           </div>
         )}
 
@@ -188,6 +234,7 @@ export default function LoanBook() {
       <AddCompanyDialog
         open={addOpen}
         onOpenChange={setAddOpen}
+        initialStage={addStage}
         onCreated={(created) => navigate(`/borrower/${created.id}?checking=1`)}
       />
     </div>

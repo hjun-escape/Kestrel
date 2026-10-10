@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { runAgent } from './logic.ts';
 import type { DataLayer } from './logic.ts';
+import { scopeDataLayer } from './scopedData.ts';
 
 // askPortfolio({ messages, context_company_id? }). "Ask Early Warning" scoped chat agent.
 // Read-only: it never writes entities. Screen / refresh / deep-check requests
@@ -21,11 +22,13 @@ export default async function(req: Request): Promise<Response> {
     if (!user) return Response.json({ error: 'Sign in to use Ask Early Warning.' }, { status: 401 });
 
     const db = base44.asServiceRole.entities;
-    const data: DataLayer = {
+    // Every tool only sees the caller's own companies (access.ts); a
+    // context_company_id the caller cannot access resolves to null.
+    const data: DataLayer = scopeDataLayer({
       listBorrowers: () => db.Borrower.filter({}, '-created_date', MAX_ROWS),
       getBorrower: (id: string) => db.Borrower.get(id).catch(() => null),
       listSignals: (borrowerId: string) => db.Signal.filter({ borrower_id: borrowerId }, '-date', MAX_SIGNALS),
-    };
+    }, user);
     // Core.InvokeLLM goes through the SDK's response interceptor, so it
     // resolves to the parsed JSON object itself when response_json_schema is set.
     const llm = (prompt: string, responseSchema: object) =>
