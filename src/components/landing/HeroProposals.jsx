@@ -177,9 +177,8 @@ const STAGES = [
   { title: "Tag", body: "AI marks what matters" },
   { title: "Verify", body: "Same company, exact quote" },
 ];
-const STRIP = 64; // compact intro at the top
 const GUTTER = 230; // input column: example items being encoded
-const HEADER = 62; // stage titles above the cells
+const HEADER = 72; // stage titles (and the applicant input) above the cells
 const EXIT = 0.66; // share of the canvas the pipeline runs across; the report sits to the right
 const css = ([r, g, b], a = 1) => `rgba(${r},${g},${b},${a})`;
 
@@ -333,106 +332,155 @@ export function PipelineHero() {
   const { tip, handlers } = useProbe(sceneRef, describe);
 
   return (
-    <Stage>
+    <div className="bg-ew-ink text-white">
       {/* Stage titles pulse when something happens in that stage. Self-contained keyframes. */}
       <style>{"@keyframes kestrelPulse{0%{color:#fff;text-shadow:0 0 14px rgba(255,255,255,.9)}100%{text-shadow:0 0 0 rgba(255,255,255,0)}}"}</style>
-      {/* Compact intro across the top. */}
-      <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between gap-6 border-b border-white/10 px-6" style={{ height: STRIP }}>
-        <div className="min-w-0">
-          <h1 id="hero-heading" className="truncate font-heading text-[22px] font-bold leading-tight tracking-[-0.01em]">
-            See the trouble before you lend.
-          </h1>
-          <p className="truncate text-[12.5px] text-white/60">Kestrel screens private-company borrowers: every flag with a source.</p>
-        </div>
-        <LandingCtas tone="dark" className="shrink-0 scale-90 origin-right" />
-      </div>
+      <section aria-labelledby="hero-heading" className="mx-auto max-w-[1280px] px-4 pb-16 pt-8 sm:px-8">
+        <h1 id="hero-heading" className="font-heading text-[clamp(1.6rem,1.2rem+1.4vw,2.3rem)] font-bold leading-tight tracking-[-0.015em]">
+          See the trouble before you lend.
+        </h1>
+        <p className="mt-1 text-[15px] text-white/65">Kestrel screens private-company borrowers: every flag with a source.</p>
 
-      {/* Input column: the five sources, each showing an example item being encoded. */}
-      <div className="absolute bottom-0 left-0 border-r border-white/10" style={{ top: STRIP, width: GUTTER }}>
-        <p className="flex items-end px-3 pb-2 text-[11px] font-semibold tracking-[0.14em] text-white/45" style={{ height: HEADER }}>
-          INPUT
-        </p>
-        <div className="absolute inset-x-0 bottom-0 grid" style={{ top: HEADER, gridTemplateRows: `repeat(${LANES}, minmax(0, 1fr))` }}>
-          {SOURCES.map((s, lane) => {
-            const job = jobs.find((j) => j.lane === lane);
-            return (
-              <div key={s.label} className="flex flex-col justify-center gap-1 border-t border-white/5 px-3">
-                <p className="flex items-center gap-1.5 text-[12px] font-semibold text-white/85">
-                  <span aria-hidden="true" className="h-2 w-2 rounded-[2px]" style={{ background: css(LANE_COLORS[lane]) }} />
-                  {s.label}
-                  <span aria-hidden="true" className="ml-auto text-white/35">→</span>
-                </p>
-                {job ? <EncoderCard key={job.key} job={job} /> : <div className="h-[46px]" />}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* The automaton, its stage titles, and the report. */}
-      <div ref={regionRef} className="absolute bottom-0 right-0" style={{ top: STRIP, left: GUTTER }}>
-        <canvas ref={canvasRef} aria-hidden="true" className="absolute inset-0 h-full w-full cursor-crosshair" {...handlers} />
-        <ol className="pointer-events-none absolute left-0 top-0 grid grid-cols-4" style={{ width: `${EXIT * 100}%`, height: HEADER }}>
-          {STAGES.map((s, i) => (
-            <li key={s.title} className="flex flex-col justify-end border-l border-white/10 px-4 pb-2 first:border-l-0">
-              <p className="text-[11px] font-semibold tracking-[0.14em] text-white/45">0{i + 1}</p>
-              <p key={pulse[i]} className="font-heading text-[17px] font-bold leading-tight text-white motion-safe:animate-[kestrelPulse_700ms_ease-out]">
-                {s.title}
-              </p>
-              <p className="text-[12px] text-white/55">{s.body}</p>
-            </li>
-          ))}
-        </ol>
-
-        <div className="pointer-events-none absolute bottom-0 right-0 top-0 flex flex-col justify-center px-5" style={{ width: `${(1 - EXIT) * 100}%` }}>
-          <div ref={reportRef} className="pointer-events-auto rounded-sm border border-white/10 bg-white text-ew-ink shadow-[0_18px_50px_rgba(0,0,0,0.4)]">
-            <div className="flex items-start justify-between gap-3 border-b border-ew-rule px-4 py-3">
-              <div className="min-w-0">
-                <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-ew-muted">Report · sample</p>
-                <p className="font-heading text-[15px] font-bold leading-tight">{SAMPLE_COMPANY.name}</p>
-              </div>
-              <StatusChip status={progress.status} />
+        {/* The pipeline, in a padded frame. */}
+        <figure aria-label="How Kestrel checks one applicant: input, search, read, tag, verify, report" className="relative mt-6 h-[clamp(560px,72vh,720px)] overflow-hidden rounded-sm border border-white/10 bg-black/10">
+          {/* Input column: the applicant, then each source's example item being encoded. */}
+          <div className="absolute bottom-0 left-0 top-0 border-r border-white/10" style={{ width: GUTTER }}>
+            <div className="flex flex-col justify-center px-3" style={{ height: HEADER }}>
+              <ApplicantInput key={progress.step === 0 ? "run" : "hold"} />
             </div>
-            <p aria-live="polite" className="border-b border-ew-rule-soft px-4 py-2 text-[12.5px] text-ew-ink-soft">
-              {progress.why}
-            </p>
-            <ul className="min-h-[86px] px-4 py-2">
-              {progress.flags.length === 0 && <li className="py-1 text-[12.5px] text-ew-muted">Waiting for a verified signal…</li>}
-              {progress.flags.map((f) => (
-                <li
-                  key={f.id}
-                  className={`-mx-2 flex items-baseline justify-between gap-3 rounded-sm px-2 py-1 text-[13px] transition-colors duration-1000 ${
-                    landed === f.id ? "bg-sky-100" : "bg-transparent"
-                  }`}
-                  onTransitionEnd={() => setLanded((l) => (l === f.id ? null : l))}
-                >
-                  <span className="font-semibold">{f.title}</span>
-                  <span className="shrink-0 text-[12px] text-ew-muted">{f.when}</span>
-                </li>
-              ))}
-            </ul>
-            <div className="border-t border-ew-rule bg-ew-paper px-4 py-2">
-              <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-ew-muted">Activity log</p>
-              <ol aria-live="polite" className="mt-1 space-y-0.5 font-mono text-[11px] leading-snug">
-                {log.map((e) => (
-                  <li key={e.key} className="flex gap-2">
-                    <span className="shrink-0 text-ew-muted">{e.stamp}</span>
-                    <span className="shrink-0 font-semibold" style={{ color: css(LANE_COLORS[e.lane].map((v) => Math.round(v * 0.62))) }}>
-                      {e.stage}
-                    </span>
-                    <span className="min-w-0 truncate text-ew-ink-soft">{e.text}</span>
-                  </li>
-                ))}
-                {log.length === 0 && <li className="text-ew-muted">Starting…</li>}
-              </ol>
+            <div className="absolute inset-x-0 bottom-0 grid" style={{ top: HEADER, gridTemplateRows: `repeat(${LANES}, minmax(0, 1fr))` }}>
+              {SOURCES.map((s, lane) => {
+                const job = jobs.find((j) => j.lane === lane);
+                return (
+                  <div key={s.label} className="flex flex-col justify-center gap-1 border-t border-white/5 px-3">
+                    <p className="flex items-center gap-1.5 text-[12px] font-semibold text-white/85">
+                      <span aria-hidden="true" className="h-2 w-2 rounded-[2px]" style={{ background: css(LANE_COLORS[lane]) }} />
+                      {s.label}
+                      <span aria-hidden="true" className="ml-auto text-white/35">→</span>
+                    </p>
+                    {job ? <EncoderCard key={job.key} job={job} /> : <div className="h-[46px]" />}
+                  </div>
+                );
+              })}
             </div>
           </div>
+
+          {/* The automaton, its stage titles, and the report. */}
+          <div ref={regionRef} className="absolute bottom-0 right-0 top-0" style={{ left: GUTTER }}>
+            <canvas ref={canvasRef} aria-hidden="true" className="absolute inset-0 h-full w-full cursor-crosshair" {...handlers} />
+            <ol className="pointer-events-none absolute left-0 top-0 grid grid-cols-4" style={{ width: `${EXIT * 100}%`, height: HEADER }}>
+              {STAGES.map((s, i) => (
+                <li key={s.title} className="flex flex-col justify-end border-l border-white/10 px-4 pb-2 first:border-l-0">
+                  <p className="text-[11px] font-semibold tracking-[0.14em] text-white/45">0{i + 1}</p>
+                  <p key={pulse[i]} className="font-heading text-[17px] font-bold leading-tight text-white motion-safe:animate-[kestrelPulse_700ms_ease-out]">
+                    {s.title}
+                  </p>
+                  <p className="text-[12px] text-white/55">{s.body}</p>
+                </li>
+              ))}
+            </ol>
+
+            <div className="pointer-events-none absolute bottom-0 right-0 top-0 flex flex-col justify-center px-4" style={{ width: `${(1 - EXIT) * 100}%` }}>
+              <div ref={reportRef} className="pointer-events-auto rounded-sm border border-white/10 bg-white text-ew-ink shadow-[0_18px_50px_rgba(0,0,0,0.4)]">
+                <div className="flex items-start justify-between gap-3 border-b border-ew-rule px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-ew-muted">Report · sample</p>
+                    <p className="font-heading text-[15px] font-bold leading-tight">{SAMPLE_COMPANY.name}</p>
+                  </div>
+                  <StatusChip status={progress.status} />
+                </div>
+                <p aria-live="polite" className="border-b border-ew-rule-soft px-4 py-2 text-[12.5px] text-ew-ink-soft">
+                  {progress.why}
+                </p>
+                <ul className="min-h-[86px] px-4 py-2">
+                  {progress.flags.length === 0 && <li className="py-1 text-[12.5px] text-ew-muted">Waiting for a verified signal…</li>}
+                  {progress.flags.map((f) => (
+                    <li
+                      key={f.id}
+                      className={`-mx-2 flex items-baseline justify-between gap-3 rounded-sm px-2 py-1 text-[13px] transition-colors duration-1000 ${
+                        landed === f.id ? "bg-sky-100" : "bg-transparent"
+                      }`}
+                      onTransitionEnd={() => setLanded((l) => (l === f.id ? null : l))}
+                    >
+                      <span className="font-semibold">{f.title}</span>
+                      <span className="shrink-0 text-[12px] text-ew-muted">{f.when}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="border-t border-ew-rule bg-ew-paper px-4 py-2">
+                  <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-ew-muted">Activity log</p>
+                  <ol aria-live="polite" className="mt-1 space-y-0.5 font-mono text-[11px] leading-snug">
+                    {log.map((e) => (
+                      <li key={e.key} className="flex gap-2">
+                        <span className="shrink-0 text-ew-muted">{e.stamp}</span>
+                        <span className="shrink-0 font-semibold" style={{ color: css(LANE_COLORS[e.lane].map((v) => Math.round(v * 0.62))) }}>
+                          {e.stage}
+                        </span>
+                        <span className="min-w-0 truncate text-ew-ink-soft">{e.text}</span>
+                      </li>
+                    ))}
+                    {log.length === 0 && <li className="text-ew-muted">Starting…</li>}
+                  </ol>
+                </div>
+              </div>
+            </div>
+            <Tooltip tip={tip} />
+          </div>
+        </figure>
+
+        {/* Description below the pipeline. */}
+        <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)]">
+          <p className="text-[15px] leading-relaxed text-white/75">
+            Enter an applicant and Kestrel checks five public sources at once. Every item is read, judged by AI and then
+            verified in code: the same company, and a quote found word for word in the source. Only what survives reaches
+            the report, with its source attached. Hover any cell above to see what it is.
+          </p>
+          <dl className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {STAGE_DETAILS.map((d, i) => (
+              <div key={d.title} className="border-t border-white/15 pt-3">
+                <dt className="text-[11px] font-semibold tracking-[0.14em] text-white/45">
+                  0{i + 1} <span className="text-white">{d.title}</span>
+                </dt>
+                <dd className="mt-1 text-[13.5px] leading-relaxed text-white/65">{d.body}</dd>
+              </div>
+            ))}
+          </dl>
         </div>
-        <Tooltip tip={tip} />
-      </div>
-    </Stage>
+      </section>
+    </div>
   );
 }
+
+/** The applicant being entered: types the company, then shows its domain and city. */
+function ApplicantInput() {
+  const name = SAMPLE_COMPANY.name;
+  const [n, setN] = useState(() => (prefersReducedMotion() ? name.length : 0));
+  useEffect(() => {
+    if (prefersReducedMotion()) return undefined;
+    const t = setInterval(() => setN((v) => (v >= name.length ? v : v + 1)), 55);
+    return () => clearInterval(t);
+  }, [name]);
+  const done = n >= name.length;
+  return (
+    <div className="rounded-sm border border-white/30 bg-white/[0.06] px-2.5 py-1.5">
+      <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-white/55">Input · applicant</p>
+      <p className="truncate font-mono text-[12px] text-white">
+        {name.slice(0, n)}
+        <span aria-hidden="true" className={`ml-px inline-block h-3 w-[6px] translate-y-[1px] bg-white ${done ? "opacity-0" : "animate-pulse"}`} />
+      </p>
+      <p className={`truncate text-[11px] text-white/55 transition-opacity duration-300 ${done ? "opacity-100" : "opacity-0"}`}>
+        {SAMPLE_COMPANY.place} · searching 5 sources
+      </p>
+    </div>
+  );
+}
+
+const STAGE_DETAILS = [
+  { title: "Search", body: "News, court filings, job posts, reviews and LinkedIn, searched in parallel for the last 180 days." },
+  { title: "Read", body: "Each result is opened in full through Bright Data, not judged from a headline." },
+  { title: "Tag", body: "AI marks what is a real warning sign about this company and says why. It never sets the status." },
+  { title: "Verify", body: "Code drops anything about a different company, or whose quote is not word for word in the source." },
+];
 
 function shorten(text, max = 40) {
   const t = String(text).replace(/\s*·.*$/, "");

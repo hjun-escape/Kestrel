@@ -158,7 +158,7 @@ export function pipelineScene({ onSignal, onMark, onDrop, cell = 6, exitFrac = 0
           else if (s === 1) out = n >= TAG_N && Math.random() < TAG_P ? 2 : n <= 1 ? 0 : n >= 3 ? 1 : 0;
           else out = n === 3 && Math.random() < 0.5 ? 1 : 0;
           if (s === 1 && out === 2) {
-            if (Math.random() < 0.25) effect({ kind: "pop", x: (c + 0.5) * cell, y: (r + 0.5) * cell, lane: laneOf(r), at: now, dur: 650 });
+            if (Math.random() < 0.12) effect({ kind: "pop", x: (c + 0.5) * cell, y: (r + 0.5) * cell, lane: laneOf(r), at: now, dur: 550 });
             if (now - lastMark > 1300) {
               lastMark = now;
               onMark?.({ lane: laneOf(r), id: r * 7919 + (c - shifted) });
@@ -285,9 +285,9 @@ export function pipelineScene({ onSignal, onMark, onDrop, cell = 6, exitFrac = 0
         keep.push(e);
         const col = LANE_COLORS[e.lane];
         if (e.kind === "absorb") {
+          // A ripple along the gate only (vertical), as the fragment is taken in.
           ctx.fillStyle = rgba(col, 0.8 * (1 - t));
-          ctx.fillRect(e.x - 14 * t, e.y - 0.5, 28 * t + 1, 1.5);
-          ctx.fillRect(e.x - 0.5, e.y - 6 * t, 1.5, 12 * t + 1);
+          ctx.fillRect(e.x - 0.5, e.y - 10 * t, 2, 20 * t + 1);
           continue;
         }
         if (e.kind === "spark") {
@@ -337,11 +337,11 @@ export function pipelineScene({ onSignal, onMark, onDrop, cell = 6, exitFrac = 0
           ctx.fillStyle = rgba(col, 0.5 * (1 - t));
           ctx.fillRect(0, e.y - e.h / 2, 3 + 30 * t, e.h);
         } else if (e.kind === "pop") {
+          // Newly marked: a square outline on the grid, not a ring.
+          const sz = cell + 2 + 4 * t;
           ctx.strokeStyle = rgba(col, 0.9 * (1 - t));
-          ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          ctx.arc(e.x, e.y, 3 + 12 * t, 0, Math.PI * 2);
-          ctx.stroke();
+          ctx.lineWidth = 1;
+          ctx.strokeRect(e.x - sz / 2, e.y - sz / 2, sz, sz);
         } else if (e.kind === "fade") {
           const s = (cell - 1) * (1 - t);
           ctx.fillStyle = white(0.6 * (1 - t));

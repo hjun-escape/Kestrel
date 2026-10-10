@@ -43,3 +43,21 @@ export default function LandingCtas({ tone = "dark", className = "" }) {
     </div>
   );
 }
+
+/** "Explore the demo" on its own (the landing nav uses it next to Sign in). Same behaviour as above. */
+export function ExploreDemoLink({ className = "" }) {
+  const navigate = useNavigate();
+  return (
+    <a
+      href={DEMO_LOAD_PATH}
+      onClick={(e) => {
+        e.preventDefault();
+        chooseDemo(browserStorage());
+        navigate(DEMO_LOAD_PATH);
+      }}
+      className={className}
+    >
+      Explore the demo
+    </a>
+  );
+}
