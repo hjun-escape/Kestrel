@@ -23,7 +23,7 @@ const STAGES = [
 ];
 const GUTTER = 210; // sources column: example items sliding into their lanes
 const HEADER = 72; // stage titles above the cells
-const EXIT = 0.97; // share of the canvas the pipeline runs across; a short runway before the exit edge
+const EXIT = 1; // the pipeline runs the full frame; its exit gate is the frame's right edge
 const FPS = 14;
 const MS_PER_COLUMN = (2 * 1000) / FPS; // the conveyor moves one column every other step
 const css = ([r, g, b], a = 1) => `rgba(${r},${g},${b},${a})`;
@@ -482,7 +482,8 @@ export function PipelineHero() {
   return (
     // -mt-16 pt-16: the dark background and character field extend up behind the transparent nav.
     <div className="relative -mt-16 overflow-hidden bg-ew-ink pt-16 text-white">
-      <AsciiField className="absolute inset-0 h-full w-full" />
+      {/* Page-wide character field (fixed behind the viewport; covers every section). */}
+      <AsciiField />
       {/* Stage titles pulse when something happens in that stage. Self-contained keyframes. */}
       <style>{"@keyframes kestrelPulse{0%{color:#fff;text-shadow:0 0 14px rgba(255,255,255,.9)}100%{text-shadow:0 0 0 rgba(255,255,255,0)}}"}</style>
       <section aria-labelledby="hero-heading" className="relative mx-auto max-w-[1400px] px-4 pb-16 pt-6 sm:px-8">

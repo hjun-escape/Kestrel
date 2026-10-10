@@ -232,11 +232,12 @@ export function pipelineScene({ onSignal, onMark, onDrop, cell = 6, exitFrac = 0
       for (let l = 0; l < LANES; l++) {
         const [a, b] = laneRows(l);
         ctx.fillStyle = rgba(LANE_COLORS[l], 0.03);
-        ctx.fillRect(0, a * cell, exitCol * cell, (b - a + 1) * cell);
+        ctx.fillRect(0, a * cell, exitCol === cols ? w : exitCol * cell, (b - a + 1) * cell);
       }
       // Gates: each brightens with traffic and has its own look.
       for (let g = 0; g < 4; g++) gateAct[g] *= 0.9;
-      const gateX = [1, 2, 3].map((b) => Math.floor((b * exitCol) / BANDS) * cell).concat(exitCol * cell);
+      // The exit gate sits on the frame's right edge when the pipeline runs the full width.
+      const gateX = [1, 2, 3].map((b) => Math.floor((b * exitCol) / BANDS) * cell).concat(exitCol === cols ? w - 5 : exitCol * cell);
       const glow = (g) => 0.14 + Math.min(0.45, gateAct[g] * 0.012);
       // 1 absorb: dotted line.
       ctx.fillStyle = white(glow(0));
