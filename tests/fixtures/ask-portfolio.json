@@ -1,0 +1,83 @@
+{
+  "now": "2026-10-10T12:00:00.000Z",
+  "borrowers": [
+    {
+      "id": "b_north",
+      "name": "Northfield Packaging Co.",
+      "website_domain": "northfieldpack.example",
+      "stage": "borrower",
+      "status": "red",
+      "why": "CFO departed and layoffs reported in the last 30 days.",
+      "loan_amount_usd": 4500000,
+      "last_refreshed": "2026-10-08T09:00:00.000Z",
+      "sources_unavailable": []
+    },
+    {
+      "id": "b_harbor",
+      "name": "Harbor Freight Logistics",
+      "website_domain": "harborfreightlog.example",
+      "stage": "borrower",
+      "status": "yellow",
+      "why": "Job postings down 60% quarter over quarter.",
+      "loan_amount_usd": 2000000,
+      "last_refreshed": "2026-09-20T09:00:00.000Z",
+      "sources_unavailable": ["Reviews"]
+    },
+    {
+      "id": "b_harbor_bev",
+      "name": "Harbor Beverages",
+      "website_domain": "harborbev.example",
+      "stage": "applicant",
+      "status": "green",
+      "why": "",
+      "loan_amount_usd": 750000,
+      "last_refreshed": "2026-10-09T09:00:00.000Z",
+      "sources_unavailable": []
+    },
+    {
+      "id": "b_new",
+      "name": "Cedar Ridge Dental Group",
+      "website_domain": "cedarridgedental.example",
+      "stage": "applicant",
+      "status": "green",
+      "why": "",
+      "loan_amount_usd": 300000,
+      "sources_unavailable": []
+    }
+  ],
+  "signals": [
+    {
+      "id": "s_cfo",
+      "borrower_id": "b_north",
+      "type": "exec_departure",
+      "severity": "strong",
+      "date": "2026-09-28",
+      "title": "Northfield Packaging CFO resigns",
+      "snippet": "Northfield Packaging said its chief financial officer,   Dana Ruiz, resigned effective immediately.",
+      "source_name": "Packaging Weekly",
+      "source_url": "https://news.example/northfield-cfo"
+    },
+    {
+      "id": "s_layoffs",
+      "borrower_id": "b_north",
+      "type": "legal_layoffs",
+      "severity": "strong",
+      "date": "2026-10-02",
+      "title": "WARN notice: 120 layoffs at Northfield plant",
+      "snippet": "A WARN notice filed with the state lists 120 workers at the Dayton plant.",
+      "source_name": "State WARN database",
+      "source_url": "https://warn.example/northfield-2026"
+    },
+    {
+      "id": "s_hiring",
+      "borrower_id": "b_harbor",
+      "type": "hiring_drop",
+      "severity": "weak",
+      "date": "2026-09-15",
+      "title": "Open roles fell from 40 to 16",
+      "snippet": "Open roles on the company careers page fell from 40 to 16 over the quarter.",
+      "source_name": "LinkedIn",
+      "source_url": "https://jobs.example/harbor"
+    }
+  ]
+}
