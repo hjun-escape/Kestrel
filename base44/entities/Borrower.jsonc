@@ -60,6 +60,21 @@
           "Reviews"
         ]
       }
+    },
+    "pending_snapshots": {
+      "type": "object",
+      "description": "Written only by refreshBorrower: Bright Data snapshot_id per signal function that is still building, passed back on the next refresh. Not shown on screens.",
+      "properties": {
+        "newsSignals": {
+          "type": "string"
+        },
+        "hiringSignal": {
+          "type": "string"
+        },
+        "reviewSignals": {
+          "type": "string"
+        }
+      }
     }
   },
   "required": [

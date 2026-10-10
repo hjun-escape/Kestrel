@@ -30,12 +30,11 @@ export const AuthProvider = ({ children }) => {
         if (appParams.token) {
           await checkUserAuth();
         } else {
-          // No session token: every route requires sign-in, even if the app
-          // is configured as public. AuthenticatedApp redirects on this.
+          // No session token: a signed-out visitor. Sign-in is optional, so
+          // this is a normal state, not an error (see App.jsx).
           setIsLoadingAuth(false);
           setIsAuthenticated(false);
           setAuthChecked(true);
-          setAuthError({ type: 'auth_required', message: 'Authentication required' });
         }
         setIsLoadingPublicSettings(false);
       } catch (appError) {
