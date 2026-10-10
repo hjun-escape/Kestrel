@@ -1,16 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, ChevronRight, ExternalLink } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import AppHeader from "@/components/AppHeader";
-import CompanyHeader from "@/components/CompanyHeader";
-import SourceStatusRow from "@/components/SourceStatusRow";
-import SignalTimeline from "@/components/SignalTimeline";
-import ApplicantDecision from "@/components/ApplicantDecision";
-import CashflowReview from "@/components/CashflowReview";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { formatTimeToFlag, timeToFirstFlag } from "@/lib/timeToFlag.ts";
-import AnalystBrief from "@/components/AnalystBrief";
+import CompanyReport from "@/components/CompanyReport";
 import EditCompanyDialog from "@/components/EditCompanyDialog";
 import DeleteCompanyDialog from "@/components/DeleteCompanyDialog";
 import { useAuth } from "@/lib/AuthContext";
@@ -18,17 +11,18 @@ import { canSeeCompany, normalizeEmail } from "@/lib/ownership";
 import {
   POLL_INTERVAL_MS,
   deriveSourceStates,
-  filterRecentSignals,
   getActiveRefresh,
   startRefresh,
 } from "@/lib/borrowerUtils";
 
 async function fetchCompany(id) {
-  const [borrower, sigRes] = await Promise.all([
+  const [borrower, sigRes, runRes] = await Promise.all([
     base44.entities.Borrower.get(id),
     base44.entities.Signal.filter({ borrower_id: id }, { limit: 200, sort: "-date" }),
+    // Latest news check, for "How News and Legal were checked". Optional: never blocks the page.
+    base44.entities.CheckRun.filter({ borrower_id: id }, { limit: 1, sort: "-started_at" }).catch(() => null),
   ]);
-  return { borrower, signals: sigRes.items || [] };
+  return { borrower, signals: sigRes.items || [], checkRun: runRes?.items?.[0] || null };
 }
 
 // Thrown by loadData when the company belongs to someone else (or, signed in,
@@ -50,7 +44,7 @@ export default function CompanyDetail() {
   const [noAccess, setNoAccess] = useState(false);
   const [run, setRun] = useState(null);
   const [refreshError, setRefreshError] = useState(null);
-  const [cashflowReview, setCashflowReview] = useState(null);
+  const [checkRun, setCheckRun] = useState(null);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [notice, setNotice] = useState(null);
@@ -63,6 +57,7 @@ export default function CompanyDetail() {
     if (!canSeeCompany(data.borrower, meRef.current)) throw new Error(NO_ACCESS);
     setBorrower(data.borrower);
     setSignals(data.signals);
+    setCheckRun(data.checkRun);
     return data;
   }
 
@@ -99,7 +94,6 @@ export default function CompanyDetail() {
     setSignals([]);
     setRun(null);
     setRefreshError(null);
-    setCashflowReview(null);
     setNotice(null);
     if (isLoadingAuth) return;
     (async () => {
@@ -169,95 +163,45 @@ export default function CompanyDetail() {
 
   const running = !!run;
   const sourceStates = deriveSourceStates(borrower, signals, run);
-  const recentSignals = filterRecentSignals(signals);
-  const olderCount = signals.length - recentSignals.length;
   const newIds = run ? new Set(signals.map((s) => s.id).filter((sid) => !run.snapshot.signalIdsBefore.includes(sid))) : null;
-  const isApplicant = borrower.stage === "applicant";
-  const flagLine = formatTimeToFlag(timeToFirstFlag(borrower, signals, cashflowReview ? [cashflowReview] : []));
 
   return (
     <DetailShell>
-      <div className="border border-ew-rule bg-ew-surface">
-        <CompanyHeader
-          borrower={borrower}
-          sourceStates={sourceStates}
-          running={running}
-          refreshError={refreshError}
-          onRefresh={() => handleRefresh()}
-          // Signed-in owners only: the shared demo book is the same for every signed-out visitor (manageCompany).
-          onEdit={me ? () => setEditOpen(true) : undefined}
-          onDelete={me ? () => setDeleteOpen(true) : undefined}
-        />
-        {notice && (
-          <p role="status" className="border-t border-ew-rule-soft px-5 py-2 text-xs text-ew-ink-soft">
-            {notice}
-          </p>
-        )}
-        <SourceStatusRow states={sourceStates} recentSignals={recentSignals} running={running} startedAt={run?.startedAt} />
-        {flagLine && (
-          <p className="border-t border-ew-rule-soft px-5 py-2 text-xs text-ew-ink-soft">{flagLine}</p>
-        )}
-      </div>
-
-      {/* Evidence first: the signals behind the status, each with its source and
-          what to ask. Next steps (decision, other lenders, analyst) sit beside it. */}
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_400px]">
-        <section aria-labelledby="evidence-heading" className="min-w-0">
-          <div className="mb-3 flex items-baseline justify-between gap-4">
-            <h2 id="evidence-heading" className="font-heading text-xl font-bold tracking-tight text-ew-ink">
-              Evidence
-            </h2>
-            <p className="text-xs tabular-nums text-ew-muted">
-              {recentSignals.length} in the last 90 days{olderCount > 0 ? `, ${olderCount} older` : ""}
-            </p>
-          </div>
-          <SignalTimeline
-            signals={signals}
-            neverRefreshed={!borrower.last_refreshed}
-            checking={running}
-            newIds={newIds}
-          />
-          {isApplicant ? (
-            <div className="mt-6">
-              <CashflowReview borrower={borrower} onReviewChange={setCashflowReview} />
-            </div>
-          ) : (
-            <Collapsible className="mt-6 border border-ew-rule bg-ew-surface">
-              <CollapsibleTrigger className="group flex w-full items-center gap-2 px-4 py-3 text-left font-heading text-sm font-bold text-ew-ink">
-                <ChevronRight aria-hidden="true" className="h-4 w-4 transition-transform group-data-[state=open]:rotate-90" />
-                Upload latest statement
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <CashflowReview borrower={borrower} onReviewChange={setCashflowReview} />
-              </CollapsibleContent>
-            </Collapsible>
-          )}
-        </section>
-
-        <EditCompanyDialog
-          borrower={borrower}
-          open={editOpen}
-          onOpenChange={setEditOpen}
-          onSaved={(updated, evidenceCleared) => {
-            if (updated) setBorrower(updated);
-            if (evidenceCleared) setSignals([]);
-            setNotice(evidenceCleared ? "Saved. The old evidence was cleared because the company's identity changed. Refresh to check it again." : "Saved.");
-            loadData().catch(() => {});
-          }}
-        />
-        <DeleteCompanyDialog
-          borrower={borrower}
-          open={deleteOpen}
-          onOpenChange={setDeleteOpen}
-          onDeleted={() => navigate("/", { replace: true })}
-        />
-
-        <aside aria-label="Next steps" className="flex min-w-0 flex-col gap-4">
-          <ApplicantDecision key={borrower.id} borrower={borrower} signals={signals} />
-          <AnalystBrief borrower={borrower} />
-          <CompanyLinks borrower={borrower} />
-        </aside>
-      </div>
+      <CompanyReport
+        key={borrower.id}
+        borrower={borrower}
+        signals={signals}
+        sourceStates={sourceStates}
+        running={running}
+        startedAt={run?.startedAt ?? null}
+        refreshError={refreshError}
+        onRefresh={() => handleRefresh()}
+        // Signed-in owners only: the shared demo book is the same for every signed-out visitor (manageCompany).
+        onEdit={me ? () => setEditOpen(true) : undefined}
+        onDelete={me ? () => setDeleteOpen(true) : undefined}
+        notice={notice}
+        checkRun={checkRun}
+        // A run saved before this refresh started belongs to the previous check.
+        checkRunStale={!!run && !!checkRun && Date.parse(checkRun.started_at) < run.startedAt - 5000}
+        newIds={newIds}
+      />
+      <EditCompanyDialog
+        borrower={borrower}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        onSaved={(updated, evidenceCleared) => {
+          if (updated) setBorrower(updated);
+          if (evidenceCleared) setSignals([]);
+          setNotice(evidenceCleared ? "Saved. The old evidence was cleared because the company's identity changed. Refresh to check it again." : "Saved.");
+          loadData().catch(() => {});
+        }}
+      />
+      <DeleteCompanyDialog
+        borrower={borrower}
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        onDeleted={() => navigate("/", { replace: true })}
+      />
     </DetailShell>
   );
 }
@@ -279,38 +223,6 @@ function DetailShell({ children }) {
         {children}
       </main>
     </div>
-  );
-}
-
-function CompanyLinks({ borrower }) {
-  const links = [
-    { label: "Website", href: borrower.website_domain ? `https://${borrower.website_domain}` : null },
-    { label: "LinkedIn", href: borrower.linkedin_url },
-    { label: "Glassdoor", href: borrower.glassdoor_url },
-  ].filter((l) => l.href && /^https?:\/\//.test(l.href));
-  if (links.length === 0) return null;
-  return (
-    <section aria-labelledby="links-heading" className="border border-ew-rule bg-ew-surface px-4 py-3">
-      <h2 id="links-heading" className="text-xs font-semibold text-ew-muted">
-        Company profiles
-      </h2>
-      <ul className="mt-2 flex flex-wrap gap-2">
-        {links.map((l) => (
-          <li key={l.label}>
-            <a
-              href={l.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={`${l.label} (opens in a new tab)`}
-              className="inline-flex items-center gap-1.5 rounded-sm border border-ew-rule px-2 py-1 text-xs font-medium text-ew-ink hover:border-ew-ink-soft hover:bg-ew-hover"
-            >
-              {l.label}
-              <ExternalLink aria-hidden="true" className="h-3 w-3" />
-            </a>
-          </li>
-        ))}
-      </ul>
-    </section>
   );
 }
 

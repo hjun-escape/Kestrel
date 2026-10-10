@@ -23,7 +23,7 @@ export const EDITABLE = [
 export const IDENTITY = ["name", "website_domain", "linkedin_url", "glassdoor_url"] as const;
 
 // Entities that point at a company with borrower_id. Deleting a company deletes these too.
-export const CHILD_ENTITIES = ["Signal", "Analysis", "LenderCheck", "Decision", "CashflowReview"] as const;
+export const CHILD_ENTITIES = ["Signal", "Analysis", "LenderCheck", "Decision", "CashflowReview", "CheckRun"] as const;
 
 type Patch = Record<string, unknown>;
 
@@ -127,7 +127,11 @@ export async function updateCompany(db: Db, borrower: Patch & { id: string }, fi
   const changes = changedFields(borrower, cleaned.patch);
   if (Object.keys(changes).length === 0) return { status: 200, body: { borrower, evidence_cleared: false } };
   const reset = identityChanged(changes);
-  if (reset) await db.Signal.deleteMany!({ borrower_id: borrower.id });
+  if (reset) {
+    await db.Signal.deleteMany!({ borrower_id: borrower.id });
+    // The step-by-step record of the old check describes the old identity too.
+    await db.CheckRun.deleteMany!({ borrower_id: borrower.id });
+  }
   const updated = await db.Borrower.update!(borrower.id, reset ? { ...changes, ...RESET_CHECK } : changes);
   return { status: 200, body: { borrower: updated, evidence_cleared: reset } };
 }

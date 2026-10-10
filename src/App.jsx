@@ -11,6 +11,8 @@ import LoanBook from '@/pages/LoanBook';
 import CompanyDetail from '@/pages/CompanyDetail';
 // The Assistant page pulls in assistant-ui; load it only when visited.
 const Assistant = lazy(() => import('@/pages/Assistant'));
+// Example replay of a news check (no data sources called); load only when visited.
+const DevProgression = lazy(() => import('@/pages/DevProgression'));
 // The welcome page pulls in animejs; load it only when visited.
 const Landing = lazy(() => import('@/pages/Landing'));
 import WelcomeGate from '@/components/landing/WelcomeGate';
@@ -34,6 +36,7 @@ const AppRoutes = () => (
     <Route path="/" element={<WelcomeGate><LoanBook /></WelcomeGate>} />
     <Route path="/borrower/:id" element={<CompanyDetail />} />
     <Route path="/assistant" element={<Suspense fallback={null}><Assistant /></Suspense>} />
+    <Route path="/dev/progression" element={<Suspense fallback={null}><DevProgression /></Suspense>} />
     <Route path="*" element={<PageNotFound />} />
   </Routes>
 );

@@ -86,6 +86,7 @@ test("changing name, domain, LinkedIn or Glassdoor clears the evidence and goes 
     assert.equal((r.body as { evidence_cleared: boolean }).evidence_cleared, true, JSON.stringify(fields));
     assert.deepEqual(calls, [
       'Signal.deleteMany {"borrower_id":"b1"}',
+      'CheckRun.deleteMany {"borrower_id":"b1"}',
       `Borrower.update b1 ${JSON.stringify({ ...fields, ...RESET_CHECK })}`,
     ]);
   }
@@ -114,6 +115,7 @@ test("delete removes every linked record, then the company", async () => {
     'LenderCheck.deleteMany {"borrower_id":"b1"}',
     'Decision.deleteMany {"borrower_id":"b1"}',
     'CashflowReview.deleteMany {"borrower_id":"b1"}',
+    'CheckRun.deleteMany {"borrower_id":"b1"}',
     "Borrower.delete b1",
   ]);
 });
