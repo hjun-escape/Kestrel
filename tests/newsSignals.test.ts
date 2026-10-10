@@ -11,6 +11,7 @@ import {
   buildNewsSearchUrl,
   buildTagPrompt,
   parseNewsDate,
+  judge,
   parseTag,
   runNewsSignals,
 } from '../base44/functions/newsSignals/logic.ts';
@@ -451,4 +452,50 @@ describe('runNewsSignals', () => {
     await run({ fetch: f.fn, invokeLLM: llm.fn }).result;
     assert.equal(llm.calls.length, 5);
   });
+});
+
+describe('judge (P2 additions)', () => {
+  const item = (text: string) => ({ url: 'https://x/1', title: 'T', source: 'X', date: '2026-10-01', text, query: 'exec_departure' as const });
+  const tag = (t: Record<string, unknown>) => ({ relevant: true, same_company: true, signal_type: 'exec_departure', severity: 'strong', snippet: '', ...t });
+
+  test('exec_departure without a senior role in the article is dropped (store closure mis-tag)', () => {
+    const text = 'Red Lobster to shutdown its oldest location after the lease ended.';
+    const r = judge(item(text), tag({ snippet: 'Red Lobster to shutdown its oldest location' }));
+    assert.equal(r.signal, null);
+    assert.match(r.reason, /no senior role/);
+  });
+
+  test('exec_departure naming the CFO is kept, and every drop has a reason', () => {
+    const text = 'Acme CFO Jane Doe resigned on Friday, the company said.';
+    assert.equal(judge(item(text), tag({ snippet: 'Acme CFO Jane Doe resigned on Friday' })).reason, 'kept');
+    assert.equal(judge(item(text), tag({ relevant: false })).reason, 'not relevant');
+    assert.equal(judge(item(text), tag({ same_company: false })).reason, 'not the same company');
+    assert.match(judge(item(text), tag({ snippet: 'Jane Doe was fired by the board' })).reason, /snippet guard/);
+  });
+
+  test('parseTag keeps the model reason when present', () => {
+    assert.equal(parseTag({ relevant: false, same_company: true, signal_type: 'none', severity: 'none', snippet: '', reason: 'good news' })?.reason, 'good news');
+  });
+});
+
+test('an empty search reply is retried once before the search counts as failed', async () => {
+  let legalCalls = 0;
+  const serp = JSON.stringify({ general: { empty: true } });
+  const fetchStub = async (_url: string, init: { body: string }) => {
+    const target = JSON.parse(init.body).url as string;
+    if (target.includes('lawsuit')) {
+      legalCalls += 1;
+      return { ok: true, status: 200, text: async () => (legalCalls === 1 ? '' : serp) };
+    }
+    return { ok: true, status: 200, text: async () => serp };
+  };
+  const signals = await runNewsSignals({
+    borrower: { name: 'Acme Foods' },
+    invokeLLM: async () => ({}),
+    fetch: fetchStub,
+    apiKey: 'test',
+    today: '2026-10-10',
+  });
+  assert.deepEqual(signals, []);
+  assert.equal(legalCalls, 2);
 });

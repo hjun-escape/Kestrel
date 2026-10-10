@@ -1,0 +1,2 @@
+# Recorded article pages (large, third-party content): local replay cache only
+*.news.json

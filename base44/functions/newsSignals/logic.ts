@@ -97,6 +97,8 @@ export interface Tag {
   signal_type: string;
   severity: string;
   snippet: string;
+  /** The model's one-line explanation. Logged for the team, never saved on a Signal. */
+  reason?: string;
 }
 
 export interface NewsDeps {
@@ -108,6 +110,8 @@ export interface NewsDeps {
   today?: string;
   now?: () => number;
   budgetMs?: number;
+  /** Optional progress log (Base44 function logs, local console). */
+  log?: (msg: string) => void;
 }
 
 // ---------- queries ----------
@@ -217,6 +221,7 @@ export const TAG_SCHEMA = {
     signal_type: { type: 'string', enum: ['exec_departure', 'legal_layoffs', 'none'] },
     severity: { type: 'string', enum: ['strong', 'weak', 'none'] },
     snippet: { type: 'string' },
+    reason: { type: 'string' },
   },
   required: ['relevant', 'same_company', 'signal_type', 'severity', 'snippet'],
 };
@@ -263,6 +268,7 @@ export function buildTagPrompt(borrower: Borrower, item: Omit<NewsItem, 'text'> 
     '- severity "none" if not relevant or not the same company.',
     '- snippet: copy one or two sentences EXACTLY, character for character, from the Text above that show the event.',
     '  Never paraphrase, summarise, shorten words or fix typos. Empty string if there is none.',
+    '- reason: one short sentence explaining your decision (which company, what event).',
   ].join('\n');
 }
 
@@ -276,6 +282,7 @@ export function parseTag(raw: unknown): Tag | null {
     signal_type: str(data.signal_type).toLowerCase(),
     severity: str(data.severity).toLowerCase(),
     snippet: str(data.snippet),
+    ...(str(data.reason) ? { reason: str(data.reason) } : {}),
   };
 }
 
@@ -308,21 +315,36 @@ export function findVerbatim(text: string, quote: string): string | null {
   return text.slice(at[idx], at[idx + needle.length - 1] + 1).replace(/\s+/g, ' ');
 }
 
-function toSignal(item: NewsItem, tag: Tag | null): Signal | null {
-  if (!tag || !tag.relevant || !tag.same_company) return null;
-  if (!(SIGNAL_TYPES as readonly string[]).includes(tag.signal_type)) return null;
-  if (tag.severity !== 'strong' && tag.severity !== 'weak') return null;
+/** An exec_departure must name a senior role; this catches e.g. a store closure tagged as a departure. */
+const EXEC_TITLE = /\b(ceo|cfo|coo|chief [a-z]+ officer|chief executive|chief financial|president|founder|co-founder|chairman|executive|director|vp|vice president)\b/i;
+
+/** Decides whether a tagged item becomes a Signal, and says why not when it does not. */
+export function judge(item: NewsItem, tag: Tag | null): { signal: Signal | null; reason: string } {
+  const no = (reason: string) => ({ signal: null, reason });
+  if (!tag) return no('unreadable tag');
+  if (!tag.relevant) return no('not relevant');
+  if (!tag.same_company) return no('not the same company');
+  if (!(SIGNAL_TYPES as readonly string[]).includes(tag.signal_type)) return no(`type ${tag.signal_type || 'none'}`);
+  if (tag.severity !== 'strong' && tag.severity !== 'weak') return no('no severity');
+  if (tag.signal_type === 'exec_departure' && !EXEC_TITLE.test(item.text)) return no('exec_departure but no senior role named');
   const snippet = findVerbatim(item.text, tag.snippet);
-  if (!snippet) return null;
+  if (!snippet) return no('snippet guard: not an exact quote');
   return {
-    type: tag.signal_type as SignalType,
-    severity: tag.severity,
-    date: item.date,
-    title: item.title,
-    snippet,
-    source_name: item.source || hostOf(item.url),
-    source_url: item.url,
+    reason: 'kept',
+    signal: {
+      type: tag.signal_type as SignalType,
+      severity: tag.severity,
+      date: item.date,
+      title: item.title,
+      snippet,
+      source_name: item.source || hostOf(item.url),
+      source_url: item.url,
+    },
   };
+}
+
+function toSignal(item: NewsItem, tag: Tag | null): Signal | null {
+  return judge(item, tag).signal;
 }
 
 /**
@@ -367,8 +389,14 @@ async function callBrightData(deps: NewsDeps, apiKey: string, targetUrl: string,
 
 /** One Google News search -> up to MAX_ITEMS_PER_QUERY dated items from the last 180 days. Throws on failure. */
 async function search(deps: NewsDeps, apiKey: string, q: NewsQuery, today: string, timeoutMs: number) {
-  const body = await callBrightData(deps, apiKey, buildNewsSearchUrl(q.query), timeoutMs);
-  const data = coerceJson(body);
+  const url = buildNewsSearchUrl(q.query);
+  const started = (deps.now ?? Date.now)();
+  let data = coerceJson(await callBrightData(deps, apiKey, url, timeoutMs));
+  // Bright Data occasionally answers 200 with an empty body; one retry turns that blip into an answer.
+  if (!isRecord(data)) {
+    const left = timeoutMs - ((deps.now ?? Date.now)() - started);
+    if (left > 1_000) data = coerceJson(await callBrightData(deps, apiKey, url, left));
+  }
   if (!isRecord(data)) throw new Error('unreadable search response');
   // Google's real "no results" reply is { general: { empty: true } } with no news key.
   // Anything else without a news list is a glitch, not proof there is no news.
@@ -419,8 +447,12 @@ async function readAndTag(
       Math.max(deadline - now(), LLM_MIN_MS),
       'Tagging call',
     );
-    return { query, ok: true, signal: toSignal(item, parseTag(raw)) };
-  } catch {
+    const tag = parseTag(raw);
+    const { signal, reason } = judge(item, tag);
+    deps.log?.(`${signal ? 'KEEP' : 'drop'} ${item.title.slice(0, 80)} -> ${reason}${tag?.reason ? ` | model: "${tag.reason}"` : ''}${pageText ? '' : ' (article not readable, used search preview)'}`);
+    return { query, ok: true, signal };
+  } catch (error) {
+    deps.log?.(`fail ${item.title.slice(0, 80)} -> tagging failed: ${errorMessage(error)}`);
     return { query, ok: false, signal: null };
   }
 }
@@ -445,6 +477,7 @@ export async function runNewsSignals(deps: NewsDeps): Promise<Signal[]> {
       ),
     ),
   );
+  for (const s of searches) deps.log?.(s.ok ? `1. Search ${s.q.type}: ${s.results.length} articles in the last 180 days` : `1. Search ${s.q.type} failed: ${s.error}`);
   const failures = searches.filter((s) => !s.ok).map((s) => `${s.q.type}: ${s.error}`);
   if (failures.length === searches.length) throw new Error(`News: both searches failed (${failures.join('; ')})`);
 
@@ -460,6 +493,7 @@ export async function runNewsSignals(deps: NewsDeps): Promise<Signal[]> {
     }
   }
 
+  deps.log?.(`2. Reading and tagging ${work.length} articles (one LLM call each)...`);
   const outcomes = await Promise.all(work.map((w) => readAndTag(deps, apiKey, w.result, w.query, deadline)));
 
   // A search whose every item failed to tag answered nothing; treat it like a failed search.
@@ -470,5 +504,7 @@ export async function runNewsSignals(deps: NewsDeps): Promise<Signal[]> {
   });
   if (answered.length === 0) throw new Error('News: tagging failed for every article');
 
-  return capSignals(outcomes.map((o) => o.signal).filter((s): s is Signal => s !== null));
+  const signals = capSignals(outcomes.map((o) => o.signal).filter((s): s is Signal => s !== null));
+  deps.log?.(`3. ${signals.length} signals (newest per type and severity)`);
+  return signals;
 }
