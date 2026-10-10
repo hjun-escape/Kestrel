@@ -9,6 +9,20 @@ export const PART = {
   action: "ew-action",
 };
 
+// Suggested first questions; the company ones name real companies from the book (already sorted riskiest first).
+export function suggestedQuestions(companies) {
+  const named = (companies || []).filter((c) => c?.name);
+  const [first, second] = named;
+  const lenderTarget = second || first;
+  return [
+    { prompt: "Which borrowers need attention this week?", send: true },
+    { prompt: "What's our exposure at risk?", send: true },
+    { prompt: "Screen a new applicant: ", label: "Screen a new applicant", send: false },
+    ...(lenderTarget ? [{ prompt: `Check ${lenderTarget.name} for other lenders`, send: true }] : []),
+    ...(first ? [{ prompt: `Summarise ${first.name}'s warning signs`, send: true }] : []),
+  ];
+}
+
 const MAX_TITLE = 60;
 const MAX_CARDS = 4;
 const NAME_SUFFIXES = /\b(inc|llc|ltd|co|corp|corporation|company|group|holdings|the)\b/g;
