@@ -2,6 +2,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import handler, {
+  fetchReviews,
+  sourceQuote,
   findDistress,
   normalizeReview,
   ratingTrend,
@@ -117,13 +119,14 @@ test("strong and weak together", async () => {
   assert.deepEqual(s.map((x) => x.severity), ["strong", "weak"]);
 });
 
-test("tagger can veto a match, and its snippet is kept only if exact", async () => {
+test("tagger can veto a match; the stored snippet is always the source text", async () => {
   const raw = [rev(5, 3, "Layoffs coming, I heard. Management is weak.")];
   assert.deepEqual(await reviewSignalsFromReviews(B, raw, TODAY, async () => ({ relevant: false })), []);
   const invented = await reviewSignalsFromReviews(B, raw, TODAY, async () => ({ relevant: true, signal_type: "review_distress", snippet: "The company is failing." }));
   assert.equal(invented[0].snippet, "Layoffs coming, I heard.");
-  const exact = await reviewSignalsFromReviews(B, raw, TODAY, async () => ({ relevant: true, signal_type: "review_distress", snippet: "Layoffs  coming, I heard. Management is weak." }));
-  assert.equal(exact[0].snippet, "Layoffs  coming, I heard. Management is weak.");
+  // The model's quote differs only in whitespace: the review's own text is stored, never the model's.
+  const exact = await reviewSignalsFromReviews(B, raw, TODAY, async () => ({ relevant: true, signal_type: "review_distress", snippet: "Layoffs  coming, I heard.\nManagement is weak." }));
+  assert.equal(exact[0].snippet, "Layoffs coming, I heard. Management is weak.");
 });
 
 test("Base44 handler: missing borrower is 400, missing key fails as Reviews", async () => {
@@ -134,4 +137,99 @@ test("Base44 handler: missing borrower is 400, missing key fails as Reviews", as
   assert.equal(res.status, 502);
   assert.match((await res.json()).error, /^Reviews: BRIGHTDATA_API_KEY/);
   delete (globalThis as any).Deno;
+});
+
+test("false alarms from review: pay amount, ideas shut down, closing shift", () => {
+  for (const text of [
+    "You are not paid very well.",
+    "We didn't get paid enough for the hours.",
+    "Haven't been paid that much compared to peers.",
+    "Most of my ideas were shut down by management.",
+    "I was closing the store three nights a week.",
+    "Closing the office at 6 every day was fine.",
+    "The project got shut down after a month.",
+  ]) {
+    assert.equal(hit(text), null, text);
+  }
+});
+
+test("real distress still caught: closures and late pay", () => {
+  for (const [text, label] of [
+    ["They are closing down the Dallas office next month.", "closing"],
+    ["The company is shutting down at the end of the year.", "closing"],
+    ["Several store closures were announced in September.", "closing"],
+    ["They are closing 12 stores this quarter.", "closing"],
+    ["The company filed for bankruptcy.", "closing"],
+    ["We weren't paid on time in August.", "late or missed pay"],
+    ["Paychecks bounced twice.", "late or missed pay"],
+    ["We have not been paid for three weeks.", "late or missed pay"],
+  ]) {
+    assert.equal(hit(text)?.label, label, text);
+  }
+});
+
+test("sourceQuote returns the source's own text, or null when the model invented it", () => {
+  const texts = ["Pay is fine.\nThey laid off   half the team in May."];
+  assert.equal(sourceQuote("They laid off half the team in May.", texts), "They laid off   half the team in May.");
+  assert.equal(sourceQuote("They laid off most of the team.", texts), null);
+  assert.equal(sourceQuote("   ", texts), null);
+  assert.equal(sourceQuote("(a+", ["(a+ literal"]), "(a+");
+});
+
+test("records with no readable date are a failure, not 'no signals'", async () => {
+  await assert.rejects(reviewSignalsFromReviews(B, [{ rating: 1, pros: "x" }], TODAY), /Reviews: no review has a readable date/);
+});
+
+// ---------- Bright Data replies (fetch is faked) ----------
+
+function fakeFetch(routes: Record<string, unknown[]>) {
+  const calls: string[] = [];
+  (globalThis as any).fetch = async (url: string) => {
+    calls.push(url);
+    const key = Object.keys(routes).find((k) => url.includes(k));
+    if (!key) throw new Error(`unexpected fetch ${url}`);
+    const next = routes[key].length > 1 ? routes[key].shift() : routes[key][0];
+    const [status, body] = next as [number, unknown];
+    return new Response(JSON.stringify(body), { status });
+  };
+  return calls;
+}
+
+test("Bright Data replies: empty, error-only, odd shape fail; not-ready download is waited on", async () => {
+  const realFetch = globalThis.fetch;
+  const realSetTimeout = globalThis.setTimeout;
+  (globalThis as any).setTimeout = ((f: () => void) => (f(), 0)) as any;
+  try {
+    fakeFetch({ "/scrape": [[200, []]] });
+    await assert.rejects(fetchReviews(B, "k"), /Reviews: Bright Data returned no records/);
+    fakeFetch({ "/scrape": [[200, [{ error: "blocked" }]]] });
+    await assert.rejects(fetchReviews(B, "k"), /no records: blocked/);
+    fakeFetch({ "/scrape": [[200, { status: "building" }]] });
+    await assert.rejects(fetchReviews(B, "k"), /Reviews: unexpected Bright Data reply/);
+    fakeFetch({
+      "/scrape": [[202, { snapshot_id: "sd_abc123" }]],
+      "/progress/": [[200, { status: "ready" }]],
+      "/snapshot/": [[200, { status: "running", message: "Snapshot is not ready yet" }], [200, [rev(3, 4)]]],
+    });
+    assert.equal((await fetchReviews(B, "k")).length, 1);
+  } finally {
+    globalThis.fetch = realFetch;
+    globalThis.setTimeout = realSetTimeout;
+  }
+});
+
+test("crafted snapshot_id or non-Glassdoor URL is refused before any request", async () => {
+  const realFetch = globalThis.fetch;
+  const calls = fakeFetch({});
+  try {
+    for (const bad of ["../../zone/whitelist", "sd_abc/../x", "sd_ABC?x=1", 42, ""]) {
+      await assert.rejects(fetchReviews(B, "k", bad), /Reviews: invalid snapshot_id/);
+    }
+    for (const url of ["https://evil.example.com/glassdoor.com", "http://www.glassdoor.com/x", "https://glassdoor.com.evil.io/x", "javascript:alert(1)"]) {
+      await assert.rejects(fetchReviews({ ...B, glassdoor_url: url }, "k"), /glassdoor_url must be/);
+    }
+    assert.equal(calls.length, 0);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
 });

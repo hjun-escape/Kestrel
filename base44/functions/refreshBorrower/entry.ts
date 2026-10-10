@@ -1,6 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 
-// refreshBorrower(borrower_id). Owner: P1. See docs/PLAN.md §2.
+// refreshBorrower(borrower_id). Owner: P1. See docs/PLAN.md §2 and CLAUDE.md "Refresh flow".
 //
 // Runs the signal functions (owned by P2/P3), replaces this borrower's Signals
 // source by source, and saves after each source finishes so the detail screen
@@ -17,16 +17,21 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 // signal functions read it, with Deno.env.get('BRIGHTDATA_API_KEY'). Never put
 // a key in code.
 
-// Signal functions: each takes { borrower } and returns Signal[] (or { signals }),
-// and throws / returns a non-2xx status on failure. It never writes status.
-// One function can cover several sources: newsSignals returns both
+// Signal functions: each takes { borrower, snapshot_id? } and returns Signal[]
+// (or { signals }), and returns a non-2xx status on failure. It never writes
+// status. One function can cover several sources: newsSignals returns both
 // exec_departure (News) and legal_layoffs (Legal), so if it fails, both are
 // marked unavailable.
 //
-// TODO (P2, P3): once your function is deployed and tested on one company,
-// set enabled: true on its line. That is the only change needed here.
+// Slow Bright Data snapshots: a function may answer 503 with { snapshot_id }
+// while the snapshot is still building. That source counts as unavailable for
+// this refresh, the id is saved in Borrower.pending_snapshots[name], and the
+// next refresh passes it back as snapshot_id instead of paying for a new one.
+//
+// Switch a function on in your own branch, together with the function itself:
+// set enabled: true on its line. Scoring must already be on. P1 merges.
 const SIGNAL_FUNCTIONS = [
-  { name: 'newsSignals',   owner: 'P2', enabled: false, sources: { exec_departure: 'News', legal_layoffs: 'Legal' } },
+  { name: 'newsSignals',   owner: 'P2', enabled: true,  sources: { exec_departure: 'News', legal_layoffs: 'Legal' } },
   { name: 'hiringSignal',  owner: 'P3', enabled: false, sources: { hiring_drop: 'Jobs' } },
   { name: 'reviewSignals', owner: 'P3', enabled: false, sources: { review_distress: 'Reviews' } },
 ];
@@ -36,14 +41,33 @@ const SIGNAL_FUNCTIONS = [
 // base44/functions/scoreBorrower.
 const SCORING_ENABLED = true;
 
-// A source that takes longer than this counts as unavailable.
-const SOURCE_TIMEOUT_MS = 120_000;
+// A source that takes longer than this counts as unavailable. Signal functions
+// should give up and answer 503 with their snapshot_id well before it
+// (about 150 s at most), so the id reaches us and the next refresh can resume.
+const SOURCE_TIMEOUT_MS = 200_000;
+
+// Seed data (src/lib/seedData.js) marks every fake signal this way. A real
+// refresh deletes them so they are never scored as if they were real.
+const PLACEHOLDER_PREFIX = '[placeholder]';
+
+type Signal = { id?: string; type: string; date: string; title?: string; snippet?: string; source_url?: string };
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`${label} timed out`)), ms)),
-  ]);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<T>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timed out`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+// functions.invoke rejects with the raw HTTP error; pull out what we need.
+function errorInfo(error: unknown): { status?: number; message: string; snapshotId?: string } {
+  const e = error as { response?: { status?: number; data?: { error?: string; snapshot_id?: string } }; message?: string };
+  return {
+    status: e.response?.status,
+    message: e.response?.data?.error || e.message || String(error),
+    snapshotId: e.response?.data?.snapshot_id,
+  };
 }
 
 export default async function(req: Request): Promise<Response> {
@@ -71,18 +95,22 @@ export default async function(req: Request): Promise<Response> {
     for (const fn of SIGNAL_FUNCTIONS.filter((f) => !f.enabled)) {
       Object.values(fn.sources).forEach((s) => unavailable.add(s));
     }
+    const pending: Record<string, string> = { ...(borrower.pending_snapshots || {}) };
     let answered = 0;
 
     // Saves run one after another so a slower write never overwrites a newer one.
     let saveChain: Promise<unknown> = Promise.resolve();
     const save = (fn: () => Promise<unknown>) => (saveChain = saveChain.then(fn));
+    const saveProgress = () =>
+      db.Borrower.update(borrowerId, { sources_unavailable: [...unavailable], pending_snapshots: { ...pending } });
 
     const runs = enabled.map(async (fn) => {
       const types = Object.keys(fn.sources);
       const sourceNames = Object.values(fn.sources);
+      const snapshotId = pending[fn.name];
       try {
-        const res = await withTimeout(
-          base44.asServiceRole.functions.invoke(fn.name, { borrower }),
+        const res = await withTimeout<any>(
+          base44.asServiceRole.functions.invoke(fn.name, snapshotId ? { borrower, snapshot_id: snapshotId } : { borrower }),
           SOURCE_TIMEOUT_MS,
           fn.name,
         );
@@ -91,8 +119,8 @@ export default async function(req: Request): Promise<Response> {
 
         // Keep only the signal types this function owns.
         const signals = returned
-          .filter((s) => types.includes(s.type))
-          .map((s) => ({ ...s, borrower_id: borrowerId }));
+          .filter((s: Signal) => types.includes(s.type))
+          .map((s: Signal) => ({ ...s, borrower_id: borrowerId }));
 
         await save(async () => {
           // Replace this source's signals.
@@ -101,15 +129,24 @@ export default async function(req: Request): Promise<Response> {
           }
           if (signals.length > 0) await db.Signal.bulkCreate(signals);
           sourceNames.forEach((s) => unavailable.delete(s));
+          delete pending[fn.name];
           answered += 1;
-          await db.Borrower.update(borrowerId, { sources_unavailable: [...unavailable] });
+          await saveProgress();
         });
       } catch (error) {
         // Skip a failing source: mark it unavailable and keep its previous signals.
-        console.error(`${fn.name} failed:`, (error as Error).message);
+        const info = errorInfo(error);
+        if (info.status === 503 && info.snapshotId) {
+          console.log(`${fn.name}: snapshot ${info.snapshotId} still building, will resume next refresh`);
+        } else {
+          console.error(`${fn.name} failed:`, info.message);
+        }
         await save(async () => {
           sourceNames.forEach((s) => unavailable.add(s));
-          await db.Borrower.update(borrowerId, { sources_unavailable: [...unavailable] });
+          // Keep a still-building snapshot to resume; drop anything else so the next refresh starts fresh.
+          if (info.status === 503 && info.snapshotId) pending[fn.name] = info.snapshotId;
+          else delete pending[fn.name];
+          await saveProgress();
         });
       }
     });
@@ -119,27 +156,59 @@ export default async function(req: Request): Promise<Response> {
 
     if (answered === 0) {
       // Nothing was checked: keep last_refreshed, status and why as they were.
-      return Response.json({ error: 'No data source responded. Try again in a minute.' }, { status: 502 });
+      const waiting = Object.keys(pending).length > 0;
+      const error = waiting
+        ? 'Sources are still collecting data. Refresh again in a minute.'
+        : 'No data source responded. Try again in a minute.';
+      return Response.json({ error }, { status: 502 });
+    }
+
+    // Before scoring: delete placeholder seed signals, and exact duplicates
+    // (two refreshes of the same company at once can both write a source).
+    const stored: Signal[] = await db.Signal.filter({ borrower_id: borrowerId }, '-date', 500);
+    const seen = new Set<string>();
+    const kept: Signal[] = [];
+    for (const s of stored) {
+      const key = [s.type, s.date, s.title, s.snippet, s.source_url].join('|');
+      if ((s.snippet || '').startsWith(PLACEHOLDER_PREFIX) || seen.has(key)) {
+        if (s.id) await db.Signal.delete(s.id);
+      } else {
+        seen.add(key);
+        kept.push(s);
+      }
     }
 
     const finalUpdate: Record<string, unknown> = {
-      last_refreshed: new Date().toISOString(),
       sources_unavailable: [...unavailable],
+      pending_snapshots: { ...pending },
     };
 
     if (SCORING_ENABLED) {
-      const signals = await db.Signal.filter({ borrower_id: borrowerId }, '-date', 500);
-      const today = new Date().toISOString().slice(0, 10);
-      const res = await base44.asServiceRole.functions.invoke('scoreBorrower', { signals, today });
-      if (res?.data?.status) {
-        finalUpdate.status = res.data.status;
-        finalUpdate.why = res.data.why;
+      let scored: { status?: string; why?: string } | undefined;
+      try {
+        const today = new Date().toISOString().slice(0, 10);
+        const res = await base44.asServiceRole.functions.invoke('scoreBorrower', { signals: kept, today });
+        scored = res?.data;
+      } catch (error) {
+        await db.Borrower.update(borrowerId, finalUpdate);
+        return Response.json({ error: `Scoring failed: ${errorInfo(error).message}` }, { status: 502 });
       }
+      if (!scored || !['green', 'yellow', 'red'].includes(scored.status || '')) {
+        // Never mark a company as checked with a status nobody computed.
+        await db.Borrower.update(borrowerId, finalUpdate);
+        return Response.json({ error: 'Scoring returned no status.' }, { status: 502 });
+      }
+      finalUpdate.status = scored.status;
+      finalUpdate.why = scored.why;
+      finalUpdate.last_refreshed = new Date().toISOString();
+    } else if (borrower.last_refreshed) {
+      // Scoring off: only a company that already has a computed status gets a new timestamp.
+      finalUpdate.last_refreshed = new Date().toISOString();
     }
 
     const updated = await db.Borrower.update(borrowerId, finalUpdate);
     return Response.json({ borrower: updated });
   } catch (error) {
-    return Response.json({ error: (error as Error).message }, { status: 500 });
+    return Response.json({ error: errorInfo(error).message }, { status: 500 });
   }
 }

@@ -17,7 +17,8 @@ Target borrowers are mid-size PRIVATE companies: no analyst coverage, quarterly 
 ## This repo and the Base44 app
 - Repo: github.com/hjun-escape/early-warning (private). It replaced natephunt/TalkToUsersHackathonGroup17 at about 1:15 PM.
 - Base44 app "Early Warning": id `6aca96c9744d6ba75bc4fabd`, live at https://early-warning-5bc4fabd.base44.app.
-  - It opens without login for Sense testers. Anyone with the link can press Refresh or "Screen new applicant", and once sources are on, each press spends Bright Data credits.
+  - It opens without login for Sense testers. Anyone with the link can browse, press Refresh or "Screen new applicant", and once sources are on, each press spends Bright Data credits.
+  - Signing in is optional. It unlocks Ask, the analyst brief, the lender check, the cash-flow check and recording decisions; those backend functions return 401 to signed-out visitors. `refreshAll` is admin-only.
 - Layout:
   - entities: `base44/entities/*.jsonc`
   - backend functions: `base44/functions/<name>/entry.ts` (Deno, `export default async function(req)`). Import the SDK pinned like the existing functions: `npm:@base44/sdk@0.8.52`.
@@ -45,6 +46,7 @@ Borrower:
 - why: one-line string
 - last_refreshed: ISO timestamp, empty until the first refresh that actually checked something
 - sources_unavailable: list of strings, only these values: News | Legal | Jobs | Reviews
+- pending_snapshots: internal, written only by refreshBorrower. Bright Data snapshot_id per signal function that is still building.
 
 Signal:
 - borrower_id
@@ -86,7 +88,9 @@ refreshBorrower(borrower_id):
 1. Runs the signal functions that are switched on: newsSignals (P2; exec_departure + legal_layoffs), hiringSignal and reviewSignals (P3).
 2. Skips any source that fails or is switched off, and adds its name to sources_unavailable (exec_departure → News, legal_layoffs → Legal, hiring_drop → Jobs, review_distress → Reviews).
 3. For each source that answers, replaces that source's Signals, saving after each one so the screen fills in. A failed source keeps its previous Signals, and its chip shows "Unavailable".
-4. Calls scoreBorrower (P3) and saves status, why and last_refreshed. If no source answered, it keeps status, why and last_refreshed as they were and returns an error.
+4. Deletes placeholder seed signals (snippet starts with "[placeholder]") and exact duplicates, calls scoreBorrower (P3), and saves status, why and last_refreshed. If no source answered, or scoring fails, it keeps status, why and last_refreshed as they were and returns an error.
+
+Slow snapshots: a signal function that is still waiting on Bright Data answers 503 with `{ snapshot_id }` (give up within about 150 s; refreshBorrower stops waiting at 200 s). refreshBorrower saves the id in pending_snapshots and passes it back as `snapshot_id` on the next refresh, so no second snapshot is paid for.
 
 While every signal function is switched off (placeholder mode), Refresh only bumps last_refreshed on companies that were already checked. A company that was never checked gets "No data sources are connected yet."
 
