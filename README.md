@@ -1,4 +1,13 @@
-# Base44 Project
+# Early Warning
+
+Talk to Users Hackathon, Group 17. Screens a company before a bank lends, then keeps watching it after the loan, flagging public signs of trouble before they show up in quarterly financials.
+
+- Plan, data contract and team rules: `CLAUDE.md` and `docs/PLAN.md`
+- Live app: https://early-warning-5bc4fabd.base44.app
+
+---
+
+## Base44 project setup
 
 Use this repository to run and edit the app locally, then publish changes back through Base44.
 
