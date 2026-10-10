@@ -1,17 +1,16 @@
 import React from "react";
 import { useLoop } from "./showScenes";
 
-// The user quote that shaped the product, as a light band that breaks up the dark sections.
-// Words appear once, one by one.
+// The user quote that shaped the product: a white card on the ink surface. Words appear once, one by one.
 const QUOTE = "I wish I woulda asked the cash flow documents a lot earlier in the process.";
 
 export default function ProofStrip() {
   const words = QUOTE.split(" ");
   const [ref, step] = useLoop(words.length + 1, 140, { once: true });
   return (
-    <section aria-labelledby="proof-heading" className="border-y border-[#cfe3ee] bg-[#eef6fb] py-14 text-ew-ink sm:py-16">
+    <section aria-labelledby="proof-heading" className="bg-ew-ink py-16 text-ew-ink">
       <div ref={ref} className="mx-auto max-w-[1200px] px-4 sm:px-8">
-        <figure className="grid gap-6 rounded-sm border border-[#cfe3ee] bg-white px-6 py-8 shadow-[0_14px_40px_-24px_rgba(20,32,46,0.35)] lg:grid-cols-[220px_minmax(0,1fr)] lg:px-8" style={{ boxShadow: "inset 3px 0 0 #0ea5e9" }}>
+        <figure className="grid gap-6 rounded-sm bg-white px-6 py-8 shadow-[0_18px_50px_rgba(0,0,0,0.4)] lg:grid-cols-[220px_minmax(0,1fr)] lg:px-8" style={{ boxShadow: "inset 3px 0 0 #0ea5e9" }}>
           <div>
             <h2 id="proof-heading" className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0284c7]">
               What we heard

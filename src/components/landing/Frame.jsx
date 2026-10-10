@@ -1,5 +1,14 @@
 import React from "react";
 
+// Section backgrounds alternate between two tones. A is the hero's ink; B is a lifted slate that fades into A
+// over its top and bottom edges, so sections blend instead of meeting at a hard line.
+export const SURFACE_A = "#14202e"; // same as --ew-ink
+export const SURFACE_B = "#1e2b3e";
+export const surfaceB = {
+  backgroundColor: SURFACE_B,
+  backgroundImage: `linear-gradient(to bottom, ${SURFACE_A} 0, ${SURFACE_B} 140px, ${SURFACE_B} calc(100% - 140px), ${SURFACE_A} 100%)`,
+};
+
 // The hero's framed-panel language, shared by the landing sections: a thin-bordered dark frame split into
 // columns, each with a stage-style header (small number, bold title, muted caption), and an optional mono
 // summary line along the bottom like the hero's activity log.
