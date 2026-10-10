@@ -143,7 +143,7 @@ export default function CompanyDetail() {
           refreshError={refreshError}
           onRefresh={() => handleRefresh()}
         />
-        <SourceStatusRow states={sourceStates} recentSignals={recentSignals} running={running} />
+        <SourceStatusRow states={sourceStates} recentSignals={recentSignals} running={running} startedAt={run?.startedAt} />
         {flagLine && (
           <p className="border-t border-ew-rule-soft px-5 py-2 font-mono text-xs text-ew-ink-soft">{flagLine}</p>
         )}
