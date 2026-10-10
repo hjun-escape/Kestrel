@@ -178,7 +178,7 @@ const STAGES = [
   { title: "Tag", body: "AI marks what matters" },
   { title: "Verify", body: "Same company, exact quote" },
 ];
-const GUTTER = 230; // input column: example items being encoded
+const GUTTER = 230; // input column: example items sliding into their lanes
 const HEADER = 72; // stage titles (and the applicant input) above the cells
 const EXIT = 0.66; // share of the canvas the pipeline runs across; the report sits to the right
 const css = ([r, g, b], a = 1) => `rgba(${r},${g},${b},${a})`;
@@ -270,7 +270,7 @@ export function PipelineHero() {
     };
   }, [sceneRef]);
 
-  // Example inputs: pick a lane, show its item being encoded, then spawn the bits into that lane.
+  // Example inputs: pick a lane, slide its item into the pipeline, then spawn its cells in that lane.
   useEffect(() => {
     if (prefersReducedMotion()) return undefined;
     let n = 0;
@@ -287,7 +287,7 @@ export function PipelineHero() {
       timers.push(
         setTimeout(() => {
           sceneRef.current?.inject(lane, encodeText(text));
-          addLog(lane, "Search", `${SOURCES[lane].label}: encoded “${shorten(text, 30)}”`);
+          addLog(lane, "Search", `${SOURCES[lane].label}: found “${shorten(text, 30)}”`);
           setJobs((js) => js.map((j) => (j.key === key ? { ...j, leaving: true } : j)));
           timers.push(setTimeout(() => bump(1), 1400));
         }, 1200),
@@ -333,7 +333,7 @@ export function PipelineHero() {
 
         {/* The pipeline, in a padded frame. */}
         <figure aria-label="How Kestrel checks one applicant: input, search, read, tag, verify, report" className="relative mt-6 h-[clamp(560px,72vh,720px)] overflow-hidden rounded-sm border border-white/10 bg-black/10">
-          {/* Input column: the applicant, then each source's example item being encoded. */}
+          {/* Input column: the applicant, then each source's example item sliding into its lane. */}
           <div className="absolute bottom-0 left-0 top-0 border-r border-white/10" style={{ width: GUTTER }}>
             <div className="flex flex-col justify-center px-3" style={{ height: HEADER }}>
               <ApplicantInput key={progress.step === 0 ? "run" : "hold"} />
