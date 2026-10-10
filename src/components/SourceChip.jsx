@@ -1,36 +1,59 @@
 import React from "react";
+import { Check, CircleSlash, Loader2, Minus } from "lucide-react";
 
-// One chip per source (News, Legal, Jobs, Reviews).
-// "Checked" if last_refreshed is set and the source isn't in sources_unavailable.
-// "Unavailable" if it is in sources_unavailable.
-// "Not checked yet" if last_refreshed is empty.
-// "Checking…" while a refresh is running.
-export default function SourceChip({ source, lastRefreshed, sourcesUnavailable, checking }) {
-  const unavailable = (sourcesUnavailable || []).includes(source);
+// One cell in the source-status row (News, Legal, Jobs, Reviews).
+// state: "ok" | "unavailable" | "checking" | "not_checked"
+const STATES = {
+  ok: {
+    label: "Checked",
+    Icon: Check,
+    cell: "bg-ew-surface",
+    text: "text-ew-ink",
+  },
+  unavailable: {
+    label: "Unavailable",
+    Icon: CircleSlash,
+    cell: "bg-ew-none-bg",
+    text: "text-ew-muted",
+  },
+  checking: {
+    label: "Checking",
+    Icon: Loader2,
+    cell: "bg-ew-surface",
+    text: "text-ew-focus",
+    spin: true,
+  },
+  not_checked: {
+    label: "Not checked",
+    Icon: Minus,
+    cell: "bg-ew-surface",
+    text: "text-ew-muted",
+  },
+};
 
-  let state;
-  let stateClass;
-  if (checking) {
-    state = "Checking…";
-    stateClass = "border-gray-200 bg-white text-gray-500";
-  } else if (!lastRefreshed) {
-    state = "Not checked yet";
-    stateClass = "border-gray-200 bg-gray-50 text-gray-400";
-  } else if (unavailable) {
-    state = "Unavailable";
-    stateClass = "border-gray-300 bg-gray-100 text-gray-500";
-  } else {
-    state = "Checked";
-    stateClass = "border-gray-300 bg-white text-gray-600";
-  }
+const DETAIL = {
+  ok: (n) => (n === 0 ? "No signals in 90 days" : `${n} signal${n === 1 ? "" : "s"} in 90 days`),
+  unavailable: () => "Did not answer on the last check",
+  checking: () => "Waiting for results",
+  not_checked: () => "Runs on first check",
+};
 
+export default function SourceChip({ source, description, state = "not_checked", recentCount = 0 }) {
+  const s = STATES[state] || STATES.not_checked;
+  const { Icon } = s;
   return (
-    <span
-      className={`inline-flex items-center gap-2 rounded border px-3 py-1.5 text-xs ${stateClass}`}
-    >
-      <span className="font-medium text-gray-800">{source}</span>
-      <span className="text-gray-300">·</span>
-      <span>{state}</span>
-    </span>
+    <li className={`flex min-w-0 flex-col gap-0.5 px-4 py-3 ${s.cell}`}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-heading text-sm font-bold text-ew-ink">{source}</span>
+        <span className={`inline-flex items-center gap-1 text-xs font-semibold ${s.text}`}>
+          <Icon aria-hidden="true" className={`h-3.5 w-3.5 ${s.spin ? "animate-spin" : ""}`} />
+          {s.label}
+        </span>
+      </div>
+      <span className="text-xs text-ew-muted">{description}</span>
+      <span className={`text-xs ${state === "ok" && recentCount > 0 ? "font-medium text-ew-ink-soft" : "text-ew-muted"}`}>
+        {DETAIL[state](recentCount)}
+      </span>
+    </li>
   );
 }

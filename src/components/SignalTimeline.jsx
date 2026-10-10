@@ -2,73 +2,164 @@ import React from "react";
 import { ExternalLink } from "lucide-react";
 import { format } from "date-fns";
 import { SIGNAL_TYPES } from "@/lib/signalTypes";
-import { parseSignalDate } from "@/lib/borrowerUtils";
+import { groupSignalsByMonth, parseSignalDate, splitByRecency, RECENT_DAYS } from "@/lib/borrowerUtils";
 
-// Signal timeline, newest first.
-// Each item: date, type label, severity (Strong/Weak), title, snippet (in
-// quotes), a source link (new tab), and a "What to ask" line.
-export default function SignalTimeline({ signals, neverRefreshed }) {
-  if (!signals || signals.length === 0) {
-    return (
-      <p className="py-6 text-sm text-gray-500">
-        {neverRefreshed ? "Not checked yet." : "No signals in the last 90 days."}
-      </p>
-    );
+// Evidence timeline, newest first, grouped by month. Signals from the last 90
+// days count toward status; older ones sit dimmed under "Older than 90 days".
+// Each item: type, severity, date, title, the exact snippet as a quote, a
+// source link (new tab) and a follow-up question.
+export default function SignalTimeline({ signals, neverRefreshed, checking, newIds }) {
+  const { recent, older } = splitByRecency(signals, RECENT_DAYS);
+
+  if (recent.length === 0 && older.length === 0) {
+    return <EmptyTimeline neverRefreshed={neverRefreshed} checking={checking} />;
   }
 
-  const sorted = [...signals].sort((a, b) => new Date(b.date) - new Date(a.date));
+  return (
+    <div>
+      {recent.length === 0 ? (
+        <p className="border border-ew-rule bg-ew-surface px-4 py-4 text-sm text-ew-muted">
+          No signals in the last {RECENT_DAYS} days.
+        </p>
+      ) : (
+        <MonthGroups signals={recent} newIds={newIds} />
+      )}
+
+      {older.length > 0 && (
+        <section aria-labelledby="older-heading" className="mt-8">
+          <div className="mb-2 flex items-baseline justify-between border-b border-dashed border-ew-rule pb-1.5">
+            <h3 id="older-heading" className="text-sm font-semibold text-ew-muted">
+              Older than {RECENT_DAYS} days
+            </h3>
+            <span className="text-xs text-ew-muted">Not counted in status</span>
+          </div>
+          <MonthGroups signals={older} dimmed newIds={newIds} />
+        </section>
+      )}
+    </div>
+  );
+}
+
+function MonthGroups({ signals, dimmed = false, newIds }) {
+  return groupSignalsByMonth(signals).map((group) => (
+    <section key={group.key} aria-label={group.label} className="mb-5 last:mb-0">
+      <h3 className={`mb-1.5 flex items-baseline gap-2 text-xs font-semibold ${dimmed ? "text-ew-muted" : "text-ew-ink-soft"}`}>
+        {group.label}
+        <span className="font-mono font-normal text-ew-muted">{group.items.length}</span>
+      </h3>
+      <ol className={`border ${dimmed ? "border-dashed border-ew-rule bg-ew-hover" : "border-ew-rule bg-ew-surface"}`}>
+        {group.items.map((s, i) => (
+          <SignalItem key={s.id || `${s.type}-${s.date}-${i}`} signal={s} dimmed={dimmed} isNew={!!newIds?.has(s.id)} />
+        ))}
+      </ol>
+    </section>
+  ));
+}
+
+function safeUrl(url) {
+  try {
+    const u = new URL(url);
+    return u.protocol === "http:" || u.protocol === "https:" ? u : null;
+  } catch {
+    return null;
+  }
+}
+
+function SignalItem({ signal: s, dimmed, isNew }) {
+  const type = SIGNAL_TYPES[s.type] || { label: s.type, whatToAsk: "" };
+  const isStrong = s.severity === "strong";
+  const date = parseSignalDate(s.date);
+  const url = safeUrl(s.source_url);
+  const sourceLabel = s.source_name || url?.hostname.replace(/^www\./, "") || "Source";
 
   return (
-    <div className="relative">
-      {sorted.map((s, i) => {
-        const type = SIGNAL_TYPES[s.type] || { label: s.type, whatToAsk: "" };
-        const isStrong = s.severity === "strong";
-        return (
-          <div key={s.id || i} className="relative flex gap-4 pb-6 last:pb-0">
-            {i < sorted.length - 1 && (
-              <div className="absolute left-[5px] top-5 bottom-0 w-px bg-gray-200" />
-            )}
-            <div
-              className={`relative z-10 mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ring-4 ring-white ${
-                isStrong ? "bg-gray-800" : "bg-gray-300"
-              }`}
-            />
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                <span className="text-sm font-medium text-gray-900">
-                  {format(parseSignalDate(s.date), "MMM d, yyyy")}
-                </span>
-                <span className="text-gray-300">·</span>
-                <span className="text-sm text-gray-700">{type.label}</span>
-                <span
-                  className={`rounded border px-1.5 py-0.5 text-xs ${
-                    isStrong
-                      ? "border-gray-300 bg-gray-50 text-gray-700"
-                      : "border-gray-200 bg-white text-gray-400"
-                  }`}
-                >
-                  {isStrong ? "Strong" : "Weak"}
-                </span>
-              </div>
-              <p className="mt-1.5 text-sm font-medium text-gray-900">{s.title}</p>
-              <p className="mt-1 text-sm text-gray-600">&ldquo;{s.snippet}&rdquo;</p>
-              <a
-                href={s.source_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-1.5 inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800"
-              >
-                {s.source_name}
-                <ExternalLink className="h-3 w-3" />
-              </a>
-              <p className="mt-2 rounded border border-gray-100 bg-gray-50 px-2.5 py-1.5 text-xs text-gray-500">
-                <span className="font-medium text-gray-600">What to ask: </span>
-                {type.whatToAsk}
-              </p>
+    <li className="grid grid-cols-[64px_minmax(0,1fr)] border-b border-ew-rule-soft last:border-0">
+      <div className="border-r border-ew-rule-soft px-3 py-3 text-right font-mono leading-tight">
+        <div className={`text-[15px] font-semibold ${dimmed ? "text-ew-muted" : "text-ew-ink"}`}>{format(date, "dd")}</div>
+        <div className="text-[11px] text-ew-muted">{format(date, "MMM")}</div>
+      </div>
+      <article className="min-w-0 px-4 py-3">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="text-xs font-semibold text-ew-ink-soft">{type.label}</span>
+          <span
+            className={`rounded-sm border px-1.5 text-[11px] font-semibold leading-[18px] ${
+              isStrong ? "border-ew-ink bg-ew-ink text-white" : "border-ew-rule text-ew-ink-soft"
+            }`}
+          >
+            {isStrong ? "Strong" : "Weak"}
+            <span className="sr-only"> signal</span>
+          </span>
+          {isNew && (
+            <span className="rounded-sm border border-ew-focus px-1.5 text-[11px] font-semibold leading-[18px] text-ew-focus">
+              New
+            </span>
+          )}
+          <time dateTime={s.date} className="ml-auto font-mono text-[11px] text-ew-muted">
+            {format(date, "d MMM yyyy")}
+          </time>
+        </div>
+        <p className={`mt-1 text-[15px] font-semibold leading-snug ${dimmed ? "text-ew-ink-soft" : "text-ew-ink"}`}>{s.title}</p>
+        {s.snippet && (
+          <blockquote className="mt-1.5 border-l-2 border-ew-rule pl-3 text-sm leading-relaxed text-ew-ink-soft">
+            &ldquo;{s.snippet}&rdquo;
+          </blockquote>
+        )}
+        <div className="mt-2 flex flex-wrap items-start gap-x-4 gap-y-1.5">
+          {url ? (
+            <a
+              href={url.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`Source: ${sourceLabel} (opens in a new tab)`}
+              className="inline-flex max-w-full items-center gap-1.5 rounded-sm border border-ew-rule bg-ew-hover px-2 py-0.5 text-xs font-medium text-ew-ink hover:border-ew-ink-soft hover:bg-ew-surface"
+            >
+              <span className="truncate">{sourceLabel}</span>
+              <ExternalLink aria-hidden="true" className="h-3 w-3 shrink-0" />
+            </a>
+          ) : (
+            <span className="rounded-sm border border-dashed border-ew-rule px-2 py-0.5 text-xs text-ew-muted">
+              {sourceLabel}: link missing
+            </span>
+          )}
+          {type.whatToAsk && !dimmed && (
+            <p className="min-w-0 flex-1 text-xs leading-relaxed text-ew-muted">
+              <span className="font-semibold text-ew-ink-soft">Ask: </span>
+              {type.whatToAsk}
+            </p>
+          )}
+        </div>
+      </article>
+    </li>
+  );
+}
+
+function EmptyTimeline({ neverRefreshed, checking }) {
+  if (checking) {
+    return (
+      <div className="border border-ew-rule bg-ew-surface" aria-busy="true">
+        <p className="border-b border-ew-rule-soft px-4 py-3 text-sm text-ew-ink-soft">
+          Checking sources. Signals appear here as each source answers.
+        </p>
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="grid grid-cols-[64px_minmax(0,1fr)] border-b border-ew-rule-soft last:border-0" aria-hidden="true">
+            <div className="border-r border-ew-rule-soft px-3 py-3">
+              <div className="ml-auto h-4 w-6 animate-pulse rounded-sm bg-ew-rule-soft" />
+            </div>
+            <div className="space-y-2 px-4 py-3">
+              <div className="h-3 w-1/4 animate-pulse rounded-sm bg-ew-rule-soft" />
+              <div className="h-3 w-2/3 animate-pulse rounded-sm bg-ew-rule-soft" />
+              <div className="h-3 w-1/2 animate-pulse rounded-sm bg-ew-rule-soft" />
             </div>
           </div>
-        );
-      })}
-    </div>
+        ))}
+      </div>
+    );
+  }
+  return (
+    <p className="border border-ew-rule bg-ew-surface px-4 py-6 text-sm text-ew-muted">
+      {neverRefreshed
+        ? "Not checked yet. Run a refresh to look for warning signs."
+        : "No warning signs found in any source."}
+    </p>
   );
 }
