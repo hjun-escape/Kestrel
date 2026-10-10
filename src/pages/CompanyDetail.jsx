@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import React, { useState, useEffect, useRef } from "react";
+import { useParams, Link, useSearchParams } from "react-router-dom";
 import { formatDistanceToNow, format } from "date-fns";
 import { RefreshCw, ExternalLink } from "lucide-react";
 import { base44 } from "@/api/base44Client";
@@ -12,6 +12,8 @@ import { filterRecentSignals, formatRelative } from "@/lib/borrowerUtils";
 
 export default function CompanyDetail() {
   const { id } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const autoScreened = useRef(false);
   const [borrower, setBorrower] = useState(null);
   const [signals, setSignals] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -43,15 +45,32 @@ export default function CompanyDetail() {
     loadData();
   }, [id]);
 
+  // Coming from "Screen new applicant": run the first check once.
+  useEffect(() => {
+    if (searchParams.get("screen") === "1" && !autoScreened.current) {
+      autoScreened.current = true;
+      setSearchParams({}, { replace: true });
+      handleRefresh();
+    }
+  }, [searchParams]);
+
+  // refreshBorrower saves after each source, so reload while it runs and the
+  // timeline fills in as sources answer.
+  useEffect(() => {
+    if (!refreshing) return;
+    const timer = setInterval(loadData, 3000);
+    return () => clearInterval(timer);
+  }, [refreshing, id]);
+
   async function handleRefresh() {
     setRefreshing(true);
     setRefreshError(null);
     try {
       await base44.functions.invoke("refreshBorrower", { borrower_id: id });
-      await loadData();
     } catch (e) {
-      setRefreshError("Refresh failed. Please try again.");
+      setRefreshError(e?.response?.data?.error || "Refresh failed. Please try again.");
     } finally {
+      await loadData();
       setRefreshing(false);
     }
   }
@@ -189,6 +208,7 @@ export default function CompanyDetail() {
                 source={src}
                 lastRefreshed={borrower.last_refreshed}
                 sourcesUnavailable={borrower.sources_unavailable}
+                checking={refreshing}
               />
             ))}
           </div>
