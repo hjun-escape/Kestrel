@@ -3,8 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import BrandMark from "@/components/auth/BrandMark";
 import LandingCtas, { SIGN_IN_PATH } from "./LandingCtas";
 import SignalFile from "./SignalFile";
-import HeroBackdrop, { BACKDROP_OPTIONS } from "./HeroBackdrop";
-import SourceTicker from "./SourceTicker";
+import { PipelineHero, SandpileHero, WavesHero } from "./HeroProposals";
 
 // Faint ledger ruling behind the hero: the paper a credit file is kept on.
 const LEDGER =
@@ -29,23 +28,28 @@ export function LandingNav() {
   );
 }
 
-// Background direction for the hero. ?hero=swarm|radar|streams|constellation picks one; while
-// developing locally a small switcher shows all four (never on the published site).
-const DEFAULT_BACKDROP = "swarm";
+// Hero proposals to compare: ?hero=pipeline|waves|sandpile shows one; no value shows the current hero.
+// While developing locally a small switcher shows all of them (never on the published site).
+const PROPOSALS = [
+  { id: "current", label: "0. Current", Hero: CurrentHero },
+  { id: "pipeline", label: "1. Pipeline", Hero: PipelineHero },
+  { id: "waves", label: "2. Waves", Hero: WavesHero },
+  { id: "sandpile", label: "3. Sandpile", Hero: SandpileHero },
+];
 
-function BackdropSwitcher({ value, onChange }) {
+function ProposalSwitcher({ value, onChange }) {
   return (
-    <div className="fixed bottom-4 left-4 z-50 flex items-center gap-1 rounded-sm border border-white/20 bg-ew-ink/90 p-1 text-[12px] text-white shadow-lg">
-      <span className="px-2 text-white/60">Hero option (dev only)</span>
-      {BACKDROP_OPTIONS.map((o) => (
+    <div className="fixed bottom-4 left-4 z-50 flex items-center gap-1 rounded-sm border border-white/20 bg-ew-ink/95 p-1 text-[12px] text-white shadow-lg">
+      <span className="px-2 text-white/60">Hero proposal (dev only)</span>
+      {PROPOSALS.map((p) => (
         <button
-          key={o.id}
+          key={p.id}
           type="button"
-          onClick={() => onChange(o.id)}
-          aria-pressed={value === o.id}
-          className={`rounded-sm px-2 py-1 font-semibold ${value === o.id ? "bg-white text-ew-ink" : "text-white/80 hover:bg-white/10"}`}
+          onClick={() => onChange(p.id)}
+          aria-pressed={value === p.id}
+          className={`rounded-sm px-2 py-1 font-semibold ${value === p.id ? "bg-white text-ew-ink" : "text-white/80 hover:bg-white/10"}`}
         >
-          {o.label}
+          {p.label}
         </button>
       ))}
     </div>
@@ -54,15 +58,14 @@ function BackdropSwitcher({ value, onChange }) {
 
 export default function HeroSection() {
   const [params, setParams] = useSearchParams();
-  const asked = params.get("hero");
-  const backdrop = BACKDROP_OPTIONS.some((o) => o.id === asked) ? asked : DEFAULT_BACKDROP;
+  const chosen = PROPOSALS.find((p) => p.id === params.get("hero")) || PROPOSALS[0];
+  const { Hero } = chosen;
   return (
-    <div className={`relative overflow-hidden bg-ew-ink text-white ${LEDGER}`}>
-      {/* Checks running in parallel behind the hero (decorative). */}
-      <HeroBackdrop key={backdrop} variant={backdrop} className="absolute inset-0 h-full w-full" />
+    <>
+      <Hero />
       {import.meta.env.DEV && (
-        <BackdropSwitcher
-          value={backdrop}
+        <ProposalSwitcher
+          value={chosen.id}
           onChange={(id) => {
             const next = new URLSearchParams(params);
             next.set("hero", id);
@@ -70,11 +73,18 @@ export default function HeroSection() {
           }}
         />
       )}
+    </>
+  );
+}
+
+function CurrentHero() {
+  return (
+    <div className={`relative overflow-hidden bg-ew-ink text-white ${LEDGER}`}>
       <section
         aria-labelledby="hero-heading"
-        className="relative mx-auto grid max-w-[1200px] items-center gap-14 px-4 pb-20 pt-10 sm:px-8 sm:pb-24 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-16 lg:pb-28 lg:pt-16"
+        className="mx-auto grid max-w-[1200px] items-center gap-14 px-4 pb-20 pt-10 sm:px-8 sm:pb-24 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-16 lg:pb-28 lg:pt-16"
       >
-        <div data-swarm-clear>
+        <div>
           <h1
             id="hero-heading"
             className="font-heading text-[clamp(2.9rem,1.7rem+5vw,5.4rem)] font-bold leading-[0.93] tracking-[-0.025em] [font-stretch:72%] [text-wrap:balance]"
@@ -86,14 +96,11 @@ export default function HeroSection() {
             every flag with a source.
           </p>
           <LandingCtas tone="dark" className="mt-9" />
-          <SourceTicker className="mt-6" />
           <p className="mt-4 text-[13px] text-white/65">
             Built for bank credit officers. Sign-in is optional; the demo opens a sample loan book.
           </p>
         </div>
-        <div data-swarm-clear>
-          <SignalFile />
-        </div>
+        <SignalFile />
       </section>
     </div>
   );
