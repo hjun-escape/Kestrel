@@ -268,7 +268,7 @@ function PipelineRun({ company, onProgress }) {
   const addLog = useCallback((lane, stage, text) => {
     const s = Math.floor((performance.now() - startRef.current) / 1000);
     const stamp = `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
-    setLog((l) => [...l.slice(-6), { key: `${s}-${Math.random()}`, stamp, lane, stage, text }]);
+    setLog((l) => [...l.slice(-17), { key: `${s}-${Math.random()}`, stamp, lane, stage, text }]);
   }, []);
   const bump = useCallback((stage) => setPulse((p) => p.map((v, i) => (i === stage ? v + 1 : v))), []);
 
@@ -412,8 +412,9 @@ function PipelineRun({ company, onProgress }) {
           ))}
         </ol>
 
-        <div className="pointer-events-none absolute bottom-0 right-0 top-0 flex flex-col justify-center px-4" style={{ width: `${(1 - EXIT) * 100}%` }}>
-          <div ref={reportRef} className="pointer-events-auto rounded-sm border border-white/10 bg-white text-ew-ink shadow-[0_18px_50px_rgba(0,0,0,0.4)]">
+        {/* Report: full height of the frame, like the form on the left. */}
+        <div className="pointer-events-none absolute bottom-0 right-0 top-0 flex flex-col" style={{ width: `${(1 - EXIT) * 100}%` }}>
+          <div ref={reportRef} className="pointer-events-auto flex h-full flex-col border-l border-white/10 bg-white text-ew-ink">
             <div className="flex items-start justify-between gap-3 border-b border-ew-rule px-4 py-3">
               <div className="min-w-0">
                 <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-ew-muted">Report · sample</p>
@@ -442,9 +443,9 @@ function PipelineRun({ company, onProgress }) {
                 </li>
               ))}
             </ul>
-            <div className="border-t border-ew-rule bg-ew-paper px-4 py-2">
+            <div className="flex min-h-0 flex-1 flex-col border-t border-ew-rule bg-ew-paper px-4 py-2">
               <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-ew-muted">Activity log</p>
-              <ol aria-live="polite" className="mt-1 space-y-0.5 font-mono text-[11px] leading-snug">
+              <ol aria-live="polite" className="mt-1 flex min-h-0 flex-1 flex-col justify-end space-y-0.5 overflow-hidden font-mono text-[11px] leading-snug">
                 {log.map((e) => (
                   <li key={e.key} className="flex gap-2">
                     <span className="shrink-0 text-ew-muted">{e.stamp}</span>
