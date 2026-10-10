@@ -1,0 +1,54 @@
+{
+  "general": { "search_engine": "google", "query": "fixture" },
+  "news": [
+    {
+      "title": "Acme Widgets CFO resigns after two years",
+      "link": "https://news.example.com/acme-cfo-resigns",
+      "source": "Dayton Daily Example",
+      "description": "The Dayton manufacturer said its chief financial officer is leaving...",
+      "date": "3 days ago",
+      "rank": 1
+    },
+    {
+      "title": "Acme Widgets sales chief departs",
+      "link": "https://biz.example.com/acme-vp-sales",
+      "source": "Ohio Biz Example",
+      "description": "Acme Widgets vice president of sales Tom Lee has left the company, a spokesperson confirmed.",
+      "date": "Sep 1, 2026",
+      "rank": 2
+    },
+    {
+      "title": "Acme Widgets Ltd chief executive steps down",
+      "link": "https://uk.example.co.uk/acme-widgets-ltd-ceo",
+      "source": "Leeds Example",
+      "description": "Acme Widgets Ltd, the Leeds toy maker, said its chief executive steps down at year end.",
+      "date": "Aug 20, 2026",
+      "rank": 3
+    },
+    {
+      "title": "Acme Widgets COO leaves",
+      "link": "https://news.example.com/acme-coo",
+      "source": "Dayton Daily Example",
+      "description": "Acme Widgets announced leadership changes in its operations team.",
+      "date": "1 month ago",
+      "rank": 4
+    },
+    {
+      "title": "Acme Widgets founder retires",
+      "link": "https://news.example.com/acme-founder-old",
+      "source": "Dayton Daily Example",
+      "description": "Acme Widgets founder Bob Acme said he would step down as president.",
+      "date": "Jan 5, 2026",
+      "rank": 5
+    },
+    {
+      "title": "Acme Widgets president departs, report says",
+      "link": "https://news.example.com/acme-undated",
+      "source": "Dayton Daily Example",
+      "description": "Acme Widgets president has departed.",
+      "date": "",
+      "rank": 6
+    },
+    { "title": "", "link": "not a url", "date": "1 day ago" }
+  ]
+}

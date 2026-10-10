@@ -78,15 +78,12 @@ function fill() {
 }
 $("pick").onchange = fill;
 
-const CLEAN = ["duplicate link", "older than 180 days"];
-const cleanDrop = (r) => !r.tag && (CLEAN.includes(r.reason) || r.reason.startsWith("unparsed date"));
-const L = () => (D.linkedin && !D.linkedin.error ? D.linkedin : null);
-
+const tagOf = (r) => r.tag || {};
 const NEWS = [
-  { id: "crawl", t: "1. Crawl", s: "bd", sub: "Google News, 2 queries", n: () => D.news.batches.reduce((a, b) => a + b.items.length, 0) },
-  { id: "clean", t: "2. Clean", s: "code", sub: "dedupe, dates, 180 days", n: () => D.news.trace.filter((r) => !cleanDrop(r)).length },
-  { id: "analyze", t: "3. Analyze", s: "ai", sub: "LLM: relevant? severity?", n: () => D.news.trace.filter((r) => r.tag?.relevant).length },
-  { id: "verify", t: "4. Verify", s: "code", sub: "same company, exact quote", n: () => D.news.signals.length },
+  { id: "search", t: "1. Search", s: "bd", sub: "Google News, 2 queries, 180 days", n: () => D.news.searches.reduce((a, x) => a + x.results.length, 0) },
+  { id: "read", t: "2. Read articles", s: "bd", sub: "top 5 per search, full text", n: () => D.news.reads.length },
+  { id: "tag", t: "3. Tag", s: "ai", sub: "one LLM call per article", n: () => D.news.tags.filter((r) => tagOf(r).relevant).length },
+  { id: "verify", t: "4. Verify", s: "code", sub: "same company, role, exact quote", n: () => D.news.signals.length },
 ];
 const LI = [
   { id: "execs", t: "A. Find execs", s: "bd", s2: "ai", sub: "leadership search", n: () => L()?.run.execs.length },
@@ -128,14 +125,15 @@ const table = (head, rows) => `<table><tr>${head.map((h) => `<th>${h}</th>`).joi
 function renderDetail() {
   const n = D.news, l = L();
   const views = {
-    crawl: () => n.batches.map((b) => `<h2>${esc(b.type)} &middot; ${b.items.length} results</h2><div class="muted">Query: ${esc(b.query)}</div>` +
-      table(["Raw date", "Source", "Title / description"], b.items.map((i) => `<tr><td>${esc(i.date)}</td><td>${esc(i.source)}</td><td>${link(i.link, i.title)}<div class="muted">${esc(i.description)}</div></td></tr>`))).join(""),
-    clean: () => `<h2>Clean: ${n.trace.length} in, ${NEWS[1].n()} passed to analysis</h2>` +
-      table(["Result", "Query", "Raw date", "Parsed", "Title"], n.trace.map((r) => `<tr><td class="${cleanDrop(r) ? "drop" : "keep"}">${cleanDrop(r) ? "drop: " + esc(r.reason) : "pass"}</td><td>${r.query_type}</td><td>${esc(r.item.date)}</td><td>${r.date ?? "?"}</td><td>${link(r.item.link, r.item.title)}</td></tr>`)),
-    analyze: () => `<h2>Analyze (${esc(D.tagger)}): ${n.trace.filter((r) => r.tag).length} tagged, ${NEWS[2].n()} relevant</h2>` +
-      table(["Relevant", "Why (model's reasoning)", "Same co.", "Type", "Severity", "Article", "Model output"], n.trace.filter((r) => r.tag).map((r) => `<tr><td class="${r.tag.relevant ? "keep" : "drop"}">${r.tag.relevant ? "yes" : "no"}</td><td class="why">${esc(r.tag.reason ?? "")}</td><td>${r.tag.same_company ? "yes" : "no"}</td><td>${esc(r.tag.signal_type ?? "")}</td><td class="${r.tag.severity ?? ""}">${esc(r.tag.severity ?? "")}</td><td>${link(r.item.link, r.item.title)}<div class="muted">${esc(r.item.description)}</div></td><td><pre>${esc(JSON.stringify(r.tag, null, 1))}</pre></td></tr>`)),
-    verify: () => `<h2>Verify: kept only if same company and the quote is word for word in the article</h2>` +
-      table(["Result", "Quote from model", "Article"], n.trace.filter((r) => r.tag?.relevant).map((r) => `<tr><td class="${r.kept ? "keep" : "drop"}">${r.kept ? "KEEP" : "drop: " + esc(r.reason)}</td><td>&ldquo;${esc(r.tag.snippet)}&rdquo;</td><td>${link(r.item.link, r.item.title)}<div class="muted">${esc(r.item.description)}</div></td></tr>`)),
+    search: () => n.searches.map((x) => `<h2>${esc(x.type)} &middot; ${x.results.length} results</h2><div class="muted">Query: ${esc(x.query)}</div>` +
+      table(["Date", "Source", "Title / preview"], x.results.map((i) => `<tr><td>${esc(i.date)}</td><td>${esc(i.source)}</td><td>${link(i.url, i.title)}<div class="muted">${esc(i.snippet)}</div></td></tr>`))).join(""),
+    read: () => `<h2>Articles read through Bright Data (${n.reads.length})</h2><div class="muted">Up to 5 per search; a page that cannot be read is tagged from the search preview.</div>` +
+      table(["Article", "Text size", "Saved copy"], n.reads.map((r) => `<tr><td>${link(r.url, r.url)}</td><td>${(r.chars / 1000).toFixed(1)} k chars</td><td>${r.cached ? "replayed" : "fetched live"}</td></tr>`)),
+    tag: () => `<h2>Tag: one LLM call per article (Gemini locally, Base44 LLM in the app)</h2>` +
+      table(["Relevant", "Why (model's reasoning)", "Same co.", "Type", "Severity", "Article", "Model output"], n.tags.map((r) => { const g = tagOf(r); return `<tr><td class="${g.relevant ? "keep" : "drop"}">${g.relevant ? "yes" : "no"}</td><td class="why">${esc(g.reason ?? "")}</td><td>${g.same_company ? "yes" : "no"}</td><td>${esc(g.signal_type ?? "")}</td><td class="${g.severity ?? ""}">${esc(g.severity ?? "")}</td><td>${link(r.url, r.title)}</td><td><pre>${esc(JSON.stringify(r.tag, null, 1))}</pre></td></tr>`; })),
+    verify: () => `<h2>Verify: same company, a senior role for departures, and the quote word for word in the article</h2>` +
+      table(["Result", "Reason", "Quote from model", "Article"], n.tags.map((r) => `<tr><td class="${r.decision === "KEEP" ? "keep" : "drop"}">${esc(r.decision ?? "?")}</td><td>${esc(r.reason ?? "")}</td><td>&ldquo;${esc(tagOf(r).snippet ?? "")}&rdquo;</td><td>${link(r.url, r.title)}</td></tr>`)) +
+      `<div class="muted" style="margin-top:6px">Then only the newest signal per type and severity is kept, so one event reported by several outlets counts once.</div>`,
     execs: () => `<h2>Find execs</h2><div class="muted">Search: ${esc(l.run.exec_query)} &rarr; Gemini lists execs, each backed by an exact quote from a result.</div>` +
       table(["Name", "Title", "Quote", "Source"], l.run.execs.map((e) => `<tr><td><b>${esc(e.name)}</b></td><td>${esc(e.title)}</td><td>&ldquo;${esc(e.quote)}&rdquo;</td><td>${link(e.source_url, "result")}</td></tr>`)) +
       `<h2>Search results (${l.run.exec_results.length})</h2>` + table(["Result"], l.run.exec_results.map((r) => `<tr><td>${link(r.link, r.title)}<div class="muted">${esc(r.description)}</div></td></tr>`)),
@@ -161,7 +159,7 @@ $("f").onsubmit = async (e) => {
   $("diagram").innerHTML = $("detail").innerHTML = $("log").innerHTML = "";
   $("act").open = true;
   const t = Date.now();
-  const tick = setInterval(() => { $("status").textContent = `Running... ${((Date.now() - t) / 1000).toFixed(0)}s (live: news ~20 s, LinkedIn ~30-60 s)`; }, 250);
+  const tick = setInterval(() => { $("status").textContent = `Running... ${((Date.now() - t) / 1000).toFixed(0)}s (live: news ~30-90 s, LinkedIn ~30-60 s)`; }, 250);
   try {
     const res = await fetch("/run", { method: "POST", body: JSON.stringify({ company, live: $("live").value === "1", linkedin: $("li").checked }) });
     const reader = res.body.getReader(), dec = new TextDecoder();
@@ -181,7 +179,7 @@ $("f").onsubmit = async (e) => {
     clearInterval(tick);
     if (!d) throw new Error("no result");
     const li = d.linkedin ? ` · LinkedIn ${d.linkedin.live ? "live" : "saved"} ${d.linkedin.seconds.toFixed(1)}s` : "";
-    $("status").textContent = `Done in ${((Date.now() - t) / 1000).toFixed(1)}s · news ${d.live ? "live" : "saved"}: crawl ${d.news.timings.crawl_s.toFixed(1)}s, analyze ${d.news.timings.analyze_s.toFixed(1)}s${li}`;
+    $("status").textContent = `Done in ${((Date.now() - t) / 1000).toFixed(1)}s · news ${d.news.live ? "live" : "replayed"} ${d.news.seconds.toFixed(1)}s${li}`;
     D = d; active = "signals"; renderDiagram(); renderDetail();
   } catch (err) {
     clearInterval(tick);

@@ -1,3 +1,4 @@
+// Run: node --test "tests/**/*.test.ts"   (Node 22+, runs .ts via type stripping)
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -5,157 +6,496 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 import {
-  type InvokeLLM,
-  type NewsBatch,
-  alignTags,
+  TAG_SCHEMA,
+  buildNewsQueries,
+  buildNewsSearchUrl,
+  buildTagPrompt,
   parseNewsDate,
-  signalsFromBatches,
-  snippetIsExact,
-  withinDays,
+  judge,
+  parseTag,
+  runNewsSignals,
 } from '../base44/functions/newsSignals/logic.ts';
-import { flattenExperience, type LinkedInRun, linkedInSignals, parseMonthYear, pickProfile } from '../base44/functions/newsSignals/linkedin.ts';
+import type { Signal } from '../base44/functions/newsSignals/logic.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const fixture = (name: string) => JSON.parse(readFileSync(join(here, 'fixtures', name), 'utf8'));
-const today = new Date('2026-10-10T12:00:00Z');
+const fixture = (name: string) => readFileSync(join(here, 'fixtures', name), 'utf8');
+const SERP_EXEC = JSON.parse(fixture('news-serp-exec.json'));
+const SERP_LEGAL = JSON.parse(fixture('news-serp-legal.json'));
+const PAGE_CFO = fixture('news-page-cfo.html');
+const PAGE_WARN = fixture('news-page-warn.html');
+const PAGE_SUIT = fixture('news-page-suit.html');
 
-// Fake LLM: tags every article with the same answer, quoting the article title (a verbatim quote).
-const llm = (answer: (text: string) => Record<string, unknown>): InvokeLLM => async ({ prompt }) => {
-  const items = JSON.parse(prompt.slice(prompt.indexOf('Items (JSON):') + 'Items (JSON):'.length)) as { id: number; text: string }[];
-  return { tags: items.map((it) => ({ id: it.id, ...answer(it.text) })) };
+const TODAY = '2026-10-10';
+const BORROWER = {
+  id: 'b1',
+  name: 'Acme Widgets',
+  website_domain: 'acmewidgets.com',
+  hq_city: 'Dayton',
+  hq_state: 'OH',
+  industry: 'Manufacturing',
 };
 
-describe('helpers', () => {
-  test('parseNewsDate handles relative and absolute dates', () => {
-    assert.equal(parseNewsDate('3 days ago', today), '2026-10-07');
-    assert.equal(parseNewsDate('1 month ago', today), '2026-09-10');
-    assert.equal(parseNewsDate('2 weeks ago', today), '2026-09-26');
-    assert.equal(parseNewsDate('5 hours ago', today), '2026-10-10');
-    assert.equal(parseNewsDate('yesterday', today), '2026-10-09');
-    assert.equal(parseNewsDate('Jul 9, 2026', today), '2026-07-09');
-    assert.equal(parseNewsDate('Sept 3, 2026', today), '2026-09-03');
-    assert.equal(parseNewsDate('whenever', today), null);
-  });
+const URLS = {
+  cfo: 'https://news.example.com/acme-cfo-resigns',
+  vp: 'https://biz.example.com/acme-vp-sales',
+  otherCo: 'https://uk.example.co.uk/acme-widgets-ltd-ceo',
+  coo: 'https://news.example.com/acme-coo',
+  old: 'https://news.example.com/acme-founder-old',
+  warn: 'https://warn.example.gov/acme-2026',
+  suit: 'https://court.example.com/acme-suit',
+};
 
-  test('withinDays keeps 180 days only', () => {
-    assert.equal(withinDays('2026-05-01', today, 180), true);
-    assert.equal(withinDays('2026-03-01', today, 180), false);
-  });
+// ---------- fakes ----------
 
-  test('snippet guard: exact quote passes, paraphrase fails', () => {
-    const src = 'Red Lobster  has closed\ndozens of restaurants this year.';
-    assert.equal(snippetIsExact('has closed dozens of restaurants', src), true);
-    assert.equal(snippetIsExact('closed many restaurants', src), false);
-    assert.equal(snippetIsExact('', src), false);
-  });
+type Route = { status?: number; body?: string; throws?: string };
 
-  test('alignTags accepts a JSON string and fills missing ids as not relevant', () => {
-    const tags = alignTags(2, JSON.stringify({ tags: [{ id: 1, relevant: true, same_company: true, signal_type: 'legal_layoffs', severity: 'weak', snippet: 'x' }] }));
-    assert.equal(tags[0].relevant, false);
-    assert.equal(tags[1].severity, 'weak');
-  });
-});
+function isSearch(url: string) {
+  return url.startsWith('https://www.google.com/search');
+}
 
-describe('signalsFromBatches on saved Bright Data results', () => {
-  const tgi = { id: 'b1', name: 'TGI Fridays', website_domain: 'tgifridays.com', hq_city: 'Dallas' };
-  const batches = fixture('news-tgifridays.json').batches as NewsBatch[];
-  const recorded = new Date(fixture('news-tgifridays.json').recorded_at);
-
-  test('keeps verbatim, same-company legal items and returns the contract shape', async () => {
-    const tagger = llm((text) => ({ reason: 'test', relevant: true, same_company: true, signal_type: 'legal_layoffs', severity: 'weak', snippet: text.split('\n')[0] }));
-    const { signals, trace } = await signalsFromBatches(tgi, batches.filter((b) => b.type === 'legal_layoffs'), tagger, recorded);
-    assert.ok(signals.length > 0);
-    for (const s of signals) {
-      assert.deepEqual(Object.keys(s).sort(), ['borrower_id', 'date', 'severity', 'snippet', 'source_name', 'source_url', 'title', 'type']);
-      assert.match(s.date, /^\d{4}-\d{2}-\d{2}$/);
-      assert.equal(s.borrower_id, 'b1');
+function fakeFetch(opts: { exec?: Route; legal?: Route; pages?: Record<string, Route> } = {}) {
+  const requests: Array<{ url: string; body: Record<string, string>; headers: Record<string, string> }> = [];
+  const routes = {
+    exec: opts.exec ?? { body: JSON.stringify(SERP_EXEC) },
+    legal: opts.legal ?? { body: JSON.stringify(SERP_LEGAL) },
+    pages: opts.pages ?? {
+      [URLS.cfo]: { body: PAGE_CFO },
+      [URLS.vp]: { status: 404, body: 'gone' },
+      [URLS.otherCo]: { body: '<p>Acme Widgets Ltd of Leeds said its chief executive steps down at year end.</p>' },
+      [URLS.coo]: { body: '<p>Acme Widgets announced leadership changes in its operations team this month.</p>' },
+      [URLS.warn]: { body: PAGE_WARN },
+      [URLS.suit]: { body: PAGE_SUIT },
+    },
+  };
+  const fn = async (url: string, init: { body: string; headers: Record<string, string> }) => {
+    const body = JSON.parse(init.body);
+    requests.push({ url, body, headers: init.headers });
+    let route: Route | undefined;
+    if (isSearch(body.url)) {
+      route = decodeURIComponent(body.url).includes('"WARN notice"') ? routes.legal : routes.exec;
+    } else {
+      route = routes.pages[body.url.replace(/\/$/, '')];
     }
-    assert.equal(trace.filter((r) => r.kept).length, signals.length);
+    if (!route) return new Response('not found', { status: 404 });
+    if (route.throws) throw new Error(route.throws);
+    return new Response(route.body ?? '', { status: route.status ?? 200 });
+  };
+  const pageReads = (u: string) =>
+    requests.filter((r) => !isSearch(r.body.url) && r.body.url.replace(/\/$/, '') === u).length;
+  return { fn, requests, pageReads };
+}
+
+type Tag = {
+  relevant: boolean;
+  same_company: boolean;
+  signal_type: string;
+  severity: string;
+  snippet: string;
+};
+
+const DEFAULT_TAGS: Record<string, Tag> = {
+  [URLS.cfo]: {
+    relevant: true,
+    same_company: true,
+    signal_type: 'exec_departure',
+    severity: 'strong',
+    snippet: 'Acme Widgets chief financial officer Jane Roe resigned on Monday, the Dayton company said',
+  },
+  [URLS.vp]: {
+    relevant: true,
+    same_company: true,
+    signal_type: 'exec_departure',
+    severity: 'weak',
+    snippet: 'Acme Widgets vice president of sales Tom Lee has left the company',
+  },
+  [URLS.otherCo]: {
+    relevant: true,
+    same_company: false,
+    signal_type: 'exec_departure',
+    severity: 'strong',
+    snippet: 'Acme Widgets Ltd of Leeds said its chief executive steps down at year end.',
+  },
+  [URLS.coo]: {
+    relevant: true,
+    same_company: true,
+    signal_type: 'exec_departure',
+    severity: 'weak',
+    snippet: 'COO Mary Smith was fired after an internal investigation',
+  },
+  [URLS.warn]: {
+    relevant: true,
+    same_company: true,
+    signal_type: 'legal_layoffs',
+    severity: 'strong',
+    snippet: 'acme widgets filed a WARN notice on September 18, 2026 covering 120 workers',
+  },
+  [URLS.suit]: {
+    relevant: true,
+    same_company: true,
+    signal_type: 'legal_layoffs',
+    severity: 'weak',
+    snippet: 'A customer filed a lawsuit against Acme Widgets of Dayton',
+  },
+};
+
+function fakeLLM(tags: Record<string, Tag | Error> = DEFAULT_TAGS) {
+  const calls: Array<{ prompt: string; url: string; response_json_schema: object }> = [];
+  const fn = async (params: { prompt: string; response_json_schema: object }) => {
+    const url = (/^URL: (\S+)$/m.exec(params.prompt)?.[1] ?? '').replace(/\/$/, '');
+    calls.push({ ...params, url });
+    const tag = tags[url];
+    if (!tag) return { relevant: false, same_company: false, signal_type: 'none', severity: 'none', snippet: '' };
+    if (tag instanceof Error) throw tag;
+    return tag;
+  };
+  return { fn, calls };
+}
+
+function run(overrides: Partial<Parameters<typeof runNewsSignals>[0]> = {}) {
+  const f = fakeFetch();
+  const llm = fakeLLM();
+  return {
+    f,
+    llm,
+    result: runNewsSignals({
+      borrower: BORROWER,
+      invokeLLM: llm.fn,
+      fetch: f.fn,
+      apiKey: 'test-key',
+      today: TODAY,
+      ...overrides,
+    }),
+  };
+}
+
+const byUrl = (signals: Signal[], url: string) => signals.filter((s) => s.source_url.replace(/\/$/, '') === url);
+
+// ---------- queries and requests ----------
+
+describe('queries', () => {
+  test('builds the exact contract queries', () => {
+    const [exec, legal] = buildNewsQueries('Acme Widgets');
+    assert.equal(exec.type, 'exec_departure');
+    assert.equal(
+      exec.query,
+      '"Acme Widgets" (CEO OR CFO OR president OR founder) (resigns OR "steps down" OR departs OR leaves)',
+    );
+    assert.equal(legal.type, 'legal_layoffs');
+    assert.equal(legal.query, '"Acme Widgets" (lawsuit OR sued OR lien OR "WARN notice" OR layoffs OR bankruptcy)');
   });
 
-  test('drops a model-written snippet', async () => {
-    const liar = llm(() => ({ relevant: true, same_company: true, signal_type: 'legal_layoffs', severity: 'strong', snippet: 'TGI Fridays is in deep trouble' }));
-    const { signals, trace } = await signalsFromBatches(tgi, batches, liar, recorded);
-    assert.equal(signals.length, 0);
-    assert.ok(trace.some((r) => r.reason.startsWith('snippet guard')));
+  test('strips quotes from the company name', () => {
+    assert.match(buildNewsQueries('The "Best" Co')[0].query, /^"The Best Co" /);
   });
 
-  test('drops other companies and irrelevant items', async () => {
-    const other = llm((text) => ({ relevant: true, same_company: false, signal_type: 'legal_layoffs', severity: 'weak', snippet: text.split('\n')[0] }));
-    assert.equal((await signalsFromBatches(tgi, batches, other, recorded)).signals.length, 0);
-    const none = llm(() => ({ relevant: false, same_company: true, signal_type: null, severity: null, snippet: '' }));
-    assert.equal((await signalsFromBatches(tgi, batches, none, recorded)).signals.length, 0);
+  test('search URL asks Google News for the last 6 months as JSON', () => {
+    assert.equal(
+      buildNewsSearchUrl('"A B" x'),
+      'https://www.google.com/search?q=%22A%20B%22%20x&tbm=nws&tbs=qdr:m6&hl=en&gl=us&brd_json=1',
+    );
   });
 
-  test('rejects exec_departure when the article names no executive (store closure mis-tag)', async () => {
-    const closure: NewsBatch[] = [{ type: 'exec_departure', source: 'News', query: 'q', items: [
-      { title: 'Red Lobster to shutdown its oldest location', link: 'https://x/1', source: 'X', description: 'The restaurant will close.', date: '2 days ago' },
-    ] }];
-    const tagger = llm((text) => ({ relevant: true, same_company: true, signal_type: 'exec_departure', severity: 'strong', snippet: text.split('\n')[0] }));
-    const { signals, trace } = await signalsFromBatches({ name: 'Red Lobster' }, closure, tagger, today);
-    assert.equal(signals.length, 0);
-    assert.match(trace[0].reason, /no executive title/);
-  });
-
-  test('drops articles older than 180 days before calling the LLM', async () => {
-    let called = 0;
-    const counting: InvokeLLM = async (p) => { called++; return llm(() => ({ relevant: false }))(p); };
-    const old: NewsBatch[] = [{ type: 'legal_layoffs', source: 'Legal', query: 'q', items: [
-      { title: 'Old news', link: 'https://x/old', source: 'X', description: '', date: 'Jan 2, 2025' },
-    ] }];
-    const { trace } = await signalsFromBatches({ name: 'Acme' }, old, counting, today);
-    assert.equal(called, 0);
-    assert.equal(trace[0].reason, 'older than 180 days');
+  test('calls Bright Data with the mcp_unlocker zone, raw format and bearer key', async () => {
+    const { f, result } = run();
+    await result;
+    const searches = f.requests.filter((r) => isSearch(r.body.url));
+    assert.equal(searches.length, 2);
+    for (const r of [...searches, ...f.requests]) {
+      assert.equal(r.url, 'https://api.brightdata.com/request');
+      assert.equal(r.body.zone, 'mcp_unlocker');
+      assert.equal(r.body.format, 'raw');
+      assert.equal(r.headers.Authorization, 'Bearer test-key');
+    }
   });
 });
 
-describe('LinkedIn exec check', () => {
-  const b = { id: 'b1', name: 'Acme Foods' };
-  const run = (experience: unknown[], current_company = ''): LinkedInRun => ({
-    exec_query: 'q',
-    exec_results: [],
-    execs: [{ name: 'Jane Doe', title: 'CFO', quote: 'Jane Doe, CFO', source_url: 'https://x' }],
-    profile_hits: [{ exec: 'Jane Doe', query: 'q', url: 'https://www.linkedin.com/in/jane', results: [] }],
-    profiles: [{ url: 'https://www.linkedin.com/in/jane', name: 'Jane Doe', current_company, experience: flattenExperience(experience) }],
+// ---------- dates ----------
+
+describe('parseNewsDate', () => {
+  const cases: Array<[string, string | null]> = [
+    ['3 days ago', '2026-10-07'],
+    ['1 day ago', '2026-10-09'],
+    ['yesterday', '2026-10-09'],
+    ['5 hours ago', '2026-10-10'],
+    ['12 mins ago', '2026-10-10'],
+    ['2 weeks ago', '2026-09-26'],
+    ['1 month ago', '2026-09-10'],
+    ['3 months ago', '2026-07-10'],
+    ['1 year ago', '2025-10-10'],
+    ['Jun 18, 2026', '2026-06-18'],
+    ['June 18, 2026', '2026-06-18'],
+    ['18 Jun 2026', '2026-06-18'],
+    ['Sept 3, 2026', '2026-09-03'],
+    ['2026-06-18', '2026-06-18'],
+    ['2026-06-18T23:30:00Z', '2026-06-18'],
+    ['Oct 11, 2026', '2026-10-10'],
+    ['Dec 25, 2026', null],
+    ['', null],
+    ['last spring', null],
+    ['Feb 30, 2026', null],
+  ];
+  for (const [input, expected] of cases) {
+    test(`${JSON.stringify(input)} -> ${expected}`, () => {
+      assert.equal(parseNewsDate(input, TODAY), expected);
+    });
+  }
+});
+
+// ---------- tag parsing ----------
+
+describe('parseTag and prompt', () => {
+  test('accepts a well-formed tag, including a JSON string reply', () => {
+    const tag = DEFAULT_TAGS[URLS.cfo];
+    assert.deepEqual(parseTag(tag), tag);
+    assert.deepEqual(parseTag('```json\n' + JSON.stringify(tag) + '\n```'), tag);
   });
 
-  test('parseMonthYear', () => {
-    assert.equal(parseMonthYear('Aug 2026'), '2026-08-01');
-    assert.equal(parseMonthYear('2021'), '2021-01-01');
-    assert.equal(parseMonthYear('Present'), null);
+  test('rejects malformed tags', () => {
+    assert.equal(parseTag(null), null);
+    assert.equal(parseTag('nonsense'), null);
+    assert.equal(parseTag({ relevant: 'yes' }), null);
   });
 
-  test('recent CFO exit at the borrower is a strong exec_departure sourced to LinkedIn', () => {
-    const { signals, checks } = linkedInSignals(b, run([{ title: 'Chief Financial Officer', company: 'Acme Foods Inc.', start_date: 'Jan 2020', end_date: 'Aug 2026' }], 'Other Co'), today);
-    assert.equal(checks[0].result, 'departed');
-    assert.deepEqual([signals[0].type, signals[0].severity, signals[0].date, signals[0].source_name], ['exec_departure', 'strong', '2026-08-01', 'LinkedIn']);
-  });
-
-  test('grouped positions are flattened; president is weak', () => {
-    const { signals } = linkedInSignals(b, run([{ company: 'Acme Foods', positions: [{ title: 'VP Sales', start_date: '2018', end_date: '2020' }, { title: 'President', start_date: '2020', end_date: 'Sep 2026' }] }]), today);
-    assert.equal(signals[0]?.severity, 'weak');
-  });
-
-  test('still in role, old exit, and a different employer alone raise no signal', () => {
-    assert.equal(linkedInSignals(b, run([{ title: 'CFO', company: 'Acme Foods', start_date: '2020', end_date: 'Present' }]), today).checks[0].result, 'still there');
-    assert.equal(linkedInSignals(b, run([{ title: 'CFO', company: 'Acme Foods', start_date: '2015', end_date: 'Dec 2023' }]), today).signals.length, 0);
-    const r = linkedInSignals(b, run([], 'Parent Holdings'), today);
-    assert.deepEqual([r.signals.length, r.checks[0].result], [0, 'unconfirmed']);
-  });
-
-  test('pickProfile needs a linkedin.com/in link whose title names the person', () => {
-    const results = [
-      { title: 'TGI Fridays', link: 'https://tgifridays.com/', description: '' },
-      { title: 'Nik Rupp - CFO', link: 'https://www.linkedin.com/in/nik-rupp?trk=x', description: '' },
-    ];
-    assert.equal(pickProfile('Nik Rupp', results), 'https://www.linkedin.com/in/nik-rupp');
-    assert.equal(pickProfile('Brandon Coleman III', [{ title: 'Brandon Coleman', link: 'https://www.linkedin.com/in/bc', description: '' }]), 'https://www.linkedin.com/in/bc');
-    assert.equal(pickProfile('Someone Else', results), null);
+  test('prompt carries the borrower identity, the item text and the URL', () => {
+    const prompt = buildTagPrompt(BORROWER, {
+      url: URLS.cfo,
+      title: 'Acme Widgets CFO resigns',
+      source: 'Dayton Daily',
+      date: '2026-10-07',
+      text: 'BODY TEXT',
+      query: 'exec_departure',
+    });
+    for (const s of ['Acme Widgets', 'acmewidgets.com', 'Dayton', `URL: ${URLS.cfo}`, 'BODY TEXT', 'same_company']) {
+      assert.ok(prompt.includes(s), `prompt missing ${s}`);
+    }
+    assert.ok(TAG_SCHEMA.properties.snippet);
   });
 });
 
-test('tagItem/shared.ts is an exact copy of newsSignals/logic.ts (Base44 bundles folders separately)', () => {
-  const read = (p: string) => readFileSync(join(here, '..', 'base44', 'functions', p), 'utf8');
-  const copy = read('tagItem/shared.ts');
-  assert.equal(copy.slice(copy.indexOf('\n\n') + 2), read('newsSignals/logic.ts'));
+// ---------- end-to-end through the pure pipeline ----------
+
+describe('runNewsSignals', () => {
+  test('CFO resignation becomes a strong exec_departure with the verbatim snippet', async () => {
+    const signals = await run().result;
+    const [cfo] = byUrl(signals, URLS.cfo);
+    assert.deepEqual(cfo, {
+      type: 'exec_departure',
+      severity: 'strong',
+      date: '2026-10-07',
+      title: 'Acme Widgets CFO resigns after two years',
+      snippet: 'Acme Widgets chief financial officer Jane Roe resigned on Monday, the Dayton company said',
+      source_name: 'Dayton Daily Example',
+      source_url: URLS.cfo,
+    });
+  });
+
+  test('VP departure is weak', async () => {
+    const [vp] = byUrl(await run().result, URLS.vp);
+    assert.equal(vp.type, 'exec_departure');
+    assert.equal(vp.severity, 'weak');
+    assert.equal(vp.date, '2026-09-01');
+  });
+
+  test('WARN notice is a strong legal_layoffs; snippet matched case- and whitespace-insensitively', async () => {
+    const [warn] = byUrl(await run().result, URLS.warn);
+    assert.equal(warn.type, 'legal_layoffs');
+    assert.equal(warn.severity, 'strong');
+    assert.equal(warn.date, '2026-09-20');
+    // Copied from the source text, not the model's lower-cased, whitespace-mangled version.
+    assert.equal(warn.snippet, 'Acme Widgets filed a WARN notice on September 18, 2026 covering 120 workers');
+  });
+
+  test('generic lawsuit is a weak legal_layoffs with a relative date', async () => {
+    const [suit] = byUrl(await run().result, URLS.suit);
+    assert.equal(suit.type, 'legal_layoffs');
+    assert.equal(suit.severity, 'weak');
+    assert.equal(suit.date, '2026-09-26');
+  });
+
+  test('returns exactly the expected four signals and never a status', async () => {
+    const signals = await run().result;
+    assert.deepEqual(signals.map((s) => s.source_url.replace(/\/$/, '')).sort(), [URLS.vp, URLS.cfo, URLS.suit, URLS.warn].sort());
+    for (const s of signals) assert.equal('status' in s, false);
+  });
+
+  test('hallucinated snippet is dropped', async () => {
+    const { llm, result } = run();
+    const signals = await result;
+    assert.ok(llm.calls.some((c) => c.url === URLS.coo), 'COO item was tagged');
+    assert.equal(byUrl(signals, URLS.coo).length, 0);
+  });
+
+  test('a different company with a similar name is dropped', async () => {
+    const { llm, result } = run();
+    const signals = await result;
+    assert.ok(llm.calls.some((c) => c.url === URLS.otherCo));
+    assert.equal(byUrl(signals, URLS.otherCo).length, 0);
+  });
+
+  test('items older than 180 days or undated are dropped before reading or tagging', async () => {
+    const { f, llm, result } = run();
+    await result;
+    assert.equal(f.pageReads(URLS.old), 0);
+    assert.equal(llm.calls.some((c) => c.url === URLS.old), false);
+    assert.equal(llm.calls.some((c) => c.url === 'https://news.example.com/acme-undated'), false);
+  });
+
+  test('page read failure falls back to the SERP title and description', async () => {
+    const { f, llm, result } = run();
+    const signals = await result;
+    assert.equal(f.pageReads(URLS.vp), 1);
+    const vpCall = llm.calls.find((c) => c.url === URLS.vp)!;
+    assert.ok(vpCall.prompt.includes('Tom Lee has left the company'));
+    assert.equal(byUrl(signals, URLS.vp).length, 1);
+  });
+
+  test('a duplicate URL across both queries is read, tagged and returned once', async () => {
+    const { f, llm, result } = run();
+    const signals = await result;
+    assert.equal(f.pageReads(URLS.cfo), 1);
+    assert.equal(llm.calls.filter((c) => c.url === URLS.cfo).length, 1);
+    assert.equal(byUrl(signals, URLS.cfo).length, 1);
+  });
+
+  test('relevant=false and severity=none are dropped', async () => {
+    const llm = fakeLLM({
+      ...DEFAULT_TAGS,
+      [URLS.cfo]: { ...DEFAULT_TAGS[URLS.cfo], relevant: false },
+      [URLS.warn]: { ...DEFAULT_TAGS[URLS.warn], severity: 'none' },
+    });
+    const signals = await run({ invokeLLM: llm.fn }).result;
+    assert.equal(byUrl(signals, URLS.cfo).length, 0);
+    assert.equal(byUrl(signals, URLS.warn).length, 0);
+  });
+
+  test('keeps at most one signal per type and severity (newest), so one story cannot turn a company red', async () => {
+    const llm = fakeLLM({
+      ...DEFAULT_TAGS,
+      [URLS.suit]: { ...DEFAULT_TAGS[URLS.suit], severity: 'strong' },
+    });
+    const signals = await run({ invokeLLM: llm.fn }).result;
+    const strongLegal = signals.filter((s) => s.type === 'legal_layoffs' && s.severity === 'strong');
+    assert.equal(strongLegal.length, 1);
+    assert.equal(strongLegal[0].source_url, URLS.suit); // 2026-09-26 is newer than 2026-09-20
+  });
+
+  test('one query failing still returns the other query\'s signals', async () => {
+    const f = fakeFetch({ exec: { status: 502, body: 'bad gateway' } });
+    const signals = await run({ fetch: f.fn }).result;
+    assert.ok(byUrl(signals, URLS.warn).length === 1);
+    assert.ok(byUrl(signals, URLS.suit).length === 1);
+    assert.equal(byUrl(signals, URLS.vp).length, 0);
+  });
+
+  test('a search returning non-JSON counts as a failed query', async () => {
+    const f = fakeFetch({ legal: { body: '<html>captcha</html>' } });
+    const signals = await run({ fetch: f.fn }).result;
+    assert.equal(signals.filter((s) => s.type === 'exec_departure').length, 2);
+  });
+
+  test('both queries failing throws', async () => {
+    const f = fakeFetch({ exec: { throws: 'network down' }, legal: { status: 500, body: 'err' } });
+    await assert.rejects(run({ fetch: f.fn }).result, /News/);
+  });
+
+  test('LLM failing on every item throws instead of reporting no signals', async () => {
+    const boom = new Error('LLM down');
+    const tags = Object.fromEntries(Object.keys(DEFAULT_TAGS).map((k) => [k, boom]));
+    const llm = fakeLLM(tags);
+    await assert.rejects(run({ invokeLLM: llm.fn }).result, /News/);
+  });
+
+  test('a search with no news block and no empty flag counts as a failed query', async () => {
+    const f = fakeFetch({ legal: { body: JSON.stringify({ general: { search_type: 'news' }, navigation: [] }) } });
+    const signals = await run({ fetch: f.fn }).result;
+    assert.equal(signals.filter((s) => s.type === 'exec_departure').length, 2);
+    const both = fakeFetch({
+      exec: { body: JSON.stringify({ general: {} }) },
+      legal: { body: JSON.stringify({ general: {} }) },
+    });
+    await assert.rejects(run({ fetch: both.fn }).result, /News/);
+  });
+
+  test('Google\'s real empty-result shape (general.empty, no news key) returns an empty list', async () => {
+    const empty = { body: JSON.stringify({ general: { search_type: 'news', empty: true }, navigation: [] }) };
+    const f = fakeFetch({ exec: empty, legal: empty });
+    assert.deepEqual(await run({ fetch: f.fn }).result, []);
+  });
+
+  test('no news at all returns an empty list', async () => {
+    const empty = { body: JSON.stringify({ news: [] }) };
+    const f = fakeFetch({ exec: empty, legal: empty });
+    assert.deepEqual(await run({ fetch: f.fn }).result, []);
+  });
+
+  test('missing API key throws', async () => {
+    await assert.rejects(run({ apiKey: undefined }).result, /BRIGHTDATA_API_KEY/);
+  });
+
+  test('missing borrower name throws', async () => {
+    await assert.rejects(run({ borrower: { name: '' } }).result, /borrower/);
+  });
+
+  test('reads at most 5 results per query', async () => {
+    const many = {
+      news: Array.from({ length: 9 }, (_, i) => ({
+        title: `Acme Widgets story ${i}`,
+        link: `https://many.example.com/${i}`,
+        source: 'Many',
+        description: 'Acme Widgets news.',
+        date: '1 day ago',
+      })),
+    };
+    const empty = { body: JSON.stringify({ news: [] }) };
+    const f = fakeFetch({ exec: { body: JSON.stringify(many) }, legal: empty });
+    const llm = fakeLLM({});
+    await run({ fetch: f.fn, invokeLLM: llm.fn }).result;
+    assert.equal(llm.calls.length, 5);
+  });
+});
+
+describe('judge (P2 additions)', () => {
+  const item = (text: string) => ({ url: 'https://x/1', title: 'T', source: 'X', date: '2026-10-01', text, query: 'exec_departure' as const });
+  const tag = (t: Record<string, unknown>) => ({ relevant: true, same_company: true, signal_type: 'exec_departure', severity: 'strong', snippet: '', ...t });
+
+  test('exec_departure without a senior role in the article is dropped (store closure mis-tag)', () => {
+    const text = 'Red Lobster to shutdown its oldest location after the lease ended.';
+    const r = judge(item(text), tag({ snippet: 'Red Lobster to shutdown its oldest location' }));
+    assert.equal(r.signal, null);
+    assert.match(r.reason, /no senior role/);
+  });
+
+  test('exec_departure naming the CFO is kept, and every drop has a reason', () => {
+    const text = 'Acme CFO Jane Doe resigned on Friday, the company said.';
+    assert.equal(judge(item(text), tag({ snippet: 'Acme CFO Jane Doe resigned on Friday' })).reason, 'kept');
+    assert.equal(judge(item(text), tag({ relevant: false })).reason, 'not relevant');
+    assert.equal(judge(item(text), tag({ same_company: false })).reason, 'not the same company');
+    assert.match(judge(item(text), tag({ snippet: 'Jane Doe was fired by the board' })).reason, /snippet guard/);
+  });
+
+  test('parseTag keeps the model reason when present', () => {
+    assert.equal(parseTag({ relevant: false, same_company: true, signal_type: 'none', severity: 'none', snippet: '', reason: 'good news' })?.reason, 'good news');
+  });
+});
+
+test('an empty search reply is retried once before the search counts as failed', async () => {
+  let legalCalls = 0;
+  const serp = JSON.stringify({ general: { empty: true } });
+  const fetchStub = async (_url: string, init: { body: string }) => {
+    const target = JSON.parse(init.body).url as string;
+    if (target.includes('lawsuit')) {
+      legalCalls += 1;
+      return { ok: true, status: 200, text: async () => (legalCalls === 1 ? '' : serp) };
+    }
+    return { ok: true, status: 200, text: async () => serp };
+  };
+  const signals = await runNewsSignals({
+    borrower: { name: 'Acme Foods' },
+    invokeLLM: async () => ({}),
+    fetch: fetchStub,
+    apiKey: 'test',
+    today: '2026-10-10',
+  });
+  assert.deepEqual(signals, []);
+  assert.equal(legalCalls, 2);
 });

@@ -99,16 +99,39 @@ export function normalizeReview(raw: Record<string, unknown>): Review | null {
   return { date: iso(t), rating: Number.isFinite(r) && r > 0 ? r : null, texts, url: typeof url === "string" ? url : undefined };
 }
 
+// "Paid" complaints about the amount ("not paid very well", "didn't get paid enough") are not distress.
+const NOT_AMOUNT = String.raw`(?! (very |that |so |too |as |all that |nearly |anywhere near )?(enough|well|fairly|much|competitively|market|a lot|great|good|decent|high|more|less|what))`;
+
+// Patterns need distress context: a bare "shut down" ("my ideas were shut down") or "closing the store" (a closing
+// shift) is not a company closing.
 const DISTRESS: { label: string; re: RegExp }[] = [
   { label: "layoffs", re: /\b(lay ?offs?|laid off|laying off|reductions? in force|RIFs?)\b/i },
   { label: "furloughs", re: /\bfurlough(s|ed|ing)?\b/i },
   {
     label: "late or missed pay",
-    re: /\b(late (pay|paychecks?|payroll|wages)|pay(checks?|roll)? (was |were |is |are |came |comes )?(late|delayed|missed|bounced)|missed (pay|paychecks?|payroll)|(didn'?t|did not) get paid|(haven'?t|have not|weren'?t|were not|wasn'?t|was not|not) (been |being |getting )?paid(?! (enough|well|fairly|much|competitively|market))|bounced paychecks?)\b/i,
+    re: new RegExp(
+      String.raw`\b(late (pay|paychecks?|payroll|wages)` +
+        String.raw`|pay(checks?|roll)? (was |were |is |are |has been |have been |came |comes |keeps being )?(late|delayed|missed|bounced)` +
+        String.raw`|paid late|missed (pay ?days?|paychecks?|payroll)|bounced paychecks?` +
+        String.raw`|(not|\w+n'?t) (been |being |getting )?paid on time` +
+        String.raw`|(didn'?t|did not|don'?t|do not) get paid${NOT_AMOUNT}` +
+        String.raw`|(haven'?t|have not|hasn'?t|has not) been paid${NOT_AMOUNT}` +
+        String.raw`|not getting paid${NOT_AMOUNT})\b`,
+      "i",
+    ),
   },
   {
     label: "closing",
-    re: /\b(clos(ing|ed|es) (down|its doors|the (plant|office|location|facility|warehouse|store))|shutting down|shut down|going out of business|out of business|bankrupt(cy)?)\b/i,
+    re: new RegExp(
+      String.raw`\b((going|went) out of business|bankrupt(cy)?|chapter 11` +
+        String.raw`|clos(ed|ing|es) (its|our|their) doors` +
+        String.raw`|clos(ed|ing|es|e) (the |our |its |their |a |one of the |two |\d+ )?(plants?|factor(y|ies)|facilit(y|ies)|distribution centers?)` +
+        String.raw`|(shutting|shut|closing) down (the |our |its |this |that )?([\w-]+ ){0,2}(company|business|plant|factory|offices?|locations?|division|facilit(y|ies)|sites?)` +
+        String.raw`|(company|business|plant|factory|office|division|facility|location) (is |was |will be |is being |are |were )?(shutting down|shut down|closing down|closing permanently|closed permanently|being closed|being shut down)` +
+        String.raw`|(plant|factory|office|store|location|facility|site) closures?` +
+        String.raw`|closing (several|multiple|many|all|\d+) (stores|locations|offices|plants|sites))\b`,
+      "i",
+    ),
   },
 ];
 
@@ -180,11 +203,22 @@ export interface Tagger {
   (text: string, url: string): Promise<{ relevant?: boolean; signal_type?: string; snippet?: string } | null>;
 }
 
-const squash = (s: string) => s.replace(/\s+/g, " ").trim();
+// Finds `quote` in one of the source texts, matching any run of whitespace, and returns the source's exact text.
+export function sourceQuote(quote: string, texts: string[]): string | null {
+  const words = quote.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return null;
+  const re = new RegExp(words.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s+"));
+  for (const text of texts) {
+    const m = re.exec(text);
+    if (m) return m[0];
+  }
+  return null;
+}
 
 export async function reviewSignalsFromReviews(b: Borrower, raw: Record<string, unknown>[], today: string, tag?: Tagger): Promise<Signal[]> {
   if (parseDay(today) === null) throw new Error(`Reviews: invalid today ${today}`);
   const reviews = raw.map(normalizeReview).filter((r): r is Review => r !== null);
+  if (raw.length > 0 && reviews.length === 0) throw new Error("Reviews: no review has a readable date (Bright Data fields changed?)");
   const pageUrl = b.glassdoor_url ?? "https://www.glassdoor.com";
   const out: Signal[] = [];
 
@@ -202,8 +236,10 @@ export async function reviewSignalsFromReviews(b: Borrower, raw: Record<string, 
     if (tag) {
       const t = await tag(r.texts.join("\n"), r.url ?? pageUrl);
       if (!t?.relevant || t.signal_type !== "review_distress") continue;
-      // Snippet guard: keep the model's snippet only if it is copied exactly from the review.
-      if (t.snippet && r.texts.some((x) => squash(x).includes(squash(t.snippet!)))) snippet = t.snippet;
+      // Snippet guard: the model's quote is used only to locate text in the review, and what we store is the
+      // review's own text. A quote that is not in the review keeps our keyword sentence.
+      const quote = t.snippet ? sourceQuote(t.snippet, r.texts) : null;
+      if (quote) snippet = quote;
     }
     out.push({
       borrower_id: b.id,
@@ -248,6 +284,47 @@ export class ReviewsPendingError extends Error {
   }
 }
 
+// Bright Data snapshot ids look like "sd_mv2ukg5rk1k28ztor". Anything else is refused, so a caller can never steer
+// our API key to another Bright Data endpoint through the path.
+export function checkSnapshotId(id: unknown): string {
+  if (typeof id !== "string" || !/^sd?_[a-z0-9]{4,40}$/.test(id)) throw new Error("Reviews: invalid snapshot_id");
+  return id;
+}
+
+// Only Glassdoor pages go to the Glassdoor dataset with our key.
+export function checkGlassdoorUrl(url: unknown): string {
+  let host = "";
+  try {
+    const u = new URL(String(url));
+    host = u.protocol === "https:" ? u.hostname : "";
+  } catch {
+    // fall through
+  }
+  if (host !== "glassdoor.com" && !host.endsWith(".glassdoor.com")) throw new Error("Reviews: glassdoor_url must be an https glassdoor.com page");
+  return String(url);
+}
+
+const NOT_READY = new Set(["building", "running", "starting", "collecting", "digesting", "scheduled"]);
+
+function isNotReady(body: unknown): boolean {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return false;
+  const b = body as { status?: unknown; message?: unknown };
+  return NOT_READY.has(String(b.status)) || /not ready/i.test(String(b.message ?? ""));
+}
+
+// A Bright Data reply must be a list holding at least one real record. Error records (include_errors), an empty
+// list, or any other shape is a failure, so refreshBorrower keeps the old signals and marks Reviews unavailable
+// instead of replacing them with "nothing found".
+export function usableRecords(body: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(body)) throw new Error(`Reviews: unexpected Bright Data reply ${JSON.stringify(body).slice(0, 120)}`);
+  const records = body.filter((r) => r && typeof r === "object" && !("error" in r) && !("error_code" in r));
+  if (records.length === 0) {
+    const firstError = body.find((r) => r && typeof r === "object" && ("error" in r || "error_code" in r));
+    throw new Error(`Reviews: Bright Data returned no records${firstError ? `: ${String(firstError.error ?? firstError.error_code)}` : ""}`);
+  }
+  return records;
+}
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function bd(apiKey: string, path: string, init: RequestInit = {}): Promise<Response> {
@@ -260,28 +337,34 @@ async function bd(apiKey: string, path: string, init: RequestInit = {}): Promise
   return res;
 }
 
-async function waitForSnapshot(apiKey: string, id: string): Promise<Record<string, unknown>[]> {
+async function waitForSnapshot(apiKey: string, rawId: unknown): Promise<Record<string, unknown>[]> {
+  const id = encodeURIComponent(checkSnapshotId(rawId));
   const deadline = Date.now() + POLL_BUDGET_MS;
   while (Date.now() < deadline) {
     const p = await (await bd(apiKey, `/progress/${id}`)).json();
-    if (p.status === "ready") return await (await bd(apiKey, `/snapshot/${id}?format=json`)).json();
     if (p.status === "failed") throw new Error(`Reviews: snapshot ${id} failed`);
+    if (p.status === "ready") {
+      // The download can still answer "not ready" for a moment after progress says ready.
+      const res = await bd(apiKey, `/snapshot/${id}?format=json`);
+      const body = res.status === 202 ? { status: "building" } : await res.json();
+      if (!isNotReady(body)) return usableRecords(body);
+    }
     await sleep(POLL_EVERY_MS);
   }
   throw new ReviewsPendingError(id);
 }
 
-export async function fetchReviews(b: Borrower, apiKey: string, snapshotId?: string): Promise<Record<string, unknown>[]> {
-  if (snapshotId) return waitForSnapshot(apiKey, snapshotId);
+export async function fetchReviews(b: Borrower, apiKey: string, snapshotId?: unknown): Promise<Record<string, unknown>[]> {
+  if (snapshotId !== undefined) return waitForSnapshot(apiKey, snapshotId);
   if (!b.glassdoor_url) throw new Error("Reviews: borrower has no glassdoor_url");
+  const url = checkGlassdoorUrl(b.glassdoor_url);
   const qs = new URLSearchParams({ dataset_id: GLASSDOOR_REVIEWS_DATASET_ID, format: "json", include_errors: "true" });
-  const body = JSON.stringify({ input: [{ url: b.glassdoor_url, days: 455 }], limit_per_input: 300 });
+  // days is required by the dataset: 455 covers the 90-day window plus the prior 12 months.
+  const body = JSON.stringify({ input: [{ url, days: 455 }], limit_per_input: 300 });
   const res = await bd(apiKey, `/scrape?${qs}`, { method: "POST", body });
   const data = await res.json();
-  if (res.status === 202) return waitForSnapshot(apiKey, data.snapshot_id);
-  // days is required by the dataset: 455 covers the 90-day window plus the prior 12 months.
-  // Error records from include_errors have no review date and are dropped by normalizeReview.
-  return Array.isArray(data) ? data : [];
+  if (res.status === 202) return waitForSnapshot(apiKey, data?.snapshot_id);
+  return usableRecords(data);
 }
 
 // Base44 backend function. Reads the BRIGHTDATA_API_KEY secret.

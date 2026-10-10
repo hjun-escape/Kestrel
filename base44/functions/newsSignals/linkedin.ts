@@ -7,7 +7,20 @@
 //   D. check dates    exec role at the borrower with an end date in the last 180 days -> Signal
 // A profile that only shows a different current employer is "unconfirmed", never a signal: parent companies
 // and old departures make it unreliable (TGI Fridays' former CEOs all show other employers, from 2023-24).
-import { type Borrower, type InvokeLLM, type Log, type Signal, snippetIsExact, withinDays } from "./logic.ts";
+import type { Borrower, Signal } from "./logic.ts";
+import { coerceJson } from "./shared.ts";
+import type { LLMParams } from "./shared.ts";
+
+export type InvokeLLM = (params: LLMParams) => Promise<unknown>;
+export type Log = (msg: string) => void;
+
+const squash = (s: string) => (s ?? "").replace(/\s+/g, " ").trim();
+const snippetIsExact = (snippet: string, source: string) => squash(snippet).length > 0 && squash(source).includes(squash(snippet));
+
+function withinDays(date: string, today: Date, days: number): boolean {
+  const age = (today.getTime() - new Date(date + "T00:00:00Z").getTime()) / 86400000;
+  return age >= 0 && age <= days;
+}
 
 export const PEOPLE_DATASET = "gd_l1viktl72bvl7bjuj0"; // "LinkedIn people profiles"
 const MAX_EXECS = 3;
@@ -96,7 +109,7 @@ For each: full name, title, the result index, and a quote copied EXACTLY from th
 ${text}`,
     response_json_schema: EXEC_SCHEMA,
   });
-  const out = (typeof raw === "string" ? JSON.parse(raw) : raw) as { execs?: { name: string; title: string; quote: string; result_index: number }[] };
+  const out = coerceJson(raw) as { execs?: { name: string; title: string; quote: string; result_index: number }[] };
   const seen = new Set<string>();
   const execs = (out?.execs ?? []).flatMap((e) => {
     const r = results[e.result_index];
@@ -181,7 +194,6 @@ export function linkedInSignals(b: Borrower, run: LinkedInRun, today = new Date(
     if (ended && withinDays(ended.end, today, 180)) {
       const now = p.current_company ? `; now at ${p.current_company}` : "";
       signals.push({
-        borrower_id: b.id,
         type: "exec_departure",
         severity: STRONG_TITLE.test(ended.title) ? "strong" : "weak",
         date: ended.end,
