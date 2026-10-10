@@ -16,6 +16,8 @@ const Assistant = lazy(() => import('@/pages/Assistant'));
 const DevProgression = lazy(() => import('@/pages/DevProgression'));
 // The welcome page pulls in animejs; load it only when visited.
 const Landing = lazy(() => import('@/pages/Landing'));
+// About: a plain page; load it only when visited.
+const About = lazy(() => import('@/pages/About'));
 import WelcomeGate from '@/components/landing/WelcomeGate';
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
@@ -34,6 +36,7 @@ const AppRoutes = () => (
     <Route path="/forgot-password" element={<ForgotPassword />} />
     <Route path="/reset-password" element={<ResetPassword />} />
     <Route path="/welcome" element={<Suspense fallback={null}><Landing /></Suspense>} />
+    <Route path="/about" element={<Suspense fallback={null}><About /></Suspense>} />
     <Route path="/" element={<WelcomeGate><LoanBook /></WelcomeGate>} />
     <Route path="/borrower/:id" element={<CompanyDetail />} />
     <Route path="/assistant" element={<Suspense fallback={null}><Assistant /></Suspense>} />

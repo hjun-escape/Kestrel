@@ -1,9 +1,7 @@
 import React, { useEffect } from "react";
 import HeroSection, { LandingNav } from "@/components/landing/HeroSection";
-import HowItWorks from "@/components/landing/HowItWorks";
-import ProofStrip from "@/components/landing/ProofStrip";
-import TrustPrinciples from "@/components/landing/TrustPrinciples";
 import LandingFooter from "@/components/landing/LandingFooter";
+import Presentation from "@/components/landing/Presentation";
 
 // Public welcome page at /welcome. Lazy-loaded from App.jsx so animejs stays
 // out of the main bundle.
@@ -27,9 +25,9 @@ export default function Landing() {
       <LandingNav />
       <main id="main">
         <HeroSection />
-        <HowItWorks />
-        <ProofStrip />
-        <TrustPrinciples />
+        {/* A white sheet that widens out of the hero, steps through slides as you scroll, then narrows back
+            to reveal the footer. Phones and reduced motion get the stacked sections instead. */}
+        <Presentation />
       </main>
       <LandingFooter />
     </div>
