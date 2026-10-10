@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,11 @@ import { getTopSignal, filterRecentSignals, sortRows, statusKey } from "@/lib/bo
 import { ensureSeedData } from "@/lib/seed";
 import { useAuth } from "@/lib/AuthContext";
 import { normalizeEmail, visibleCompanies } from "@/lib/ownership";
+import LoadDemoButton from "@/components/demo/LoadDemoButton";
+import DemoProgress from "@/components/demo/DemoProgress";
+import DemoEmptyPanel from "@/components/demo/DemoEmptyPanel";
+import { useDemoLoader } from "@/components/demo/useDemoLoader";
+import { DEMO_LOAD_PARAM, demoLoadRequested, hasRealCompanies } from "@/lib/demoLoad";
 
 const TABS = [
   { value: "all", label: "All" },
@@ -32,6 +37,7 @@ function groupSignals(items) {
 
 export default function LoanBook() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { email, isAuthenticated, isLoadingAuth, navigateToLogin } = useAuth();
   const me = isAuthenticated ? normalizeEmail(email) : "";
   const [borrowers, setBorrowers] = useState(null);
@@ -46,8 +52,9 @@ export default function LoanBook() {
 
   // Signed in: only the user's own companies. Signed out: only the unowned
   // shared demo book. The backend functions enforce the same rule.
-  async function loadData() {
-    setLoading(true);
+  // quiet: reload behind the table (demo checks landing) without the loading skeleton.
+  async function loadData({ quiet = false } = {}) {
+    if (!quiet) setLoading(true);
     setLoadError(null);
     try {
       const query = me ? { owner_email: me } : {};
@@ -64,6 +71,21 @@ export default function LoanBook() {
       setLoading(false);
     }
   }
+
+  const demo = useDemoLoader({ me, onChanged: () => loadData({ quiet: true }) });
+
+  // "Explore the demo" on the landing page links to "/?demo-load=1": start the demo load once the book has
+  // loaded, if the signed-out shared book has no real companies yet. The flag is then removed from the URL.
+  const autoDemoHandled = useRef(false);
+  useEffect(() => {
+    if (autoDemoHandled.current || loading || isLoadingAuth || !demoLoadRequested(location.search)) return;
+    autoDemoHandled.current = true;
+    const params = new URLSearchParams(location.search);
+    params.delete(DEMO_LOAD_PARAM);
+    const search = params.toString();
+    navigate({ pathname: location.pathname, search: search ? `?${search}` : "" }, { replace: true });
+    if (!me && !loadError && !hasRealCompanies(borrowers)) demo.start();
+  }, [loading, isLoadingAuth, location.search, me, borrowers, loadError]);
 
   useEffect(() => {
     document.title = "Loan book | Early Warning";
@@ -147,11 +169,27 @@ export default function LoanBook() {
               </p>
             )}
           </div>
-          <Button data-demo="screen-applicant" onClick={() => openAdd("applicant")} className="h-9 rounded-sm bg-ew-ink px-3.5 hover:bg-ew-ink-soft">
-            <Plus aria-hidden="true" />
-            Screen new applicant
-          </Button>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <LoadDemoButton signedIn={!!me} running={demo.running} onClick={demo.start} />
+            <Button data-demo="screen-applicant" onClick={() => openAdd("applicant")} className="h-9 rounded-sm bg-ew-ink px-3.5 hover:bg-ew-ink-soft">
+              <Plus aria-hidden="true" />
+              Screen new applicant
+            </Button>
+          </div>
         </div>
+
+        <DemoProgress
+          phase={demo.phase}
+          items={demo.items}
+          error={demo.error}
+          summary={demo.summary}
+          onCancel={demo.cancel}
+          onDismiss={demo.dismiss}
+        />
+
+        {!me && !loading && !loadError && !isBookEmpty && !hasRealCompanies(borrowers) && demo.phase === "idle" && (
+          <DemoEmptyPanel running={demo.running} onLoad={demo.start} />
+        )}
 
         <SummaryStrip
           borrowers={inTab}
@@ -201,10 +239,11 @@ export default function LoanBook() {
             <p className="mx-auto mt-1 max-w-[520px] text-sm text-ew-muted">
               {me
                 ? "Screen a new applicant before you lend, or add a company you already lend to. Only you will see the companies you add."
-                : "Screen an applicant to run the first check on news, court filings, hiring and reviews."}
+                : "Load six real mid-size companies and watch the live checks on news, court filings, hiring and reviews run, or screen an applicant of your own. No account needed."}
             </p>
             <div className="mt-4 flex flex-wrap justify-center gap-2">
-              <Button onClick={() => openAdd("applicant")} className="h-9 rounded-sm bg-ew-ink hover:bg-ew-ink-soft">
+              <LoadDemoButton signedIn={!!me} running={demo.running} onClick={demo.start} variant="default" className="bg-ew-ink hover:bg-ew-ink-soft" />
+              <Button variant="outline" onClick={() => openAdd("applicant")} className="h-9 rounded-sm">
                 Screen a new applicant
               </Button>
               {me && (

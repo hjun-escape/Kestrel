@@ -4,6 +4,9 @@
 
 export const DEMO_FLAG_KEY = "ew_demo_chosen";
 export const WELCOME_PATH = "/welcome";
+// "Explore the demo" opens the loan book with this flag; the loan book loads the real demo companies when the
+// shared book has none yet (src/lib/demoLoad.js, src/pages/LoanBook.jsx).
+export const DEMO_LOAD_PATH = "/?demo-load=1";
 
 /** True when this browser has chosen "Explore the demo". Never throws. */
 export function hasChosenDemo(storage) {
