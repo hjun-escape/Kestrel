@@ -173,7 +173,7 @@ function TypedField({ id, label, value, active, mono = false }) {
         tabIndex={-1}
         value={value}
         className={`mt-1 h-9 w-full rounded-sm border bg-white px-2.5 text-[13.5px] text-ew-ink outline-none ${
-          active ? "border-ew-focus ring-2 ring-ew-focus/25" : "border-ew-rule"
+          active ? "border-ew-focus ring-2 ring-[#2d5bd7]/25" : "border-ew-rule"
         } ${mono ? "font-mono text-[12.5px]" : ""}`}
       />
     </label>
@@ -227,7 +227,7 @@ function ApplicantForm({ company, onSelect, progress, runKey }) {
           <div
             aria-live="polite"
             className={`flex h-10 w-full items-center justify-center gap-2 rounded-sm text-[14px] font-semibold transition-colors ${
-              phase === "typing" ? "bg-ew-ink/40 text-white" : "bg-ew-ink text-white"
+              phase === "typing" ? "bg-[#14202e]/40 text-white" : "bg-ew-ink text-white"
             }`}
           >
             {phase === "typing" && "Save and check"}

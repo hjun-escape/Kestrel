@@ -60,9 +60,9 @@ export function RaceBars() {
       ].map((r) => (
         <div key={r.label} className="grid grid-cols-[130px_minmax(0,1fr)_84px] items-center gap-4">
           <span className={`text-[14px] ${r.fast ? "font-semibold text-ew-ink" : "text-ew-muted"}`}>{r.label}</span>
-          <span className="h-3 overflow-hidden rounded-sm bg-ew-rule/60">
+          <span className="h-3 overflow-hidden rounded-sm bg-[#cdd3db]/60">
             <span
-              className={`block h-full rounded-sm ${r.fast ? "bg-[#0ea5e9]" : "bg-ew-muted/45"}`}
+              className={`block h-full rounded-sm ${r.fast ? "bg-[#0ea5e9]" : "bg-[#5a6675]/45"}`}
               style={{ width: `${r.pct}%`, transition: `width ${r.fast ? 600 : 900}ms ${r.fast ? "cubic-bezier(.2,.8,.2,1)" : "linear"}` }}
             />
           </span>
@@ -146,7 +146,7 @@ export function DecideDemo() {
   const clicked = step >= 4;
   return (
     <div ref={ref} className={`${CARD} relative`}>
-      <div className={`rounded-sm border border-ew-red-rule bg-ew-red-bg/40 p-2.5 transition-all duration-500 ${flagIn ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"}`}>
+      <div className={`rounded-sm border border-ew-red-rule bg-[#fdecea]/40 p-2.5 transition-all duration-500 ${flagIn ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"}`}>
         <p className="flex justify-between text-[13px] font-semibold">
           WARN notice, 125 jobs <span className="font-normal text-ew-muted">Nevada DETR</span>
         </p>
@@ -193,10 +193,10 @@ export function LeadTimeline() {
   return (
     <div ref={ref} className="relative h-[176px]">
       {/* Axis with month ticks and labels. */}
-      <div className="absolute inset-x-0 h-[2px] rounded bg-ew-ink/25" style={{ top: LINE_Y }} />
+      <div className="absolute inset-x-0 h-[2px] rounded bg-[#14202e]/25" style={{ top: LINE_Y }} />
       {MONTHS.map((m) => (
         <div key={m.label} className="absolute" style={{ left: `${m.at}%`, top: LINE_Y - 4 }}>
-          <span className="block h-[10px] w-px bg-ew-ink/35" />
+          <span className="block h-[10px] w-px bg-[#14202e]/35" />
           <span className="absolute left-0 top-4 -translate-x-1/2 text-[12px] text-ew-muted">{m.label}</span>
         </div>
       ))}
@@ -227,7 +227,7 @@ export function LeadTimeline() {
       >
         <p className="-translate-x-1/2 whitespace-nowrap text-[12.5px] font-semibold text-ew-ink-soft">Q3 financials</p>
         <p className="-translate-x-1/2 whitespace-nowrap text-[11px] text-ew-muted">Nov 14</p>
-        <span className="mt-1 block h-[34px] w-0 border-l-2 border-dashed border-ew-ink/45" />
+        <span className="mt-1 block h-[34px] w-0 border-l-2 border-dashed border-[#14202e]/45" />
       </div>
 
       {/* Lead-time bracket, drawn across as you scroll. */}
