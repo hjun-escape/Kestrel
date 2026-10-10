@@ -30,7 +30,7 @@ export default function UserMenu({ className = "", tone = "light" }) {
     return (
       <Link
         to={to}
-        className={`inline-flex h-7 items-center rounded-md px-2.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 ${TONES[tone]} ${className}`}
+        className={`inline-flex h-7 items-center whitespace-nowrap rounded-md px-2.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 ${TONES[tone]} ${className}`}
       >
         Sign in
       </Link>
