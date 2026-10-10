@@ -201,6 +201,18 @@ function parseAbsolute(s: string): number | null {
 }
 
 /**
+ * Publish date from a dated article path (/2026/08/21/), or null. More exact than Google's
+ * relative dates: "1 month ago" covers 30-59 days, but parseRelative can only pick one end.
+ */
+export function dateFromUrl(url: string, today: string): string | null {
+  const now = parseIsoDay(today);
+  const m = /\/(20\d{2})\/(\d{2})\/(\d{2})(?:\/|$)/.exec(str(url));
+  if (now === null || !m) return null;
+  const t = utcDay(+m[1], +m[2] - 1, +m[3]);
+  return t === null || t > now ? null : isoDay(t);
+}
+
+/**
  * SERP date ("3 days ago", "Jun 18, 2026", "18 Jun 2026", ISO) -> YYYY-MM-DD against today (UTC),
  * or null if it can't be parsed or is clearly in the future.
  */
@@ -412,7 +424,7 @@ async function search(deps: NewsDeps, apiKey: string, q: NewsQuery, today: strin
     throw new Error('search response had no news results block');
   }
   return normaliseSerpJson(data)
-    .map((r: NewsResult) => ({ ...r, date: parseNewsDate(r.date, today) }))
+    .map((r: NewsResult) => ({ ...r, date: dateFromUrl(r.url, today) ?? parseNewsDate(r.date, today) }))
     .filter((r): r is NewsResult => r.date !== null && ageDays(r.date, today) <= MAX_AGE_DAYS)
     .slice(0, MAX_ITEMS_PER_QUERY);
 }
