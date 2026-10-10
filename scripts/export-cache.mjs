@@ -13,7 +13,7 @@
 
 import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 
-const APP_URL = "https://early-warning-5bc4fabd.base44.app";
+const APP_URL = "https://kestrel-app.base44.app";
 const APP_ID = "6aca96c9744d6ba75bc4fabd";
 const OUT_DIR = new URL("../data/cache/", import.meta.url);
 const includeSamples = process.argv.includes("--include-samples");
