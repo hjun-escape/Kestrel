@@ -1,0 +1,23 @@
+{
+  "general": { "search_engine": "google", "query": "Acme Widgets lawsuit", "search_type": "news" },
+  "news": [
+    {
+      "title": "Acme Widgets sued by First Harbor Bank over unpaid credit line",
+      "link": "https://www.dayton-business.example/news/acme-widgets-sued",
+      "source": "Dayton Business Journal",
+      "date": "2 weeks ago",
+      "description": "First Harbor Bank filed suit against Acme Widgets Inc. seeking $4.2 million on a defaulted revolving credit facility.",
+      "rank": 1
+    },
+    {
+      "title": "Acme Widgets CFO steps down",
+      "link": "https://news.example.org/acme-cfo-exit",
+      "source": "Ohio Manufacturing News",
+      "date": "Mar 3, 2026",
+      "snippet": "Chief financial officer Dana Ruiz has left Acme Widgets effective immediately.",
+      "rank": 2
+    },
+    { "title": "   ", "link": "not-a-url" },
+    "garbage-entry"
+  ]
+}
