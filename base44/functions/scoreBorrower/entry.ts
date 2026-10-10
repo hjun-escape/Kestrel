@@ -28,11 +28,13 @@ export const WINDOW_DAYS = 90;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
+// "2026-10-01" or "2026-10-01T00:00:00Z" (the calendar date as written). Impossible dates like 2026-02-30 are null.
 function parseDay(s: string): number | null {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s ?? "");
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:$|[T ])/.exec(typeof s === "string" ? s.trim() : "");
   if (!m) return null;
   const t = Date.UTC(+m[1], +m[2] - 1, +m[3]);
-  return Number.isNaN(t) ? null : t;
+  const d = new Date(t);
+  return d.getUTCFullYear() === +m[1] && d.getUTCMonth() === +m[2] - 1 && d.getUTCDate() === +m[3] ? t : null;
 }
 
 function todayIso(): string {
@@ -66,8 +68,34 @@ export function recentSignals(signals: Signal[], today: string = todayIso()): Si
   });
 }
 
+// Strongest first, then newest.
+function byRank(a: Signal, b: Signal): number {
+  if (a.severity !== b.severity) return a.severity === "strong" ? -1 : 1;
+  return (parseDay(b.date) ?? 0) - (parseDay(a.date) ?? 0);
+}
+
+const normText = (s: unknown) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+const normUrl = (s: unknown) => String(s ?? "").trim().toLowerCase().replace(/#.*$/, "").replace(/\/+$/, "");
+
+// The same event reported twice counts once: same type and either the same link and title, or the same title on
+// the same day. The strongest copy is kept. (A Glassdoor strong and weak signal can share a link, so a link
+// alone is not enough.)
+export function dedupeSignals(signals: Signal[]): Signal[] {
+  const seen = new Set<string>();
+  const out: Signal[] = [];
+  for (const s of [...signals].sort(byRank)) {
+    const title = normText(s.title);
+    const keys = [`${s.type}|day|${title}|${parseDay(s.date)}`];
+    if (s.source_url) keys.push(`${s.type}|url|${normUrl(s.source_url)}|${title}`);
+    if (keys.some((k) => seen.has(k))) continue;
+    keys.forEach((k) => seen.add(k));
+    out.push(s);
+  }
+  return out;
+}
+
 export function scoreBorrower(signals: Signal[], today: string = todayIso()): { status: Status; why: string } {
-  const recent = recentSignals(signals, today);
+  const recent = dedupeSignals(recentSignals(signals, today));
   const strong = recent.filter((s) => s.severity === "strong").length;
   const weak = recent.length - strong;
 
@@ -77,13 +105,7 @@ export function scoreBorrower(signals: Signal[], today: string = todayIso()): { 
 
   if (status === "green") return { status, why: "Green: no warning signs in the last 90 days." };
 
-  const top = [...recent]
-    .sort((a, b) => {
-      if (a.severity !== b.severity) return a.severity === "strong" ? -1 : 1;
-      return b.date.localeCompare(a.date);
-    })
-    .slice(0, 2)
-    .map(label);
+  const top = [...recent].sort(byRank).slice(0, 2).map(label);
 
   const name = status === "red" ? "Red" : "Yellow";
   return { status, why: `${name}: ${top.join(" + ")}.` };

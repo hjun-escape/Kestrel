@@ -97,3 +97,35 @@ test("Base44 handler takes { signals, today } like refreshBorrower sends", async
   assert.equal(res.status, 200);
   assert.deepEqual(await res.json(), { status: "yellow", why: "Yellow: CEO resigns (Oct 1)." });
 });
+
+test("dates with a time attached count, by their calendar date", () => {
+  assert.equal(scoreBorrower([sig("strong", "2026-10-01T00:00:00Z")], TODAY).status, "yellow");
+  assert.equal(scoreBorrower([sig("strong", "2026-10-01T23:59:59.000Z", "CEO resigns")], TODAY).why, "Yellow: CEO resigns (Oct 1).");
+  assert.equal(scoreBorrower([sig("strong", "2026-07-11T12:00:00Z")], TODAY).status, "green"); // 91 days
+});
+
+test("impossible dates are ignored", () => {
+  assert.equal(scoreBorrower([sig("strong", "2026-02-30")], TODAY).status, "green");
+});
+
+test("the same event reported twice counts once", () => {
+  const a = { ...sig("strong", "2026-10-01", "Acme CFO steps down", "exec_departure"), source_url: "https://news.example.com/a" };
+  // Same article twice (trailing slash, title case differ), and same headline on the same day from another outlet.
+  const s = [a, { ...a, source_url: "https://news.example.com/a/", title: "ACME CFO steps down" }, { ...a, source_url: "https://other.example.com/b" }];
+  assert.deepEqual(scoreBorrower(s, TODAY), { status: "yellow", why: "Yellow: Acme CFO steps down (Oct 1)." });
+});
+
+test("different events are not merged: same link with different titles, or same title on different days", () => {
+  const page = "https://www.glassdoor.com/Reviews/Acme-Reviews-E1.htm";
+  const strong = { ...sig("strong", "2026-10-01", "Employee review mentions layoffs", "review_distress"), source_url: page };
+  const weak = { ...sig("weak", "2026-10-01", "Glassdoor rating down 0.7 in 90 days", "review_distress"), source_url: page };
+  const weak2 = { ...sig("weak", "2026-09-01", "Lawsuit filed"), source_url: "https://x.example.com/1" };
+  const weak3 = { ...sig("weak", "2026-09-20", "Lawsuit filed"), source_url: "https://x.example.com/2" };
+  assert.equal(scoreBorrower([strong, weak, weak2, weak3], TODAY).status, "red");
+});
+
+test("a duplicate keeps the strongest copy", () => {
+  const w = { ...sig("weak", "2026-10-01", "WARN notice filed"), source_url: "https://x.example.com/w" };
+  const s = { ...w, severity: "strong" as const };
+  assert.equal(scoreBorrower([w, s], TODAY).status, "yellow");
+});

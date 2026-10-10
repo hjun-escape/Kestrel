@@ -1,5 +1,5 @@
 // hiringSignal (P3): job postings in the last 30 days vs the prior 60 days (normalized per 30 days).
-// Drop >= 50% = strong, 25-50% = weak. Skipped if the prior 60 days had 0 postings.
+// Drop >= 50% = strong, 25-50% = weak. Skipped if the prior 60 days had fewer than MIN_PRIOR_POSTINGS.
 //
 // Input:  { borrower: Borrower, today?: "YYYY-MM-DD", snapshot_id?: string }  (refreshBorrower sends { borrower })
 // Output: Signal[] (0 or 1 hiring_drop). Never writes status.
@@ -138,9 +138,15 @@ function fmt(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(1);
 }
 
+// Below this many postings in the prior 60 days (3 a month) a drop is noise: 1 posting then 0 is not "down 100%".
+export const MIN_PRIOR_POSTINGS = 6;
+
 export function hiringSignalFromJobs(b: Borrower, jobs: Job[], today: string): Signal[] {
+  if (jobs.length > 0 && !jobs.some((j) => postedAt(j, today) !== null)) {
+    throw new Error("Jobs: no posting has a readable date (Bright Data fields changed?)");
+  }
   const c = countPostings(jobs.filter((j) => isSameCompany(j, b)), today);
-  if (c.dropPct === null || c.dropPct < 25) return [];
+  if (c.prior60 < MIN_PRIOR_POSTINGS || c.dropPct === null || c.dropPct < 25) return [];
   return [
     {
       borrower_id: b.id,
@@ -165,6 +171,34 @@ export class JobsPendingError extends Error {
   }
 }
 
+// Bright Data snapshot ids look like "sd_mv2ukg5rk1k28ztor". Anything else is refused, so a caller can never steer
+// our API key to another Bright Data endpoint through the path.
+export function checkSnapshotId(id: unknown): string {
+  if (typeof id !== "string" || !/^sd?_[a-z0-9]{4,40}$/.test(id)) throw new Error("Jobs: invalid snapshot_id");
+  return id;
+}
+
+const NOT_READY = new Set(["building", "running", "starting", "collecting", "digesting", "scheduled"]);
+
+function isNotReady(body: unknown): boolean {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return false;
+  const b = body as { status?: unknown; message?: unknown };
+  return NOT_READY.has(String(b.status)) || /not ready/i.test(String(b.message ?? ""));
+}
+
+// A Bright Data reply must be a list holding at least one real record. Error records (include_errors), an empty
+// list, or any other shape is a failure, so refreshBorrower keeps the old signals and marks Jobs unavailable
+// instead of replacing them with "nothing found".
+export function usableRecords(body: unknown): Job[] {
+  if (!Array.isArray(body)) throw new Error(`Jobs: unexpected Bright Data reply ${JSON.stringify(body).slice(0, 120)}`);
+  const records = body.filter((r) => r && typeof r === "object" && !("error" in r) && !("error_code" in r));
+  if (records.length === 0) {
+    const firstError = body.find((r) => r && typeof r === "object" && ("error" in r || "error_code" in r));
+    throw new Error(`Jobs: Bright Data returned no records${firstError ? `: ${String(firstError.error ?? firstError.error_code)}` : ""}`);
+  }
+  return records;
+}
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function bd(apiKey: string, path: string, init: RequestInit = {}): Promise<Response> {
@@ -177,19 +211,25 @@ async function bd(apiKey: string, path: string, init: RequestInit = {}): Promise
   return res;
 }
 
-async function waitForSnapshot(apiKey: string, id: string): Promise<Job[]> {
+async function waitForSnapshot(apiKey: string, rawId: unknown): Promise<Job[]> {
+  const id = encodeURIComponent(checkSnapshotId(rawId));
   const deadline = Date.now() + POLL_BUDGET_MS;
   while (Date.now() < deadline) {
     const p = await (await bd(apiKey, `/progress/${id}`)).json();
-    if (p.status === "ready") return await (await bd(apiKey, `/snapshot/${id}?format=json`)).json();
     if (p.status === "failed") throw new Error(`Jobs: snapshot ${id} failed`);
+    if (p.status === "ready") {
+      // The download can still answer "not ready" for a moment after progress says ready.
+      const res = await bd(apiKey, `/snapshot/${id}?format=json`);
+      const body = res.status === 202 ? { status: "building" } : await res.json();
+      if (!isNotReady(body)) return usableRecords(body);
+    }
     await sleep(POLL_EVERY_MS);
   }
   throw new JobsPendingError(id);
 }
 
-export async function fetchJobs(b: Borrower, apiKey: string, snapshotId?: string): Promise<Job[]> {
-  if (snapshotId) return waitForSnapshot(apiKey, snapshotId);
+export async function fetchJobs(b: Borrower, apiKey: string, snapshotId?: unknown): Promise<Job[]> {
+  if (snapshotId !== undefined) return waitForSnapshot(apiKey, snapshotId);
   const qs = new URLSearchParams({
     dataset_id: JOBS_DATASET_ID,
     format: "json",
@@ -200,11 +240,11 @@ export async function fetchJobs(b: Borrower, apiKey: string, snapshotId?: string
   const input = [{ keyword: b.name, company: b.name, location: "United States", time_range: "Any time" }];
   const res = await bd(apiKey, `/scrape?${qs}`, { method: "POST", body: JSON.stringify({ input, limit_per_input: 200 }) });
   const body = await res.json();
-  if (res.status === 202) return waitForSnapshot(apiKey, body.snapshot_id);
-  return Array.isArray(body) ? body : [];
+  if (res.status === 202) return waitForSnapshot(apiKey, body?.snapshot_id);
+  return usableRecords(body);
 }
 
-export async function hiringSignal(b: Borrower, apiKey: string, today: string, snapshotId?: string): Promise<Signal[]> {
+export async function hiringSignal(b: Borrower, apiKey: string, today: string, snapshotId?: unknown): Promise<Signal[]> {
   return hiringSignalFromJobs(b, await fetchJobs(b, apiKey, snapshotId), today);
 }
 

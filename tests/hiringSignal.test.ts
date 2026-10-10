@@ -2,6 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import handler, {
+  fetchJobs,
   countPostings,
   hiringSignalFromJobs,
   isSameCompany,
@@ -89,4 +90,70 @@ test("Base44 handler: missing borrower is 400, missing key fails as Jobs", async
   assert.equal(res.status, 502);
   assert.match((await res.json()).error, /^Jobs: BRIGHTDATA_API_KEY/);
   delete (globalThis as any).Deno;
+});
+
+test("minimum sample: 1 or 5 prior postings then none is not a drop; 6 is", () => {
+  assert.deepEqual(hiringSignalFromJobs(B, many(1, 45), TODAY), []);
+  assert.deepEqual(hiringSignalFromJobs(B, many(5, 45), TODAY), []);
+  assert.equal(hiringSignalFromJobs(B, many(6, 45), TODAY)[0].severity, "strong");
+});
+
+test("records with no readable date at all are a failure, not 'no signal'", () => {
+  assert.throws(() => hiringSignalFromJobs(B, [{ company_name: "Acme Widgets", posted: "yesterday-ish" }], TODAY), /^Error: Jobs: no posting/);
+});
+
+// ---------- Bright Data replies (fetch is faked) ----------
+
+function fakeFetch(routes: Record<string, unknown[]>) {
+  const calls: string[] = [];
+  (globalThis as any).fetch = async (url: string) => {
+    calls.push(url);
+    const key = Object.keys(routes).find((k) => url.includes(k));
+    if (!key) throw new Error(`unexpected fetch ${url}`);
+    const next = routes[key].length > 1 ? routes[key].shift() : routes[key][0];
+    const [status, body] = next as [number, unknown];
+    return new Response(JSON.stringify(body), { status });
+  };
+  return calls;
+}
+const realFetch = globalThis.fetch;
+
+test("empty or error-only Bright Data result is a failure, not 'no signals'", async () => {
+  fakeFetch({ "/scrape": [[200, []]] });
+  await assert.rejects(fetchJobs(B, "k"), /Jobs: Bright Data returned no records/);
+  fakeFetch({ "/scrape": [[200, [{ error: "blocked", error_code: "dead_page" }]]] });
+  await assert.rejects(fetchJobs(B, "k"), /Jobs: Bright Data returned no records: blocked/);
+  fakeFetch({ "/scrape": [[200, { message: "something odd" }]] });
+  await assert.rejects(fetchJobs(B, "k"), /Jobs: unexpected Bright Data reply/);
+  globalThis.fetch = realFetch;
+});
+
+test("error records are dropped, real ones kept", async () => {
+  fakeFetch({ "/scrape": [[200, [{ error: "x" }, job(3)]]] });
+  assert.equal((await fetchJobs(B, "k")).length, 1);
+  globalThis.fetch = realFetch;
+});
+
+test("snapshot download that says 'not ready' is waited on, never parsed as jobs", async () => {
+  fakeFetch({
+    "/progress/": [[200, { status: "ready" }]],
+    "/snapshot/": [[200, { status: "building", message: "Snapshot is not ready yet, try again in 10s" }], [200, [job(3)]]],
+  });
+  const realSetTimeout = globalThis.setTimeout;
+  (globalThis as any).setTimeout = ((f: () => void) => (f(), 0)) as any; // skip the 10 s poll sleep
+  try {
+    assert.equal((await fetchJobs(B, "k", "sd_abc123")).length, 1);
+  } finally {
+    globalThis.setTimeout = realSetTimeout;
+    globalThis.fetch = realFetch;
+  }
+});
+
+test("crafted snapshot_id is refused before any request is made", async () => {
+  const calls = fakeFetch({});
+  for (const bad of ["../../zone/whitelist", "sd_abc/../../x", "sd_ABC?x=1", 42, "", "s_"]) {
+    await assert.rejects(fetchJobs(B, "k", bad), /Jobs: invalid snapshot_id/);
+  }
+  assert.equal(calls.length, 0);
+  globalThis.fetch = realFetch;
 });
