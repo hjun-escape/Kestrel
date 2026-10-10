@@ -43,7 +43,7 @@ export default function TrustPrinciples() {
     <section aria-labelledby="trust-heading" className="bg-ew-paper py-20 sm:py-28">
       <div className="mx-auto max-w-[1200px] px-4 sm:px-8">
         <h2 id="trust-heading" className="sr-only">
-          How Early Warning earns trust
+          How Kestrel earns trust
         </h2>
         <div className="grid gap-12 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-16">
           <article>

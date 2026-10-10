@@ -11,8 +11,8 @@ const UserNotRegisteredError = () => {
       title="Your account does not have access"
       subtitle={
         email
-          ? `${email} is not registered for Early Warning.`
-          : 'This account is not registered for Early Warning.'
+          ? `${email} is not registered for Kestrel.`
+          : 'This account is not registered for Kestrel.'
       }
     >
       <div role="alert" className="space-y-5 text-sm leading-relaxed text-slate-800">

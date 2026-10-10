@@ -1,0 +1,42 @@
+# Checks every pull request into main (and main itself): the same lint, build
+# and test run we use before merging. Base44 publishes from main, so a red run
+# here means "do not merge / do not publish".
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 24 runs the TypeScript tests in tests/ directly (type stripping).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Lint
+        run: npx eslint src --quiet
+
+      - name: Build
+        run: npx vite build
+
+      - name: Tests
+        run: node --test tests/*.test.ts

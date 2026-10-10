@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { browserStorage, chooseDemo } from "./gate";
+import { DEMO_LOAD_PATH, browserStorage, chooseDemo } from "./gate";
 
 export const SIGN_IN_PATH = "/login?returnTo=%2F";
 
@@ -20,7 +20,8 @@ const BASE =
   "inline-flex h-12 items-center justify-center rounded-[3px] px-6 text-[15px] font-semibold tracking-[-0.005em] transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[3px]";
 
 // "Sign in" goes to the existing login page and comes back to the loan book.
-// "Explore the demo" remembers the choice so "/" stops redirecting here.
+// "Explore the demo" remembers the choice so "/" stops redirecting here, and asks the loan book to load the
+// real demo companies if the shared book has none yet.
 export default function LandingCtas({ tone = "dark", className = "" }) {
   const navigate = useNavigate();
   const styles = TONES[tone];
@@ -28,7 +29,7 @@ export default function LandingCtas({ tone = "dark", className = "" }) {
   const handleExplore = (e) => {
     e.preventDefault();
     chooseDemo(browserStorage());
-    navigate("/");
+    navigate(DEMO_LOAD_PATH);
   };
 
   return (
@@ -36,7 +37,7 @@ export default function LandingCtas({ tone = "dark", className = "" }) {
       <Link to={SIGN_IN_PATH} className={`${BASE} ${styles.primary}`}>
         Sign in
       </Link>
-      <a href="/" onClick={handleExplore} className={`${BASE} ${styles.secondary}`}>
+      <a href={DEMO_LOAD_PATH} onClick={handleExplore} className={`${BASE} ${styles.secondary}`}>
         Explore the demo
       </a>
     </div>

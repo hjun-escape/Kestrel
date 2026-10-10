@@ -15,7 +15,7 @@ export function LandingNav() {
       <header className="mx-auto flex h-16 max-w-[1200px] items-center justify-between px-4 sm:px-8">
         <Link to="/welcome" className="flex items-center gap-2.5 rounded-sm focus-visible:outline-white">
           <BrandMark className="h-6 w-6 text-white" />
-          <span className="font-heading text-[16px] font-bold tracking-tight">Early Warning</span>
+          <span className="font-heading text-[16px] font-bold tracking-tight">Kestrel</span>
         </Link>
         <Link
           to={SIGN_IN_PATH}
@@ -92,7 +92,7 @@ function CurrentHero() {
             See the trouble before you lend.
           </h1>
           <p className="mt-6 max-w-[34rem] text-[18px] leading-relaxed text-white/80 sm:text-[19px]">
-            Early Warning screens private companies in minutes: public warning signs, other lenders, late payments,
+            Kestrel screens private companies in minutes: public warning signs, other lenders, late payments,
             every flag with a source.
           </p>
           <LandingCtas tone="dark" className="mt-9" />

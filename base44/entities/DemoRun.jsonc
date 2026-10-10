@@ -1,0 +1,19 @@
+// DemoRun (P1): when "Load demo companies" last ran for a book, so loadDemo can refuse more than one call per 30 s.
+// One record per book: scope "shared" (the signed-out demo book) or the signed-in user's email. Written only by loadDemo.
+{
+  "name": "DemoRun",
+  "type": "object",
+  "properties": {
+    "scope": {
+      "type": "string"
+    },
+    "ran_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "scope",
+    "ran_at"
+  ]
+}

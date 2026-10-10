@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
@@ -8,11 +8,18 @@ import AppHeader from "@/components/AppHeader";
 import AddCompanyDialog from "@/components/AddCompanyDialog";
 import SummaryStrip from "@/components/SummaryStrip";
 import LoanBookTable from "@/components/LoanBookTable";
+import LoanBookCards from "@/components/LoanBookCards";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { STATUS_STYLES } from "@/components/StatusBadge";
 import { getTopSignal, filterRecentSignals, sortRows, statusKey } from "@/lib/borrowerUtils";
 import { ensureSeedData } from "@/lib/seed";
 import { useAuth } from "@/lib/AuthContext";
 import { normalizeEmail, visibleCompanies } from "@/lib/ownership";
+import LoadDemoButton from "@/components/demo/LoadDemoButton";
+import DemoProgress from "@/components/demo/DemoProgress";
+import DemoEmptyPanel from "@/components/demo/DemoEmptyPanel";
+import { useDemoLoader } from "@/components/demo/useDemoLoader";
+import { DEMO_LOAD_PARAM, demoLoadRequested, hasRealCompanies } from "@/lib/demoLoad";
 
 const TABS = [
   { value: "all", label: "All" },
@@ -21,6 +28,9 @@ const TABS = [
 ];
 
 const DEFAULT_SORT = { key: "status", dir: "asc" };
+
+// First direction when a sort key is picked: biggest / newest first for numbers and dates.
+const defaultDir = (key) => (key === "amount" || key === "signal" || key === "checked" ? "desc" : "asc");
 
 function groupSignals(items) {
   const map = {};
@@ -32,6 +42,7 @@ function groupSignals(items) {
 
 export default function LoanBook() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { email, isAuthenticated, isLoadingAuth, navigateToLogin } = useAuth();
   const me = isAuthenticated ? normalizeEmail(email) : "";
   const [borrowers, setBorrowers] = useState(null);
@@ -43,11 +54,14 @@ export default function LoanBook() {
   const [addStage, setAddStage] = useState("applicant");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
+  // Phones get cards instead of the table: one or the other is rendered, never both.
+  const isMobile = useIsMobile();
 
   // Signed in: only the user's own companies. Signed out: only the unowned
   // shared demo book. The backend functions enforce the same rule.
-  async function loadData() {
-    setLoading(true);
+  // quiet: reload behind the table (demo checks landing) without the loading skeleton.
+  async function loadData({ quiet = false } = {}) {
+    if (!quiet) setLoading(true);
     setLoadError(null);
     try {
       const query = me ? { owner_email: me } : {};
@@ -65,8 +79,23 @@ export default function LoanBook() {
     }
   }
 
+  const demo = useDemoLoader({ me, onChanged: () => loadData({ quiet: true }) });
+
+  // "Explore the demo" on the landing page links to "/?demo-load=1": start the demo load once the book has
+  // loaded, if the signed-out shared book has no real companies yet. The flag is then removed from the URL.
+  const autoDemoHandled = useRef(false);
   useEffect(() => {
-    document.title = "Loan book | Early Warning";
+    if (autoDemoHandled.current || loading || isLoadingAuth || !demoLoadRequested(location.search)) return;
+    autoDemoHandled.current = true;
+    const params = new URLSearchParams(location.search);
+    params.delete(DEMO_LOAD_PARAM);
+    const search = params.toString();
+    navigate({ pathname: location.pathname, search: search ? `?${search}` : "" }, { replace: true });
+    if (!me && !loadError && !hasRealCompanies(borrowers)) demo.start();
+  }, [loading, isLoadingAuth, location.search, me, borrowers, loadError]);
+
+  useEffect(() => {
+    document.title = "Loan book | Kestrel";
   }, []);
 
   useEffect(() => {
@@ -112,8 +141,13 @@ export default function LoanBook() {
 
   function handleSort(key) {
     setSort((s) =>
-      s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: key === "amount" || key === "signal" || key === "checked" ? "desc" : "asc" }
+      s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: defaultDir(key) }
     );
+  }
+
+  // Phone sort picker: choosing a key always starts in its default direction.
+  function handleSortSet(key) {
+    setSort({ key, dir: defaultDir(key) });
   }
 
   const isBookEmpty = !loading && !loadError && (borrowers || []).length === 0;
@@ -123,8 +157,8 @@ export default function LoanBook() {
     <div className="min-h-screen bg-ew-paper text-ew-ink">
       <AppHeader onAskClosed={loadData} />
 
-      <main className="mx-auto max-w-[1360px] px-6 pb-16 pt-6">
-        <div className="mb-5 flex items-end justify-between gap-4">
+      <main className="mx-auto max-w-[1360px] px-4 pb-16 pt-6 md:px-6">
+        <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <h1 className="font-heading text-[28px] font-bold leading-none tracking-tight">
               {me ? "My companies" : "Loan book"}
@@ -147,11 +181,27 @@ export default function LoanBook() {
               </p>
             )}
           </div>
-          <Button data-demo="screen-applicant" onClick={() => openAdd("applicant")} className="h-9 rounded-sm bg-ew-ink px-3.5 hover:bg-ew-ink-soft">
-            <Plus aria-hidden="true" />
-            Screen new applicant
-          </Button>
+          <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:justify-end">
+            <LoadDemoButton signedIn={!!me} running={demo.running} onClick={demo.start} />
+            <Button data-demo="screen-applicant" onClick={() => openAdd("applicant")} className="h-9 rounded-sm bg-ew-ink px-3.5 hover:bg-ew-ink-soft">
+              <Plus aria-hidden="true" />
+              Screen new applicant
+            </Button>
+          </div>
         </div>
+
+        <DemoProgress
+          phase={demo.phase}
+          items={demo.items}
+          error={demo.error}
+          summary={demo.summary}
+          onCancel={demo.cancel}
+          onDismiss={demo.dismiss}
+        />
+
+        {!me && !loading && !loadError && !isBookEmpty && !hasRealCompanies(borrowers) && demo.phase === "idle" && (
+          <DemoEmptyPanel running={demo.running} onLoad={demo.start} />
+        )}
 
         <SummaryStrip
           borrowers={inTab}
@@ -160,7 +210,7 @@ export default function LoanBook() {
           onStatusFilter={setStatusFilter}
         />
 
-        <div className="mb-2 mt-6 flex items-center justify-between gap-4">
+        <div className="mb-2 mt-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <Tabs value={tab} onValueChange={setTab}>
             <TabsList className="h-auto rounded-none bg-transparent p-0">
               {TABS.map((t) => (
@@ -201,10 +251,11 @@ export default function LoanBook() {
             <p className="mx-auto mt-1 max-w-[520px] text-sm text-ew-muted">
               {me
                 ? "Screen a new applicant before you lend, or add a company you already lend to. Only you will see the companies you add."
-                : "Screen an applicant to run the first check on news, court filings, hiring and reviews."}
+                : "Load six real mid-size companies and watch the live checks on news, court filings, hiring and reviews run, or screen an applicant of your own. No account needed."}
             </p>
             <div className="mt-4 flex flex-wrap justify-center gap-2">
-              <Button onClick={() => openAdd("applicant")} className="h-9 rounded-sm bg-ew-ink hover:bg-ew-ink-soft">
+              <LoadDemoButton signedIn={!!me} running={demo.running} onClick={demo.start} variant="default" className="bg-ew-ink hover:bg-ew-ink-soft" />
+              <Button variant="outline" onClick={() => openAdd("applicant")} className="h-9 rounded-sm">
                 Screen a new applicant
               </Button>
               {me && (
@@ -227,9 +278,12 @@ export default function LoanBook() {
           </div>
         )}
 
-        {(loading || rows.length > 0) && (
-          <LoanBookTable rows={rows} sort={sort} onSort={handleSort} loading={loading} />
-        )}
+        {(loading || rows.length > 0) &&
+          (isMobile ? (
+            <LoanBookCards rows={rows} sort={sort} onSortSet={handleSortSet} loading={loading} />
+          ) : (
+            <LoanBookTable rows={rows} sort={sort} onSort={handleSort} loading={loading} />
+          ))}
       </main>
 
       <AddCompanyDialog

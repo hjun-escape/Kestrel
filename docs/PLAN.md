@@ -97,8 +97,8 @@ On failure it throws, with the source name in the message (`News`, `Legal`, `Job
 | Source | API | Flow |
 |---|---|---|
 | News (P2) | **SERP via zone `mcp_unlocker`** (verified working 12:44) | `POST https://api.brightdata.com/request`, `Authorization: Bearer <key>`, body `{"zone":"mcp_unlocker","url":"https://www.google.com/search?q=<query>&tbm=nws&tbs=qdr:m6&hl=en&gl=us&brd_json=1","format":"raw"}`. This returns **parsed JSON** (`search_type: "news"`, results under `news`). `tbs=qdr:m6` = last 6 months |
-| Jobs (P3) | **Web Scraper API**: LinkedIn job listings (discover by company keyword) + LinkedIn company information (by URL), in parallel | sync `/scrape` → count the company's open postings; company page gives employees + industry → compare with employees × BLS openings rate |
-| Reviews (P3) | **Web Scraper API**, Glassdoor reviews dataset | trigger (glassdoor_url) → poll → download → reviews with date, rating, text |
+| Jobs (P3) | **Web Scraper API** LinkedIn company information (by URL, ~3 s) + **Web Unlocker** LinkedIn public jobs page for that company id (~2–10 s) | company page gives employees, industry, company_id → jobs page title/count element gives the exact open-role count → compare with employees × BLS openings rate |
+| Reviews (P3) | **Web Scraper API** Glassdoor reviews dataset (`days: 90`) + **SERP** for the overall rating | trigger → (refreshBorrower resumes by snapshot_id) → download → 90-day reviews; overall rating from Google's result for the company-wide Glassdoor page with the same employer id |
 
 - **P2:** confirm the field names inside `news[]` (title, link, source, date) on the first real call, and put them in §8.
 - **Dataset IDs:** look them up with the Bright Data MCP (`search_scrapers`, `get_scraper_details`) and confirm the
@@ -134,7 +134,8 @@ Put names here: **P1** ____ · **P2** ____ · **P3** ____ · **P4** ____
 - [x] **by 2:00** `hiringSignal`. **Rule changed:** the old "last 30 days vs prior 60" never fired, because LinkedIn only lists open postings (Gravie live: 34 recent, 0 prior). Now: open postings vs employees × BLS industry openings rate; ≥75% below expected = strong, 50–75% = weak, skip if < 5 expected. Gravie live: 34 open vs ~25 expected, no signal
 - [x] **by 2:30** `reviewSignals`: strong via keyword match with exact-sentence snippet (tagItem hook behind a flag), weak via 90-day average vs prior 12 months. Gravie live: strong (layoffs review, Sep 1) + weak (3.6 → 2.2)
 - [x] **after 3** Timeouts, async snapshot handling hardened (empty/error results fail, "not ready" waited on, snapshot_id validated)
-- [x] Switch on `hiringSignal` and `reviewSignals` in `refreshBorrower`. Glassdoor takes ~6 min, so its first refresh answers 503 + snapshot_id; `refreshBorrower` saves it in `pending_snapshots` and the next Refresh collects it. **Before the demo, run `refreshAll` twice a few minutes apart.**
+- [x] **Faster checks (2026-10-10):** jobs now read LinkedIn's company jobs page (~5–20 s total, was ~40 s; also fixes the job dataset's 200-result cap that wrongly flagged Rivian with 994 open roles). Glassdoor asks for 90 days only (~4 min for a large company, was up to 13), and the weak rule compares with the overall Glassdoor rating
+- [x] Switch on `hiringSignal` and `reviewSignals` in `refreshBorrower`. Glassdoor takes minutes, so its first refresh answers 503 + snapshot_id; `refreshBorrower` saves it in `pending_snapshots` and the next Refresh collects it. **Before the demo, run `refreshAll` twice a few minutes apart.**
 
 ### P4: Research & pitch (`research/`): Sense, companies, feedback, demo, QA
 - [ ] **now** Sense check 1 results → `docs/USER_FEEDBACK.md` (in progress). Watch whether testers 2–3 also talk about pre-loan screening
@@ -213,10 +214,10 @@ Every person runs **one Claude Code session in this repo**. That's the harness. 
 |---|---|---|
 | SERP zone | **`mcp_unlocker`**: Google News with `tbm=nws&brd_json=1` returns parsed JSON (verified 12:44) | P4 |
 | `news[]` field names | | P2 |
-| LinkedIn jobs dataset ID | `gd_lpfll7v5hcqtkxl6l` ("Linkedin job listings information"); input `{keyword, company, location, time_range}` with `type=discover_new&discover_by=keyword`; fields `company_name`, `company_url`, `job_posted_date`, `url` | P3 |
+| LinkedIn jobs dataset ID | `gd_lpfll7v5hcqtkxl6l` ("Linkedin job listings information"). **No longer used:** ~40 s and capped at 200 results. Replaced by the Web Unlocker on `https://www.linkedin.com/jobs/search?f_C=<company_id>&geoId=92000000`, whose title reads "Jobs at Gravie in Worldwide (34 Open Roles)" or "34 Jobs jobs in Worldwide" (two layouts) | P3 |
 | LinkedIn company dataset ID | `gd_l1vikfnt1wgvvqz95w` ("LinkedIn company information"); input `{url}`; fields `employees_in_linkedin`, `company_size`, `industries` | P3 |
 | Indeed jobs dataset ID | not used | P3 |
-| Glassdoor reviews dataset ID | `gd_l7j1po0921hbu0ri1z` ("Glassdoor companies reviews"); input `{url, days}` (`days` required); fields `rating_date`, `rating_overall`, `summary`, `review_pros`, `review_cons`, `review_id`, `overview_id` (`review_url` is null) | P3 |
-| Snapshot time (trigger → ready) | Gravie, 2026-10-10: LinkedIn jobs ~40 s (sync), company page ~3 s (sync), Glassdoor reviews ~5.7 min (async snapshot) | P3 |
+| Glassdoor reviews dataset ID | `gd_l7j1po0921hbu0ri1z` ("Glassdoor companies reviews"); input `{url, days}` (`days` required, we send 90); fields `rating_date`, `rating_overall`, `summary`, `review_pros`, `review_cons`, `review_id`, `overview_id` (`review_url` is null). Overall rating: Google result snippet ("has an employee rating of 3.1 out of 5"), 3–14 s; the Glassdoor page itself took 18–120 s | P3 |
+| Snapshot time (trigger → ready) | 2026-10-10: LinkedIn company page ~3 s (sync) + jobs page 2–10 s; Glassdoor reviews: Gravie 455 days 5.7 min (19 reviews), Rivian 455 days 12.6 min (283), Rivian 90 days 4.0 min (35) | P3 |
 | Base44 app | "Early Warning", app id `6aca96c9744d6ba75bc4fabd` (not yet synced to GitHub: `git_remote_source: s3`) | P1 |
 | Base44 layout | entities `base44/entities/*.jsonc` · functions `base44/functions/<name>/entry.ts` (Deno, `npm:@base44/sdk`) · pages `src/pages/` (LoanBook, CompanyDetail) | P4 (checked 1:05) |

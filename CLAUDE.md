@@ -1,3 +1,5 @@
+Product name: Kestrel (formerly Early Warning).
+
 # Early Warning — team context for Claude Code
 
 Hackathon build. Hacking ends 8:00 PM PT; submit before then. First working version by 3:00 PM (Sense Check block 2).
@@ -66,8 +68,8 @@ Every signal function is a Base44 backend function.
 - It never writes status.
 
 ## Signal rules
-1. hiring_drop: open job postings on LinkedIn now vs what a company of this size and industry normally has open. Expected = employees (LinkedIn company page) × the industry's job-openings rate (BLS JOLTS, table in `base44/functions/hiringSignal/entry.ts`). ≥75% below expected = strong, 50–75% below = weak. Skip (no signal) if fewer than 5 openings would be expected. (Changed 2026-10-10 from "last 30 days vs prior 60": LinkedIn only lists open postings, so the earlier window was always empty.)
-2. review_distress: Glassdoor. Any review in the last 90 days mentioning layoffs, furloughs, late or missed pay, or closing = strong. 90-day average rating ≥0.5 below the prior 12 months = weak.
+1. hiring_drop: open job postings on LinkedIn now vs what a company of this size and industry normally has open. Open = the count on LinkedIn's public jobs page for the company (by LinkedIn company id). Expected = employees (LinkedIn company page) × the industry's job-openings rate (BLS JOLTS, table in `base44/functions/hiringSignal/entry.ts`). ≥75% below expected = strong, 50–75% below = weak. Skip (no signal) if fewer than 5 openings would be expected. (Changed 2026-10-10 from "last 30 days vs prior 60": LinkedIn only lists open postings, so the earlier window was always empty.)
+2. review_distress: Glassdoor reviews from the last 90 days. Any review mentioning layoffs, furloughs, late or missed pay, or closing = strong. 90-day average rating ≥0.5 below the company's overall Glassdoor rating = weak (needs 3+ reviews in the 90 days). (Changed 2026-10-10 from "below the prior 12 months": fetching 455 days of reviews took up to 13 min for large companies; 90 days takes ~4.)
 3. exec_departure: Google News via Bright Data SERP API: `"<name>" (CEO OR CFO OR president OR founder) (resigns OR "steps down" OR departs)`, last 180 days. CEO/CFO = strong, other senior roles = weak.
 4. legal_layoffs: Google News: `"<name>" (lawsuit OR sued OR lien OR "WARN notice" OR layoffs OR bankruptcy)`, last 180 days. WARN notice, bankruptcy, or a lender/supplier lawsuit = strong; others = weak.
 

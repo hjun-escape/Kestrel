@@ -13,10 +13,10 @@ export default function SummaryStrip({ borrowers, statusFilter, onStatusFilter, 
   return (
     <section
       aria-label="Loan book summary"
-      className="grid grid-cols-[minmax(0,1fr)_auto] items-stretch border border-ew-rule bg-ew-surface"
+      className="grid grid-cols-1 items-stretch border border-ew-rule bg-ew-surface md:grid-cols-[minmax(0,1fr)_auto]"
     >
       <div className="flex min-w-0 flex-col">
-        <div className="flex min-w-0 flex-1 divide-x divide-ew-rule-soft">
+        <div className="grid min-w-0 flex-1 grid-cols-2 gap-px bg-ew-rule-soft md:flex md:gap-0 md:divide-x md:divide-ew-rule-soft md:bg-transparent">
           {ORDER.map((key) => {
             const style = STATUS_STYLES[key];
             const active = statusFilter === key;
@@ -26,11 +26,11 @@ export default function SummaryStrip({ borrowers, statusFilter, onStatusFilter, 
                 type="button"
                 aria-pressed={active}
                 onClick={() => onStatusFilter(active ? null : key)}
-                className={`group flex min-w-0 flex-1 items-center justify-between gap-3 px-4 py-4 text-left transition-colors focus-visible:-outline-offset-2 ${
-                  active ? "bg-ew-paper" : "hover:bg-ew-hover"
+                className={`group flex min-w-0 flex-1 items-center justify-between gap-3 px-3 py-3 text-left transition-colors focus-visible:-outline-offset-2 md:px-4 md:py-4 ${
+                  active ? "bg-ew-paper" : "bg-ew-surface hover:bg-ew-hover"
                 }`}
               >
-                <span className="flex items-center gap-2 text-sm font-medium text-ew-ink-soft">
+                <span className="flex min-w-0 flex-wrap items-center gap-x-2 text-sm font-medium text-ew-ink-soft">
                   <span aria-hidden="true" className={`inline-block ${style.glyph}`} />
                   {style.label}
                   {active && <span className="text-xs font-normal text-ew-muted">(filter on)</span>}
@@ -45,7 +45,7 @@ export default function SummaryStrip({ borrowers, statusFilter, onStatusFilter, 
         <ExposureBar exposure={exposure} total={total} />
       </div>
 
-      <div className="flex min-w-[220px] flex-col justify-center border-l border-ew-rule bg-ew-hover px-5 py-3">
+      <div className="flex flex-col justify-center border-t border-ew-rule bg-ew-hover px-4 py-3 md:min-w-[220px] md:border-l md:border-t-0 md:px-5">
         <span className="text-xs font-medium text-ew-muted">Exposure at risk</span>
         <span className="font-mono text-[28px] font-semibold leading-tight text-ew-ink">
           {loading ? "–" : formatUsd(atRisk)}

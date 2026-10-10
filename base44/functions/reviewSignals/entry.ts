@@ -7,7 +7,11 @@
 // Rules (CLAUDE.md):
 //   strong: a review in the last 90 days mentioning layoffs, furloughs, late or missed pay, or closing.
 //           One signal for the newest such review, so reviews alone can't turn a company red.
-//   weak:   90-day average rating >= 0.5 below the prior 12 months (needs MIN_REVIEWS in each window).
+//   weak:   90-day average rating >= 0.5 below the company's overall Glassdoor rating (needs MIN_REVIEWS in the
+//           90 days). The overall rating comes from Google's result for the company's Glassdoor page (~5 s, only
+//           when collecting). If it cannot be read, the weak check is skipped and strong still counts.
+// Glassdoor is asked for 90 days only: about 4 min for a large company (Rivian, 35 reviews) instead of 13 min for the
+// 455 days the old "vs prior 12 months" rule needed (Rivian, 283 reviews).
 //
 // The strong case is matched with keywords, and the snippet is the matching sentence copied exactly from the
 // review. With TAG_ITEM_ENABLED, P2's tagItem confirms each match (CLAUDE.md: the LLM only tags; the snippet
@@ -178,25 +182,44 @@ function ageDays(date: string, today: string): number | null {
   return Math.floor((now - t) / DAY_MS);
 }
 
-export interface RatingTrend {
-  recentAvg: number | null;
-  recentCount: number;
-  priorAvg: number | null;
-  priorCount: number;
+export interface RecentRating {
+  avg: number | null;
+  count: number;
 }
 
-// Recent = 0-89 days ago. Prior 12 months = 90-454 days ago.
-export function ratingTrend(reviews: Review[], today: string): RatingTrend {
-  const recent: number[] = [];
-  const prior: number[] = [];
+// Average rating of reviews dated 0-89 days ago.
+export function recentRating(reviews: Review[], today: string): RecentRating {
+  const xs: number[] = [];
   for (const r of reviews) {
     const age = ageDays(r.date, today);
-    if (age === null || age < 0 || r.rating === null) continue;
-    if (age < 90) recent.push(r.rating);
-    else if (age < 455) prior.push(r.rating);
+    if (age !== null && age >= 0 && age < 90 && r.rating !== null) xs.push(r.rating);
   }
-  const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
-  return { recentAvg: avg(recent), recentCount: recent.length, priorAvg: avg(prior), priorCount: prior.length };
+  return { avg: xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null, count: xs.length };
+}
+
+// Glassdoor employer id from a Reviews ("-E1055527.htm") or Overview ("EI_IE630579.11,17.htm") URL.
+export function glassdoorEmployerId(url: unknown): string | null {
+  const m = /(?:-E|EI_IE)(\d+)[._]/.exec(String(url ?? ""));
+  return m ? m[1] : null;
+}
+
+// The company's overall rating from Google's result for its Glassdoor page, e.g. "Gravie has an employee rating of
+// 3.1 out of 5 stars". Only the company-wide Reviews or Overview page with the same employer id on glassdoor.com
+// counts: city and job-title pages ("Employees in Irvine have given Rivian a rating of ...") have their own ratings.
+// serp: Bright Data's parsed Google JSON (brd_json=1), results under organic[].
+export function overallRatingFromSerp(serp: unknown, employerId: string): number | null {
+  const organic = (serp as { organic?: { link?: unknown; description?: unknown }[] })?.organic;
+  if (!Array.isArray(organic)) return null;
+  for (const o of organic) {
+    const link = String(o?.link ?? "");
+    const m =
+      /^https:\/\/www\.glassdoor\.com\/Reviews\/[^/?#]+-Reviews-E(\d+)\.htm/.exec(link) ??
+      /^https:\/\/www\.glassdoor\.com\/Overview\/Working-at-[^/?#]+-EI_IE(\d+)\./.exec(link);
+    if (!m || m[1] !== employerId) continue;
+    const r = Number(/rating of ([0-9.]+) out of 5/i.exec(String(o?.description ?? ""))?.[1]);
+    if (r > 0 && r <= 5) return r;
+  }
+  return null;
 }
 
 export interface Tagger {
@@ -215,7 +238,14 @@ export function sourceQuote(quote: string, texts: string[]): string | null {
   return null;
 }
 
-export async function reviewSignalsFromReviews(b: Borrower, raw: Record<string, unknown>[], today: string, tag?: Tagger): Promise<Signal[]> {
+// overall: the company's overall Glassdoor rating, or null when it could not be read (then no weak signal).
+export async function reviewSignalsFromReviews(
+  b: Borrower,
+  raw: Record<string, unknown>[],
+  today: string,
+  tag?: Tagger,
+  overall: number | null = null,
+): Promise<Signal[]> {
   if (parseDay(today) === null) throw new Error(`Reviews: invalid today ${today}`);
   const reviews = raw.map(normalizeReview).filter((r): r is Review => r !== null);
   if (raw.length > 0 && reviews.length === 0) throw new Error("Reviews: no review has a readable date (Bright Data fields changed?)");
@@ -261,18 +291,18 @@ export async function reviewSignalsFromReviews(b: Borrower, raw: Record<string, 
     break;
   }
 
-  // Weak: 90-day average rating at least 0.5 below the prior 12 months.
-  const t = ratingTrend(reviews, today);
-  if (t.recentAvg !== null && t.priorAvg !== null && t.recentCount >= MIN_REVIEWS && t.priorCount >= MIN_REVIEWS) {
-    const drop = Math.round((t.priorAvg - t.recentAvg) * 100) / 100;
-    if (drop >= 0.5) {
+  // Weak: 90-day average rating at least 0.5 below the company's overall Glassdoor rating.
+  const r = recentRating(reviews, today);
+  if (r.avg !== null && overall !== null && r.count >= MIN_REVIEWS) {
+    const gap = Math.round((overall - r.avg) * 100) / 100;
+    if (gap >= 0.5) {
       out.push({
         borrower_id: b.id,
         type: "review_distress",
         severity: "weak",
         date: today,
-        title: `Glassdoor rating down ${drop.toFixed(1)} in 90 days`,
-        snippet: `${t.recentAvg.toFixed(1)} average over ${t.recentCount} reviews in last 90 days vs ${t.priorAvg.toFixed(1)} over ${t.priorCount} in the prior 12 months`,
+        title: `Recent Glassdoor rating ${gap.toFixed(1)} below overall`,
+        snippet: `${r.avg.toFixed(1)} average over ${r.count} reviews in the last 90 days vs ${overall.toFixed(1)} overall on Glassdoor`,
         source_name: "Glassdoor",
         source_url: pageUrl,
       });
@@ -366,12 +396,36 @@ export async function fetchReviews(b: Borrower, apiKey: string, snapshotId?: unk
   if (!b.glassdoor_url) throw new Error("Reviews: borrower has no glassdoor_url");
   const url = checkGlassdoorUrl(b.glassdoor_url);
   const qs = new URLSearchParams({ dataset_id: GLASSDOOR_REVIEWS_DATASET_ID, format: "json", include_errors: "true" });
-  // days is required by the dataset: 455 covers the 90-day window plus the prior 12 months.
-  const body = JSON.stringify({ input: [{ url, days: 455 }], limit_per_input: 300 });
+  // days is required by the dataset. 90 covers both rules and keeps large companies to ~4 min.
+  const body = JSON.stringify({ input: [{ url, days: 90 }], limit_per_input: 300 });
   const res = await bd(apiKey, `/scrape?${qs}`, { method: "POST", body });
   const data = await res.json();
   if (res.status === 202) return waitForSnapshot(apiKey, data?.snapshot_id);
   return usableRecords(data);
+}
+
+// The overall rating via one Google search through Bright Data (3-14 s seen). Fetching the Glassdoor page itself took
+// 18-120 s, too slow for a refresh, and the overall rating is a long-run average, so a search snippet is fresh enough.
+// Returns null on any failure: the weak check is then skipped, never the whole source.
+export async function fetchOverallRating(b: Borrower, apiKey: string): Promise<number | null> {
+  const id = glassdoorEmployerId(b.glassdoor_url);
+  if (!id) return null;
+  const q = encodeURIComponent(`${b.name ?? ""} Glassdoor reviews rating`);
+  try {
+    const res = await fetch("https://api.brightdata.com/request", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ zone: "mcp_unlocker", url: `https://www.google.com/search?q=${q}&hl=en&gl=us&brd_json=1`, format: "raw" }),
+      signal: AbortSignal.timeout(40_000),
+    });
+    if (!res.ok) throw new Error(`unlocker ${res.status}`);
+    const r = overallRatingFromSerp(await res.json(), id);
+    if (r === null) console.error("Reviews: no overall rating for this Glassdoor id in search results, weak check skipped");
+    return r;
+  } catch (error) {
+    console.error(`Reviews: overall rating unavailable, weak check skipped: ${(error as Error).message}`);
+    return null;
+  }
 }
 
 // Base44 backend function. Reads the BRIGHTDATA_API_KEY secret.
@@ -401,7 +455,9 @@ export default async function (req: Request): Promise<Response> {
     }
 
     const raw = await fetchReviews(borrower, apiKey, body.snapshot_id);
-    return Response.json(await reviewSignalsFromReviews(borrower, raw, today, tag));
+    // Only once the reviews are in, so a still-building first call does not spend the page fetch.
+    const overall = await fetchOverallRating(borrower, apiKey);
+    return Response.json(await reviewSignalsFromReviews(borrower, raw, today, tag, overall));
   } catch (error) {
     const snapshot_id = error instanceof ReviewsPendingError ? error.snapshot_id : undefined;
     return Response.json({ error: (error as Error).message, snapshot_id }, { status: snapshot_id ? 503 : 502 });

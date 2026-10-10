@@ -14,6 +14,7 @@ import {
   getActiveRefresh,
   startRefresh,
 } from "@/lib/borrowerUtils";
+import { AUTO_RESUME_DELAY_MS, AUTO_RESUME_MAX, pendingSources, shouldAutoResume } from "@/lib/sourceCoverage";
 
 async function fetchCompany(id) {
   const [borrower, sigRes, runRes] = await Promise.all([
@@ -48,6 +49,11 @@ export default function CompanyDetail() {
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [notice, setNotice] = useState(null);
+  // Automatic re-checks while Bright Data is still collecting (see attach).
+  // autoRef holds the live counters; autoResume is what the page shows:
+  // { at, sources } while one is scheduled, { exhausted, sources } after the cap.
+  const autoRef = useRef({ attempts: 0, stopped: false, timer: null });
+  const [autoResume, setAutoResume] = useState(null);
   const navigate = useNavigate();
 
   async function loadData() {
@@ -61,6 +67,44 @@ export default function CompanyDetail() {
     return data;
   }
 
+  function clearAutoTimer() {
+    if (autoRef.current.timer) clearTimeout(autoRef.current.timer);
+    autoRef.current.timer = null;
+  }
+
+  // After a run: if a source is still collecting, check again in 30 s (refreshBorrower
+  // resumes the saved snapshot), up to AUTO_RESUME_MAX times per page visit.
+  function scheduleAutoResume(result, data, borrowerId) {
+    clearAutoTimer();
+    const state = autoRef.current;
+    const latest = data?.borrower;
+    if (!shouldAutoResume({ borrower: latest, attempts: state.attempts, lastResult: result, stopped: state.stopped })) {
+      const still = pendingSources(latest);
+      const capped = result?.ok && !state.stopped && still.length > 0 && state.attempts >= AUTO_RESUME_MAX;
+      setAutoResume(capped ? { exhausted: true, sources: still } : null);
+      return;
+    }
+    setAutoResume({ at: Date.now() + AUTO_RESUME_DELAY_MS, sources: pendingSources(latest) });
+    state.timer = setTimeout(() => {
+      state.timer = null;
+      setAutoResume(null);
+      if (idRef.current !== borrowerId || state.stopped) return;
+      const active = getActiveRefresh(borrowerId);
+      if (active) {
+        attach(active);
+        return;
+      }
+      state.attempts += 1;
+      handleRefresh(data, { automatic: true });
+    }, AUTO_RESUME_DELAY_MS);
+  }
+
+  function stopAutoResume() {
+    autoRef.current.stopped = true;
+    clearAutoTimer();
+    setAutoResume(null);
+  }
+
   // Follow a refresh run (started here or by the "Screen new applicant" dialog).
   function attach(activeRun) {
     setRun(activeRun);
@@ -68,16 +112,25 @@ export default function CompanyDetail() {
     activeRun.promise.then(async (result) => {
       if (idRef.current !== activeRun.borrowerId) return;
       if (!result.ok) setRefreshError(result.error);
+      let data = null;
       try {
-        await loadData();
+        data = await loadData();
       } catch {
         // keep what is on screen; the next refresh will reload
       }
-      if (idRef.current === activeRun.borrowerId) setRun(null);
+      if (idRef.current !== activeRun.borrowerId) return;
+      setRun(null);
+      scheduleAutoResume(result, data, activeRun.borrowerId);
     });
   }
 
-  function handleRefresh(current = { borrower, signals }) {
+  function handleRefresh(current = { borrower, signals }, { automatic = false } = {}) {
+    if (!automatic) {
+      // A manual Refresh replaces any scheduled re-check and turns them back on after Stop.
+      clearAutoTimer();
+      autoRef.current.stopped = false;
+      setAutoResume(null);
+    }
     const activeRun = startRefresh(id, {
       unavailableBefore: current.borrower?.sources_unavailable || [],
       signalIdsBefore: (current.signals || []).map((s) => s.id),
@@ -95,6 +148,9 @@ export default function CompanyDetail() {
     setRun(null);
     setRefreshError(null);
     setNotice(null);
+    clearAutoTimer();
+    autoRef.current = { attempts: 0, stopped: false, timer: null };
+    setAutoResume(null);
     if (isLoadingAuth) return;
     (async () => {
       let data = null;
@@ -109,13 +165,16 @@ export default function CompanyDetail() {
         if (idRef.current === id) setLoading(false);
       }
       if (!data) return;
-      document.title = `${data.borrower.name} | Early Warning`;
+      document.title = `${data.borrower.name} | Kestrel`;
       const active = getActiveRefresh(id);
       if (active) attach(active);
       else if (searchParams.get("checking") === "1" && !data.borrower.last_refreshed) handleRefresh(data);
       if (searchParams.has("checking")) setSearchParams({}, { replace: true });
     })();
   }, [id, isLoadingAuth, me]);
+
+  // Leaving the page cancels a scheduled re-check.
+  useEffect(() => () => clearAutoTimer(), []);
 
   // refreshBorrower saves after each source, so poll while it runs and the
   // source row and timeline fill in as sources answer.
@@ -184,6 +243,8 @@ export default function CompanyDetail() {
         // A run saved before this refresh started belongs to the previous check.
         checkRunStale={!!run && !!checkRun && Date.parse(checkRun.started_at) < run.startedAt - 5000}
         newIds={newIds}
+        autoResume={running ? null : autoResume}
+        onStopAutoResume={stopAutoResume}
       />
       <EditCompanyDialog
         borrower={borrower}

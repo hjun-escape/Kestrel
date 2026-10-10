@@ -95,7 +95,6 @@ function HeaderCell({ col, sort, onSort }) {
 
 function BookRow({ borrower: b, topSignal, onOpen }) {
   const key = statusKey(b);
-  const typeLabel = topSignal ? SIGNAL_TYPES[topSignal.type]?.label || topSignal.type : null;
   return (
     <tr
       data-demo={`row-${b.id}`}
@@ -119,11 +118,7 @@ function BookRow({ borrower: b, topSignal, onOpen }) {
           {b.name}
         </Link>
         <div className="flex min-w-0 items-center gap-1.5">
-          {isSampleCompany(b) && (
-            <span title="Sample company with made-up data. It is not checked live." className="shrink-0 rounded-sm border border-ew-rule bg-ew-surface px-1.5 text-[11px] font-semibold leading-[18px] text-ew-muted">
-              Sample
-            </span>
-          )}
+          {isSampleCompany(b) && <SampleTag />}
           <span className="truncate text-xs text-ew-muted">{b.website_domain}</span>
         </div>
       </td>
@@ -134,39 +129,57 @@ function BookRow({ borrower: b, topSignal, onOpen }) {
         </span>
       </td>
       <td className="px-3 py-2.5">
-        {topSignal ? (
-          <div className="min-w-0">
-            <div className="truncate font-medium text-ew-ink">{typeLabel}</div>
-            <div className="mt-0.5 flex items-center gap-1.5 text-xs text-ew-muted">
-              <span
-                className={`rounded-sm border px-1 text-[11px] font-semibold leading-4 ${
-                  topSignal.severity === "strong" ? "border-ew-ink bg-ew-ink text-white" : "border-ew-rule text-ew-ink-soft"
-                }`}
-              >
-                {topSignal.severity === "strong" ? "Strong" : "Weak"}
-              </span>
-              <time dateTime={topSignal.date} className="tabular-nums">
-                {format(parseSignalDate(topSignal.date), "d MMM yyyy")}
-              </time>
-            </div>
-          </div>
-        ) : (
-          <span className="text-ew-muted">None in 90 days</span>
-        )}
+        <TopSignalSummary topSignal={topSignal} />
       </td>
       <td className="px-3 py-2.5 text-right font-medium tabular-nums text-ew-ink">
         {formatUsd(b.loan_amount_usd)}
       </td>
       <td className="px-3 py-2.5 text-xs text-ew-muted">
-        {b.last_refreshed ? (
-          <time dateTime={b.last_refreshed} title={formatRelative(b.last_refreshed)}>
-            {formatDistanceToNowStrict(new Date(b.last_refreshed), { addSuffix: true })}
-          </time>
-        ) : (
-          "Never"
-        )}
+        <LastChecked value={b.last_refreshed} />
       </td>
     </tr>
+  );
+}
+
+// Top signal: type label, then the Strong / Weak tag and its date. Shared with the phone cards.
+export function TopSignalSummary({ topSignal }) {
+  if (!topSignal) return <span className="text-ew-muted">None in 90 days</span>;
+  const typeLabel = SIGNAL_TYPES[topSignal.type]?.label || topSignal.type;
+  return (
+    <div className="min-w-0">
+      <div className="truncate font-medium text-ew-ink">{typeLabel}</div>
+      <div className="mt-0.5 flex items-center gap-1.5 text-xs text-ew-muted">
+        <span
+          className={`rounded-sm border px-1 text-[11px] font-semibold leading-4 ${
+            topSignal.severity === "strong" ? "border-ew-ink bg-ew-ink text-white" : "border-ew-rule text-ew-ink-soft"
+          }`}
+        >
+          {topSignal.severity === "strong" ? "Strong" : "Weak"}
+        </span>
+        <time dateTime={topSignal.date} className="tabular-nums">
+          {format(parseSignalDate(topSignal.date), "d MMM yyyy")}
+        </time>
+      </div>
+    </div>
+  );
+}
+
+// "3 minutes ago" with the full timestamp on hover, or "Never". Shared with the phone cards.
+export function LastChecked({ value }) {
+  if (!value) return "Never";
+  return (
+    <time dateTime={value} title={formatRelative(value)}>
+      {formatDistanceToNowStrict(new Date(value), { addSuffix: true })}
+    </time>
+  );
+}
+
+// Sample tag for seeded .example companies. Shared with the phone cards.
+export function SampleTag() {
+  return (
+    <span title="Sample company with made-up data. It is not checked live." className="shrink-0 rounded-sm border border-ew-rule bg-ew-surface px-1.5 text-[11px] font-semibold leading-[18px] text-ew-muted">
+      Sample
+    </span>
   );
 }
 
