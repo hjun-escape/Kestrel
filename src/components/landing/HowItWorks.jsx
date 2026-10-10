@@ -9,7 +9,7 @@ export default function HowItWorks() {
   return (
     <section aria-labelledby="how-heading" data-ascii-fade-top={BAND} className="pb-20 text-ew-ink" style={matte}>
       {/* The white opens out of the dark hero: it grows from the centre as you scroll in. */}
-      <GrowBand base={SURFACE_A} grow={MATTE} height={BAND} edge="bottom" start={1} end={0.6} />
+      <GrowBand base={SURFACE_A} grow={MATTE} height={BAND} />
       <div className="mx-auto max-w-[1200px] px-4 pt-6 sm:px-8">
         <Reveal>
           <SectionHeader kicker="How a check runs" title="One applicant, end to end." id="how-heading" />

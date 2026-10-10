@@ -27,7 +27,7 @@ export default function TrustPrinciples() {
         </Reveal>
       </div>
       {/* Closes back into the dark footer: the dark grows in from the centre as you scroll down. */}
-      <GrowBand base={MATTE} grow={SURFACE_A} height={BAND} edge="bottom" start={1} end={0.6} />
+      <GrowBand base={MATTE} grow={SURFACE_A} height={BAND} />
     </section>
   );
 }
