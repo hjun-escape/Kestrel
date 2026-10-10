@@ -47,7 +47,7 @@ export default function HeroSection() {
           </p>
           <LandingCtas tone="dark" className="mt-9" />
           <p className="mt-4 text-[13px] text-white/65">
-            Built for bank credit officers. Sign-in is optional; the demo opens a sample loan book.
+            Built for bank credit officers. Sign-in is optional; the demo opens a loan book of real companies with fictional loan amounts.
           </p>
         </div>
         <SignalFile />

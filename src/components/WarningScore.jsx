@@ -57,6 +57,8 @@ export default function WarningScore({ borrower, signals }) {
           <span className="font-heading text-2xl font-bold text-ew-ink">{ws.score}</span>
           <span className="text-sm text-ew-muted">/ 100</span>
           <span className={`ml-1 rounded-sm px-1.5 py-0.5 text-xs font-semibold ${band.cell} ${band.text}`}>{band.label}</span>
+          {/* Say up front that the score cannot disagree with the status: its bands are the status rules. */}
+          <span className="text-xs text-ew-muted">Same rules as the status, counted in points</span>
         </div>
 
         <div className="min-w-[220px] flex-1">

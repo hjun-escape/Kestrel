@@ -221,7 +221,8 @@ function StepDetail({ step, run }) {
 
 function formatTime(iso) {
   if (!iso) return "";
-  return new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  // Fixed English format: the rest of the app is in English whatever the browser locale.
+  return new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
 export default function CheckTrace({ run, refreshing, stale }) {
@@ -257,7 +258,7 @@ export default function CheckTrace({ run, refreshing, stale }) {
         <span id="check-trace-heading" className="text-xs font-semibold text-ew-muted">
           How News and Legal were checked
         </span>
-        <span className="font-mono text-xs text-ew-ink-soft">
+        <span className="text-xs tabular-nums text-ew-ink-soft">
           {status} <span aria-hidden="true">{open ? "▴" : "▾"}</span>
         </span>
       </button>
