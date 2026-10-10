@@ -45,7 +45,7 @@ function MonthGroups({ signals, dimmed = false, newIds }) {
     <section key={group.key} aria-label={group.label} className="mb-5 last:mb-0">
       <h3 className={`mb-1.5 flex items-baseline gap-2 text-xs font-semibold ${dimmed ? "text-ew-muted" : "text-ew-ink-soft"}`}>
         {group.label}
-        <span className="font-mono font-normal text-ew-muted">{group.items.length}</span>
+        <span className="font-normal tabular-nums text-ew-muted">{group.items.length}</span>
       </h3>
       <ol className={`border ${dimmed ? "border-dashed border-ew-rule bg-ew-hover" : "border-ew-rule bg-ew-surface"}`}>
         {group.items.map((s, i) => (
@@ -74,10 +74,14 @@ function SignalItem({ signal: s, dimmed, isNew }) {
 
   return (
     <li className="grid grid-cols-[64px_minmax(0,1fr)] border-b border-ew-rule-soft last:border-0">
-      <div className="border-r border-ew-rule-soft px-3 py-3 text-right font-mono leading-tight">
-        <div className={`text-[15px] font-semibold ${dimmed ? "text-ew-muted" : "text-ew-ink"}`}>{format(date, "dd")}</div>
-        <div className="text-[11px] text-ew-muted">{format(date, "MMM")}</div>
-      </div>
+      <time
+        dateTime={s.date}
+        title={format(date, "d MMMM yyyy")}
+        className="block border-r border-ew-rule-soft px-3 py-3 text-right leading-tight tabular-nums"
+      >
+        <span className={`block text-[15px] font-semibold ${dimmed ? "text-ew-muted" : "text-ew-ink"}`}>{format(date, "d")}</span>
+        <span className="block text-[11px] text-ew-muted">{format(date, "MMM")}</span>
+      </time>
       <article className="min-w-0 px-4 py-3">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className="text-xs font-semibold text-ew-ink-soft">{type.label}</span>
@@ -94,9 +98,6 @@ function SignalItem({ signal: s, dimmed, isNew }) {
               New
             </span>
           )}
-          <time dateTime={s.date} className="ml-auto font-mono text-[11px] text-ew-muted">
-            {format(date, "d MMM yyyy")}
-          </time>
         </div>
         <p className={`mt-1 text-[15px] font-semibold leading-snug ${dimmed ? "text-ew-ink-soft" : "text-ew-ink"}`}>{s.title}</p>
         {s.snippet && (

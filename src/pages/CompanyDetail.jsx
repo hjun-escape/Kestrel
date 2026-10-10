@@ -145,30 +145,20 @@ export default function CompanyDetail() {
         />
         <SourceStatusRow states={sourceStates} recentSignals={recentSignals} running={running} startedAt={run?.startedAt} />
         {flagLine && (
-          <p className="border-t border-ew-rule-soft px-5 py-2 font-mono text-xs text-ew-ink-soft">{flagLine}</p>
+          <p className="border-t border-ew-rule-soft px-5 py-2 text-xs text-ew-ink-soft">{flagLine}</p>
         )}
       </div>
 
-      {isApplicant && (
-        <section aria-labelledby="applicant-review-heading" className="mt-6">
-          <h2 id="applicant-review-heading" className="mb-3 font-heading text-xl font-bold tracking-tight text-ew-ink">
-            Applicant review
-          </h2>
-          <div className="flex flex-col gap-4">
-            <CashflowReview borrower={borrower} onReviewChange={setCashflowReview} />
-            <ApplicantDecision borrower={borrower} signals={signals} />
-          </div>
-        </section>
-      )}
-
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_380px]">
+      {/* Evidence first: the signals behind the status, each with its source and
+          what to ask. Next steps (decision, other lenders, analyst) sit beside it. */}
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_400px]">
         <section aria-labelledby="evidence-heading" className="min-w-0">
           <div className="mb-3 flex items-baseline justify-between gap-4">
             <h2 id="evidence-heading" className="font-heading text-xl font-bold tracking-tight text-ew-ink">
               Evidence
             </h2>
-            <p className="font-mono text-xs text-ew-muted">
-              {recentSignals.length} in last 90 days{olderCount > 0 ? `, ${olderCount} older` : ""}
+            <p className="text-xs tabular-nums text-ew-muted">
+              {recentSignals.length} in the last 90 days{olderCount > 0 ? `, ${olderCount} older` : ""}
             </p>
           </div>
           <SignalTimeline
@@ -177,7 +167,11 @@ export default function CompanyDetail() {
             checking={running}
             newIds={newIds}
           />
-          {!isApplicant && (
+          {isApplicant ? (
+            <div className="mt-6">
+              <CashflowReview borrower={borrower} onReviewChange={setCashflowReview} />
+            </div>
+          ) : (
             <Collapsible className="mt-6 border border-ew-rule bg-ew-surface">
               <CollapsibleTrigger className="group flex w-full items-center gap-2 px-4 py-3 text-left font-heading text-sm font-bold text-ew-ink">
                 <ChevronRight aria-hidden="true" className="h-4 w-4 transition-transform group-data-[state=open]:rotate-90" />
@@ -190,10 +184,10 @@ export default function CompanyDetail() {
           )}
         </section>
 
-        <aside aria-label="Analysis and decision" className="flex min-w-0 flex-col gap-4">
+        <aside aria-label="Next steps" className="flex min-w-0 flex-col gap-4">
+          <ApplicantDecision key={borrower.id} borrower={borrower} signals={signals} />
           <AnalystBrief borrower={borrower} />
           <CompanyLinks borrower={borrower} />
-          {!isApplicant && <ApplicantDecision key={borrower.id} borrower={borrower} signals={signals} />}
         </aside>
       </div>
     </DetailShell>

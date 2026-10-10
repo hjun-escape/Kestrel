@@ -4,7 +4,7 @@ import { format, formatDistanceToNowStrict } from "date-fns";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import StatusBadge, { STATUS_STYLES } from "@/components/StatusBadge";
 import { SIGNAL_TYPES } from "@/lib/signalTypes";
-import { formatRelative, formatUsd, parseSignalDate, statusKey } from "@/lib/borrowerUtils";
+import { formatRelative, formatUsd, parseSignalDate, reasonText, statusKey } from "@/lib/borrowerUtils";
 
 const COLUMNS = [
   { key: "status", label: "Status", className: "w-[120px]" },
@@ -117,31 +117,39 @@ function BookRow({ borrower: b, topSignal, onOpen }) {
         >
           {b.name}
         </Link>
-        <div className="truncate font-mono text-[11px] text-ew-muted">{b.website_domain}</div>
+        <div className="truncate text-xs text-ew-muted">{b.website_domain}</div>
       </td>
       <td className="px-3 py-2.5 capitalize text-ew-ink-soft">{b.stage}</td>
       <td className="px-3 py-2.5 text-ew-ink-soft">
         <span className="line-clamp-2">
-          {b.why || <span className="text-ew-muted">{b.last_refreshed ? "No reason recorded" : "Awaiting first check"}</span>}
+          {reasonText(b.why) || <span className="text-ew-muted">{b.last_refreshed ? "No reason recorded" : "Awaiting first check"}</span>}
         </span>
       </td>
       <td className="px-3 py-2.5">
         {topSignal ? (
           <div className="min-w-0">
             <div className="truncate font-medium text-ew-ink">{typeLabel}</div>
-            <div className="font-mono text-[11px] text-ew-muted">
-              {format(parseSignalDate(topSignal.date), "dd MMM yyyy")}
-              {topSignal.severity === "strong" ? ", strong" : ", weak"}
+            <div className="mt-0.5 flex items-center gap-1.5 text-xs text-ew-muted">
+              <span
+                className={`rounded-sm border px-1 text-[11px] font-semibold leading-4 ${
+                  topSignal.severity === "strong" ? "border-ew-ink bg-ew-ink text-white" : "border-ew-rule text-ew-ink-soft"
+                }`}
+              >
+                {topSignal.severity === "strong" ? "Strong" : "Weak"}
+              </span>
+              <time dateTime={topSignal.date} className="tabular-nums">
+                {format(parseSignalDate(topSignal.date), "d MMM yyyy")}
+              </time>
             </div>
           </div>
         ) : (
           <span className="text-ew-muted">None in 90 days</span>
         )}
       </td>
-      <td className="px-3 py-2.5 text-right font-mono font-medium text-ew-ink">
+      <td className="px-3 py-2.5 text-right font-medium tabular-nums text-ew-ink">
         {formatUsd(b.loan_amount_usd)}
       </td>
-      <td className="px-3 py-2.5 font-mono text-[12px] text-ew-muted">
+      <td className="px-3 py-2.5 text-xs text-ew-muted">
         {b.last_refreshed ? (
           <time dateTime={b.last_refreshed} title={formatRelative(b.last_refreshed)}>
             {formatDistanceToNowStrict(new Date(b.last_refreshed), { addSuffix: true })}
