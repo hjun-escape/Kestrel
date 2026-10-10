@@ -63,7 +63,9 @@ export function formatUsd(n) {
   if (n === null || n === undefined || n === "") return "—";
   const num = Number(n);
   if (Number.isNaN(num)) return "—";
-  if (num >= 1000000) return `$${(num / 1000000).toFixed(1)}M`;
+  // Thresholds sit where rounding would carry into the next unit (999,500 is "$1.0M", not "$1000K").
+  if (num >= 999_950_000) return `$${(num / 1e9).toFixed(1)}B`;
+  if (num >= 999_500) return `$${(num / 1e6).toFixed(1)}M`;
   if (num >= 1000) return `$${(num / 1000).toFixed(0)}K`;
   return `$${num}`;
 }
