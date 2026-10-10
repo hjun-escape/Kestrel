@@ -1,14 +1,14 @@
 import React from "react";
 import { formatDistanceToNowStrict } from "date-fns";
-import { RefreshCw } from "lucide-react";
+import { Pencil, RefreshCw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import StatusBadge from "@/components/StatusBadge";
 import { SOURCES } from "@/lib/signalTypes";
 import { formatRelative, formatUsdFull, reasonText } from "@/lib/borrowerUtils";
 
-// Detail header: identity, status with the reason, key facts, and the Refresh
-// control with per-source progress.
-export default function CompanyHeader({ borrower, sourceStates, running, refreshError, onRefresh }) {
+// Detail header: identity, status with the reason, key facts, the Refresh
+// control with per-source progress, and Edit / Delete.
+export default function CompanyHeader({ borrower, sourceStates, running, refreshError, onRefresh, onEdit, onDelete }) {
   const hq = [borrower.hq_city, borrower.hq_state].filter(Boolean).join(", ");
   const isApplicant = borrower.stage === "applicant";
   const facts = [
@@ -38,7 +38,26 @@ export default function CompanyHeader({ borrower, sourceStates, running, refresh
             </p>
           </div>
         </div>
-        <RefreshControl sourceStates={sourceStates} running={running} error={refreshError} onRefresh={onRefresh} />
+        <div className="flex w-[220px] shrink-0 flex-col gap-2">
+          <RefreshControl sourceStates={sourceStates} running={running} error={refreshError} onRefresh={onRefresh} />
+          {(onEdit || onDelete) && (
+            <div className="flex justify-end gap-1">
+              {/* Disabled during a check: the refresh is still writing this company's evidence. */}
+              {onEdit && (
+                <Button type="button" variant="ghost" size="sm" onClick={onEdit} disabled={running} className="h-8 rounded-sm px-2 text-ew-ink-soft hover:text-ew-ink">
+                  <Pencil aria-hidden="true" />
+                  Edit
+                </Button>
+              )}
+              {onDelete && (
+                <Button type="button" variant="ghost" size="sm" onClick={onDelete} disabled={running} className="h-8 rounded-sm px-2 text-ew-ink-soft hover:text-ew-red">
+                  <Trash2 aria-hidden="true" />
+                  Delete
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       <dl className="mt-5 grid grid-cols-3 gap-x-6 gap-y-3 border-t border-ew-rule-soft pt-4 xl:grid-cols-6">
@@ -67,7 +86,7 @@ function LastRefreshed({ value }) {
 function RefreshControl({ sourceStates, running, error, onRefresh }) {
   const answered = SOURCES.filter((s) => sourceStates[s] !== "checking").length;
   return (
-    <div className="flex w-[220px] shrink-0 flex-col items-stretch gap-2">
+    <div className="flex flex-col items-stretch gap-2">
       <Button
         onClick={onRefresh}
         disabled={running}
