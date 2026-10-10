@@ -27,7 +27,7 @@ export default function CompanyHeader({ borrower, sourceStates, running, refresh
           <h1 className="font-heading text-[32px] font-bold leading-[1.05] tracking-tight text-ew-ink">
             {borrower.name}
           </h1>
-          <div className="mt-3 flex items-start gap-3">
+          <div data-demo="status-why" className="mt-3 flex items-start gap-3">
             <StatusBadge status={borrower.status} lastRefreshed={borrower.last_refreshed} size="lg" />
             <p className="max-w-[68ch] pt-0.5 text-[15px] leading-snug text-ew-ink-soft">
               {borrower.last_refreshed

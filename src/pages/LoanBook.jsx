@@ -147,7 +147,7 @@ export default function LoanBook() {
               </p>
             )}
           </div>
-          <Button onClick={() => openAdd("applicant")} className="h-9 rounded-sm bg-ew-ink px-3.5 hover:bg-ew-ink-soft">
+          <Button data-demo="screen-applicant" onClick={() => openAdd("applicant")} className="h-9 rounded-sm bg-ew-ink px-3.5 hover:bg-ew-ink-soft">
             <Plus aria-hidden="true" />
             Screen new applicant
           </Button>
@@ -167,6 +167,7 @@ export default function LoanBook() {
                 <TabsTrigger
                   key={t.value}
                   value={t.value}
+                  data-demo={`tab-${t.value}`}
                   className="rounded-none border-b-2 border-transparent px-3 py-1.5 text-sm text-ew-muted hover:text-ew-ink data-[state=active]:border-ew-ink data-[state=active]:bg-transparent data-[state=active]:text-ew-ink data-[state=active]:shadow-none"
                 >
                   {t.label}

@@ -35,7 +35,7 @@ export default function LoanBookTable({ rows, sort, onSort, loading }) {
   }
 
   return (
-    <div className="border border-ew-rule bg-ew-surface">
+    <div data-demo="loanbook-table" className="border border-ew-rule bg-ew-surface">
       <table className="w-full table-fixed border-collapse text-[13px]">
         <caption className="sr-only">
           Companies in the loan book. Use the column buttons to sort; use Arrow Up and Down to move between rows.
@@ -98,6 +98,7 @@ function BookRow({ borrower: b, topSignal, onOpen }) {
   const typeLabel = topSignal ? SIGNAL_TYPES[topSignal.type]?.label || topSignal.type : null;
   return (
     <tr
+      data-demo={`row-${b.id}`}
       onClick={onOpen}
       className="group cursor-pointer border-b border-ew-rule-soft align-top last:border-0 hover:bg-ew-hover focus-within:bg-ew-hover"
     >
