@@ -18,7 +18,7 @@ Target borrowers are mid-size PRIVATE companies: no analyst coverage, quarterly 
 
 ## This repo and the Base44 app
 - Repo: github.com/hjun-escape/early-warning (private). It replaced natephunt/TalkToUsersHackathonGroup17 at about 1:15 PM.
-- Base44 app "Early Warning": id `6aca96c9744d6ba75bc4fabd`, live at https://early-warning-5bc4fabd.base44.app.
+- Base44 app "Kestrel" (formerly Early Warning): id `6aca96c9744d6ba75bc4fabd`, live at https://kestrel-app.base44.app. The old early-warning-5bc4fabd.base44.app address stopped working when the slug changed (Base44 does not redirect old slugs); share only the kestrel-app link.
   - It opens without login for Sense testers. Anyone with the link can browse, press Refresh or "Screen new applicant", and once sources are on, each press spends Bright Data credits.
   - Signing in is optional. It unlocks Ask, the analyst brief, the lender check, the cash-flow check and recording decisions; those backend functions return 401 to signed-out visitors. `refreshAll` is admin-only.
 - Layout:

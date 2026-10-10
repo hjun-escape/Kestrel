@@ -1,10 +1,10 @@
-# Early Warning
+# Kestrel
 
-**Catch a borrower's trouble before the quarterly financials do.** Early Warning watches the public signs that a mid-size
+**Catch a borrower's trouble before the quarterly financials do.** Kestrel (formerly Early Warning) watches the public signs that a mid-size
 private company is in trouble (executive exits, lawsuits and layoffs, hiring freezes, employee reviews about missed pay)
 and flags them for a bank's credit officer: before the bank lends, and every day after.
 
-Talk to Users Hackathon, Group 17 · **Live app: https://early-warning-5bc4fabd.base44.app** (no account needed; choose
+Talk to Users Hackathon, Group 17 · **Live app: https://kestrel-app.base44.app** (no account needed; choose
 "Explore the demo")
 
 ## Why
