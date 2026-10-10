@@ -18,8 +18,11 @@ import {
 } from "@/components/ui/select";
 import { base44 } from "@/api/base44Client";
 
-// Add company form. On save, creates a Borrower with no signals and an empty
-// last_refreshed, so it shows "Not checked".
+// "Screen new applicant" form. On save, creates a Borrower with no signals and
+// an empty last_refreshed (so it shows "Not checked"), then the loan book opens
+// its detail page, which runs the first check. Stage defaults to applicant;
+// choose Borrower to add a company the bank has already lent to.
+// LinkedIn and Glassdoor URLs feed the Jobs and Reviews checks.
 export default function AddCompanyDialog({ open, onOpenChange, onCreated }) {
   const empty = {
     name: "",
@@ -27,8 +30,10 @@ export default function AddCompanyDialog({ open, onOpenChange, onCreated }) {
     hq_city: "",
     hq_state: "",
     industry: "",
-    stage: "borrower",
+    stage: "applicant",
     loan_amount_usd: "",
+    linkedin_url: "",
+    glassdoor_url: "",
   };
   const [form, setForm] = useState(empty);
   const [saving, setSaving] = useState(false);
@@ -61,10 +66,12 @@ export default function AddCompanyDialog({ open, onOpenChange, onCreated }) {
       if (form.loan_amount_usd) {
         payload.loan_amount_usd = Number(form.loan_amount_usd);
       }
-      await base44.entities.Borrower.create(payload);
+      if (form.linkedin_url.trim()) payload.linkedin_url = form.linkedin_url.trim();
+      if (form.glassdoor_url.trim()) payload.glassdoor_url = form.glassdoor_url.trim();
+      const created = await base44.entities.Borrower.create(payload);
       setForm(empty);
-      onCreated();
       onOpenChange(false);
+      onCreated(created);
     } catch (e) {
       setError("Could not save the company. Please try again.");
     } finally {
@@ -76,7 +83,7 @@ export default function AddCompanyDialog({ open, onOpenChange, onCreated }) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Add company</DialogTitle>
+          <DialogTitle>Screen new applicant</DialogTitle>
         </DialogHeader>
 
         <div className="grid grid-cols-2 gap-4 py-2">
@@ -132,8 +139,8 @@ export default function AddCompanyDialog({ open, onOpenChange, onCreated }) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="borrower">Borrower</SelectItem>
                 <SelectItem value="applicant">Applicant</SelectItem>
+                <SelectItem value="borrower">Borrower</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -147,6 +154,24 @@ export default function AddCompanyDialog({ open, onOpenChange, onCreated }) {
               placeholder="4500000"
             />
           </div>
+          <div className="col-span-2 space-y-1.5">
+            <Label htmlFor="linkedin">LinkedIn company URL (optional)</Label>
+            <Input
+              id="linkedin"
+              value={form.linkedin_url}
+              onChange={(e) => update("linkedin_url", e.target.value)}
+              placeholder="https://www.linkedin.com/company/…"
+            />
+          </div>
+          <div className="col-span-2 space-y-1.5">
+            <Label htmlFor="glassdoor">Glassdoor URL (optional)</Label>
+            <Input
+              id="glassdoor"
+              value={form.glassdoor_url}
+              onChange={(e) => update("glassdoor_url", e.target.value)}
+              placeholder="https://www.glassdoor.com/…"
+            />
+          </div>
         </div>
 
         {error && <p className="text-sm text-red-600">{error}</p>}
@@ -156,7 +181,7 @@ export default function AddCompanyDialog({ open, onOpenChange, onCreated }) {
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={saving}>
-            {saving ? "Saving…" : "Add company"}
+            {saving ? "Saving…" : "Save and check"}
           </Button>
         </DialogFooter>
       </DialogContent>
