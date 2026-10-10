@@ -527,3 +527,15 @@ describe('runLenderCheck', () => {
     assert.equal('signals' in result.record, false);
   });
 });
+
+describe('persisted record shape', () => {
+  test('evidence and late payments omit missing dates/lenders instead of storing null', async () => {
+    const result = await runLenderCheck({ borrower: BORROWER, invokeLLM: fakeLLM().fn, fetch: fakeFetch(defaultRoutes).fn, apiKey: 'k' });
+    assert.ok(result.ok);
+    if (!result.ok) return;
+    const json = JSON.stringify(result.record);
+    assert.doesNotMatch(json, /null/);
+    const harbor = result.record.lenders.find((l) => /harbor/i.test(l.name))!;
+    assert.equal('date' in harbor.evidence[0], false);
+  });
+});
