@@ -8,6 +8,8 @@ import AppHeader from "@/components/AppHeader";
 import AddCompanyDialog from "@/components/AddCompanyDialog";
 import SummaryStrip from "@/components/SummaryStrip";
 import LoanBookTable from "@/components/LoanBookTable";
+import LoanBookCards from "@/components/LoanBookCards";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { STATUS_STYLES } from "@/components/StatusBadge";
 import { getTopSignal, filterRecentSignals, sortRows, statusKey } from "@/lib/borrowerUtils";
 import { ensureSeedData } from "@/lib/seed";
@@ -26,6 +28,9 @@ const TABS = [
 ];
 
 const DEFAULT_SORT = { key: "status", dir: "asc" };
+
+// First direction when a sort key is picked: biggest / newest first for numbers and dates.
+const defaultDir = (key) => (key === "amount" || key === "signal" || key === "checked" ? "desc" : "asc");
 
 function groupSignals(items) {
   const map = {};
@@ -49,6 +54,8 @@ export default function LoanBook() {
   const [addStage, setAddStage] = useState("applicant");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
+  // Phones get cards instead of the table: one or the other is rendered, never both.
+  const isMobile = useIsMobile();
 
   // Signed in: only the user's own companies. Signed out: only the unowned
   // shared demo book. The backend functions enforce the same rule.
@@ -134,8 +141,13 @@ export default function LoanBook() {
 
   function handleSort(key) {
     setSort((s) =>
-      s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: key === "amount" || key === "signal" || key === "checked" ? "desc" : "asc" }
+      s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: defaultDir(key) }
     );
+  }
+
+  // Phone sort picker: choosing a key always starts in its default direction.
+  function handleSortSet(key) {
+    setSort({ key, dir: defaultDir(key) });
   }
 
   const isBookEmpty = !loading && !loadError && (borrowers || []).length === 0;
@@ -145,8 +157,8 @@ export default function LoanBook() {
     <div className="min-h-screen bg-ew-paper text-ew-ink">
       <AppHeader onAskClosed={loadData} />
 
-      <main className="mx-auto max-w-[1360px] px-6 pb-16 pt-6">
-        <div className="mb-5 flex items-end justify-between gap-4">
+      <main className="mx-auto max-w-[1360px] px-4 pb-16 pt-6 md:px-6">
+        <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <h1 className="font-heading text-[28px] font-bold leading-none tracking-tight">
               {me ? "My companies" : "Loan book"}
@@ -169,7 +181,7 @@ export default function LoanBook() {
               </p>
             )}
           </div>
-          <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:justify-end">
             <LoadDemoButton signedIn={!!me} running={demo.running} onClick={demo.start} />
             <Button data-demo="screen-applicant" onClick={() => openAdd("applicant")} className="h-9 rounded-sm bg-ew-ink px-3.5 hover:bg-ew-ink-soft">
               <Plus aria-hidden="true" />
@@ -198,7 +210,7 @@ export default function LoanBook() {
           onStatusFilter={setStatusFilter}
         />
 
-        <div className="mb-2 mt-6 flex items-center justify-between gap-4">
+        <div className="mb-2 mt-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <Tabs value={tab} onValueChange={setTab}>
             <TabsList className="h-auto rounded-none bg-transparent p-0">
               {TABS.map((t) => (
@@ -266,9 +278,12 @@ export default function LoanBook() {
           </div>
         )}
 
-        {(loading || rows.length > 0) && (
-          <LoanBookTable rows={rows} sort={sort} onSort={handleSort} loading={loading} />
-        )}
+        {(loading || rows.length > 0) &&
+          (isMobile ? (
+            <LoanBookCards rows={rows} sort={sort} onSortSet={handleSortSet} loading={loading} />
+          ) : (
+            <LoanBookTable rows={rows} sort={sort} onSort={handleSort} loading={loading} />
+          ))}
       </main>
 
       <AddCompanyDialog
