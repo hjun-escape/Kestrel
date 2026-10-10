@@ -4,6 +4,7 @@ import { LANES, LANE_COLORS, encodeText, pipelineScene } from "./caScenes";
 import { prefersReducedMotion } from "./motion";
 import { SAMPLE_APPLICANTS } from "./sampleApplicants";
 import { useCanvasScene, useFlagProgress } from "./useCanvasScene";
+import AsciiField from "./AsciiField";
 import { BANDS as SCORE_BANDS, warningScore } from "@/lib/warningScore.ts";
 
 // The landing hero: Kestrel's workflow as a cellular automaton.
@@ -22,7 +23,7 @@ const STAGES = [
 ];
 const GUTTER = 210; // sources column: example items sliding into their lanes
 const HEADER = 72; // stage titles above the cells
-const EXIT = 0.64; // share of the canvas the pipeline runs across; the report sits to the right
+const EXIT = 0.97; // share of the canvas the pipeline runs across; a short runway before the exit edge
 const FPS = 14;
 const MS_PER_COLUMN = (2 * 1000) / FPS; // the conveyor moves one column every other step
 const css = ([r, g, b], a = 1) => `rgba(${r},${g},${b},${a})`;
@@ -303,7 +304,8 @@ function PipelineRun({ company, onProgress }) {
     const place = () => {
       const region = regionRef.current?.getBoundingClientRect();
       const report = reportRef.current?.getBoundingClientRect();
-      if (region && report) sceneRef.current?.setTarget({ x: report.left - region.left + 24, y: report.top - region.top + 150 });
+      // The report is a separate panel to the right; verified cells fly to the frame's edge level with its flags.
+      if (region && report) sceneRef.current?.setTarget({ x: region.width - 4, y: report.top - region.top + 170 });
     };
     place();
     const ro = new ResizeObserver(place);
@@ -373,7 +375,9 @@ function PipelineRun({ company, onProgress }) {
   );
 
   return (
-    <figure aria-label={`How Kestrel checks ${company.name}: sources, search, read, tag, verify, report`} className="relative h-[clamp(580px,74vh,740px)] overflow-hidden rounded-sm border border-white/10 bg-black/10">
+    <>
+    <div data-ascii-clear className="min-w-0">
+    <figure aria-label={`How Kestrel checks ${company.name}: sources, search, read, tag, verify, report`} className="relative h-[clamp(580px,74vh,740px)] overflow-hidden rounded-sm border border-white/10 bg-black/10 lg:h-full">
       {/* Sources column: each source's example item sliding into its lane. */}
       <div className="absolute bottom-0 left-0 top-0 border-r border-white/10" style={{ width: GUTTER }}>
         <div className="flex flex-col justify-end px-3 pb-2" style={{ height: HEADER }}>
@@ -412,57 +416,60 @@ function PipelineRun({ company, onProgress }) {
           ))}
         </ol>
 
-        {/* Report: full height of the frame, like the form on the left. */}
-        <div className="pointer-events-none absolute bottom-0 right-0 top-0 flex flex-col" style={{ width: `${(1 - EXIT) * 100}%` }}>
-          <div ref={reportRef} className="pointer-events-auto flex h-full flex-col border-l border-white/10 bg-white text-ew-ink">
-            <div className="flex items-start justify-between gap-3 border-b border-ew-rule px-4 py-3">
-              <div className="min-w-0">
-                <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-ew-muted">Report · sample</p>
-                <p className="font-heading text-[15px] font-bold leading-tight">{company.name}</p>
-              </div>
-              <StatusChip status={score.band} />
-            </div>
-            <ReportScore score={score} />
-            <p aria-live="polite" className="border-b border-ew-rule-soft px-4 py-2 text-[12.5px] text-ew-ink-soft">
-              {score.why}
-            </p>
-            <ul className="min-h-[86px] px-4 py-2">
-              {progress.flags.length === 0 && (
-                <li className="py-1 text-[12.5px] text-ew-muted">
-                  {company.flags.length ? "Waiting for a verified signal…" : "Nothing verified: every item is dropped before the report."}
-                </li>
-              )}
-              {progress.flags.map((f) => (
-                <li
-                  key={f.id}
-                  className={`-mx-2 flex items-baseline justify-between gap-3 rounded-sm px-2 py-1 text-[13px] transition-colors duration-1000 ${landed === f.id ? "bg-sky-100" : "bg-transparent"}`}
-                  onTransitionEnd={() => setLanded((l) => (l === f.id ? null : l))}
-                >
-                  <span className="font-semibold">{f.title}</span>
-                  <span className="shrink-0 text-[12px] text-ew-muted">{f.when}</span>
-                </li>
-              ))}
-            </ul>
-            <div className="flex min-h-0 flex-1 flex-col border-t border-ew-rule bg-ew-paper px-4 py-2">
-              <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-ew-muted">Activity log</p>
-              <ol aria-live="polite" className="mt-1 flex min-h-0 flex-1 flex-col justify-end space-y-0.5 overflow-hidden font-mono text-[11px] leading-snug">
-                {log.map((e) => (
-                  <li key={e.key} className="flex gap-2">
-                    <span className="shrink-0 text-ew-muted">{e.stamp}</span>
-                    <span className="shrink-0 font-semibold" style={{ color: css(LANE_COLORS[e.lane].map((v) => Math.round(v * 0.62))) }}>
-                      {e.stage}
-                    </span>
-                    <span className="min-w-0 truncate text-ew-ink-soft">{e.text}</span>
-                  </li>
-                ))}
-                {log.length === 0 && <li className="text-ew-muted">Starting…</li>}
-              </ol>
-            </div>
-          </div>
-        </div>
         <Tooltip tip={tip} />
       </div>
     </figure>
+    </div>
+
+    {/* Report: its own panel, same gap and height as the form on the left. */}
+    <div data-ascii-clear className="min-h-0 min-w-0">
+      <aside ref={reportRef} aria-label={`Report for ${company.name}`} className="flex h-full min-h-0 flex-col overflow-hidden rounded-sm border border-white/10 bg-white text-ew-ink shadow-[0_18px_50px_rgba(0,0,0,0.4)]">
+        <div className="flex items-start justify-between gap-3 border-b border-ew-rule px-4 py-3">
+          <div className="min-w-0">
+            <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-ew-muted">Report · sample</p>
+            <p className="font-heading text-[15px] font-bold leading-tight">{company.name}</p>
+          </div>
+          <StatusChip status={score.band} />
+        </div>
+        <ReportScore score={score} />
+        <p aria-live="polite" className="border-b border-ew-rule-soft px-4 py-2 text-[12.5px] text-ew-ink-soft">
+          {score.why}
+        </p>
+        <ul className="min-h-[86px] px-4 py-2">
+          {progress.flags.length === 0 && (
+            <li className="py-1 text-[12.5px] text-ew-muted">
+              {company.flags.length ? "Waiting for a verified signal…" : "Nothing verified: every item is dropped before the report."}
+            </li>
+          )}
+          {progress.flags.map((f) => (
+            <li
+              key={f.id}
+              className={`-mx-2 flex items-baseline justify-between gap-3 rounded-sm px-2 py-1 text-[13px] transition-colors duration-1000 ${landed === f.id ? "bg-sky-100" : "bg-transparent"}`}
+              onTransitionEnd={() => setLanded((l) => (l === f.id ? null : l))}
+            >
+              <span className="font-semibold">{f.title}</span>
+              <span className="shrink-0 text-[12px] text-ew-muted">{f.when}</span>
+            </li>
+          ))}
+        </ul>
+        <div className="flex min-h-0 flex-1 flex-col border-t border-ew-rule bg-ew-paper px-4 py-2">
+          <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-ew-muted">Activity log</p>
+          <ol aria-live="polite" className="mt-1 flex min-h-0 flex-1 flex-col justify-end space-y-0.5 overflow-hidden font-mono text-[11px] leading-snug">
+            {log.map((e) => (
+              <li key={e.key} className="flex gap-2">
+                <span className="shrink-0 text-ew-muted">{e.stamp}</span>
+                <span className="shrink-0 font-semibold" style={{ color: css(LANE_COLORS[e.lane].map((v) => Math.round(v * 0.62))) }}>
+                  {e.stage}
+                </span>
+                <span className="min-w-0 truncate text-ew-ink-soft">{e.text}</span>
+              </li>
+            ))}
+            {log.length === 0 && <li className="text-ew-muted">Starting…</li>}
+          </ol>
+        </div>
+      </aside>
+    </div>
+    </>
   );
 }
 
@@ -473,15 +480,18 @@ export function PipelineHero() {
   const company = SAMPLE_APPLICANTS.find((c) => c.id === companyId) || SAMPLE_APPLICANTS[0];
   const onProgress = useCallback((p) => setRun((r) => (r.cycle === p.cycle && r.done === p.done ? r : p)), []);
   return (
-    <div className="bg-ew-ink text-white">
+    // -mt-16 pt-16: the dark background and character field extend up behind the transparent nav.
+    <div className="relative -mt-16 overflow-hidden bg-ew-ink pt-16 text-white">
+      <AsciiField className="absolute inset-0 h-full w-full" />
       {/* Stage titles pulse when something happens in that stage. Self-contained keyframes. */}
       <style>{"@keyframes kestrelPulse{0%{color:#fff;text-shadow:0 0 14px rgba(255,255,255,.9)}100%{text-shadow:0 0 0 rgba(255,255,255,0)}}"}</style>
-      <section aria-labelledby="hero-heading" className="mx-auto max-w-[1400px] px-4 pb-16 pt-8 sm:px-8">
+      <section aria-labelledby="hero-heading" className="relative mx-auto max-w-[1400px] px-4 pb-16 pt-6 sm:px-8">
         {/* Visible heading removed by design (the nav shows Kestrel); kept for screen readers. */}
         <h1 id="hero-heading" className="sr-only">
           Kestrel, private company screener
         </h1>
-        <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)_300px] lg:grid-rows-[clamp(580px,74vh,740px)]">
+          <div data-ascii-clear className="min-w-0">
           <ApplicantForm
             company={company}
             onSelect={(id) => {
@@ -491,6 +501,7 @@ export function PipelineHero() {
             progress={run}
             runKey={`${company.id}-${run.cycle}`}
           />
+          </div>
           <PipelineRun key={company.id} company={company} onProgress={onProgress} />
         </div>
       </section>

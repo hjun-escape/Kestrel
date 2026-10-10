@@ -4,14 +4,12 @@ import BrandMark from "@/components/auth/BrandMark";
 import { ExploreDemoLink, SIGN_IN_PATH } from "./LandingCtas";
 import { PipelineHero } from "./PipelineHero";
 
-// Faint ledger ruling behind the nav: the paper a credit file is kept on.
-const LEDGER =
-  "bg-[repeating-linear-gradient(to_bottom,transparent_0,transparent_31px,rgba(255,255,255,0.045)_31px,rgba(255,255,255,0.045)_32px)]";
-
 export function LandingNav() {
   return (
-    <div className={`bg-ew-ink text-white ${LEDGER}`}>
-      <header className="mx-auto flex h-16 max-w-[1200px] items-center justify-between px-4 sm:px-8">
+    // Transparent and aligned with the hero (same width and padding): the hero's dark background and
+    // character field run up behind it, so nav and hero read as one surface.
+    <div className="relative z-10 text-white">
+      <header className="mx-auto flex h-16 max-w-[1400px] items-center justify-between px-4 sm:px-8">
         <Link to="/welcome" className="flex items-center gap-2.5 rounded-sm focus-visible:outline-white">
           <BrandMark className="h-6 w-6 text-white" />
           <span className="font-heading text-[16px] font-bold tracking-tight">Kestrel</span>
