@@ -7,11 +7,13 @@ import { FLAGS, STATUS_AFTER_FLAG, WHY_LINES } from "./heroData";
  * pauses off screen and in background tabs. With reduced motion it runs `warmup` steps once and
  * shows that still frame.
  */
-export function useCanvasScene(makeScene, { fps = 15, warmup = 160 } = {}) {
+export function useCanvasScene(makeScene, { fps = 15, warmup = 160, onLayout } = {}) {
   const canvasRef = useRef(null);
   const sceneRef = useRef(null);
   const makeRef = useRef(makeScene);
   makeRef.current = makeScene;
+  const layoutRef = useRef(onLayout);
+  layoutRef.current = onLayout;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -35,6 +37,7 @@ export function useCanvasScene(makeScene, { fps = 15, warmup = 160 } = {}) {
       canvas.height = Math.round(h * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       scene.resize(w, h);
+      layoutRef.current?.(scene, w, h);
       if (reduced) {
         const t = performance.now();
         for (let i = 0; i < warmup; i++) scene.frame(ctx, t + i * (1000 / fps), w, h, true);
