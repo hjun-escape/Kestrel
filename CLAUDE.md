@@ -1,3 +1,5 @@
+Product name: Kestrel (formerly Early Warning).
+
 # Early Warning — team context for Claude Code
 
 Hackathon build. Hacking ends 8:00 PM PT; submit before then. First working version by 3:00 PM (Sense Check block 2).

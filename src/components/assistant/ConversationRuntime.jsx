@@ -87,7 +87,7 @@ function ReplyAnnouncer() {
     const body = textOf(last).slice(0, ANNOUNCE_MAX);
     const actions = (last.metadata?.custom?.pending_actions || []).length;
     const note = actions ? ` ${actions} action${actions > 1 ? "s" : ""} need your confirmation.` : "";
-    setText(`Early Warning replied: ${body}${note}`);
+    setText(`Kestrel replied: ${body}${note}`);
   });
 
   return (

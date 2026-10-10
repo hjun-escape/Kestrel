@@ -36,7 +36,7 @@ export default function AppHeader({ children }) {
       <div className="mx-auto flex h-11 max-w-[1360px] items-center justify-between gap-4 px-6">
         <div className="flex items-center gap-6">
           <Link to="/" className="flex items-baseline gap-3 rounded-sm focus-visible:outline-white">
-            <span className="font-heading text-[15px] font-bold tracking-tight">Early Warning</span>
+            <span className="font-heading text-[15px] font-bold tracking-tight">Kestrel</span>
             <span className="hidden text-xs text-white/70 md:inline">Credit risk monitor</span>
           </Link>
           <nav aria-label="Main" className="flex items-center gap-4">

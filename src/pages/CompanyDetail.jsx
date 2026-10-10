@@ -109,7 +109,7 @@ export default function CompanyDetail() {
         if (idRef.current === id) setLoading(false);
       }
       if (!data) return;
-      document.title = `${data.borrower.name} | Early Warning`;
+      document.title = `${data.borrower.name} | Kestrel`;
       const active = getActiveRefresh(id);
       if (active) attach(active);
       else if (searchParams.get("checking") === "1" && !data.borrower.last_refreshed) handleRefresh(data);
