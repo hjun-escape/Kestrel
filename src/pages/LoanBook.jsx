@@ -204,7 +204,7 @@ export default function LoanBook() {
           <DemoEmptyPanel running={demo.running} onLoad={demo.start} />
         )}
 
-        <div className="mb-2 flex flex-wrap items-center justify-end gap-x-4 gap-y-1">
+        <div data-demo="status-legend" className="mb-2 flex flex-wrap items-center justify-end gap-x-4 gap-y-1">
           <p className="hidden text-xs text-ew-muted xl:block">
             <span className="font-semibold text-ew-red">Red</span> 2+ strong signs, or 1 strong + 2 weak ·{" "}
             <span className="font-semibold text-ew-amber">Yellow</span> 1 strong, or 2+ weak ·{" "}

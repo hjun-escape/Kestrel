@@ -114,7 +114,7 @@ export default function AuditTrail({ borrower, signals }) {
   const intro = `Newest first. Generated ${generated}. ${NOT_AI_TEXT}`;
 
   return (
-    <section aria-labelledby="audit-heading" className="mt-6 border border-ew-rule bg-ew-surface">
+    <section data-demo="audit-trail" aria-labelledby="audit-heading" className="mt-6 border border-ew-rule bg-ew-surface">
       <style>{PRINT_CSS}</style>
       {printing &&
         createPortal(
@@ -128,7 +128,7 @@ export default function AuditTrail({ borrower, signals }) {
         )}
       <Collapsible open={open} onOpenChange={setOpen}>
         <h2 id="audit-heading" className="font-heading text-sm font-bold text-ew-ink">
-          <CollapsibleTrigger className="group flex w-full items-center gap-2 px-4 py-3 text-left focus-visible:-outline-offset-2">
+          <CollapsibleTrigger data-demo="audit-open" className="group flex w-full items-center gap-2 px-4 py-3 text-left focus-visible:-outline-offset-2">
             <ChevronRight aria-hidden="true" className="h-4 w-4 transition-transform group-data-[state=open]:rotate-90" />
             Audit trail
             <span className="font-normal text-ew-muted">

@@ -79,6 +79,13 @@ describe("resolveStep", () => {
     assert.equal(borrowers.target, "loanbook-table");
   });
 
+  test("a caption can name the picked company", () => {
+    const step = { id: "x", caption: ({ redApplicant }) => `${redApplicant.name} is Red.`, target: "t" };
+    assert.equal(resolveStep(step, picks).caption, `${picks.redApplicant.name} is Red.`);
+    const broken = { id: "y", caption: () => { throw new Error("boom"); }, target: "t" };
+    assert.equal(resolveStep(broken, picks).caption, "");
+  });
+
   test("a throwing route or target function resolves to null", () => {
     const step = { id: "x", caption: "c", route: () => { throw new Error("boom"); }, target: () => { throw new Error("boom"); } };
     const r = resolveStep(step, picks);
@@ -93,7 +100,9 @@ describe("demoScript", () => {
     for (const s of DEMO_STEPS) {
       assert.ok(s.id && !ids.has(s.id), `duplicate or empty id ${s.id}`);
       ids.add(s.id);
-      assert.ok(typeof s.caption === "string" && s.caption.trim().length > 0, `${s.id} needs a caption`);
+      const caption = resolveStep(s, resolvePicks(book, {})).caption;
+      assert.ok(typeof caption === "string" && caption.trim().length > 0, `${s.id} needs a caption`);
+      assert.ok(resolveStep(s, resolvePicks([], {})).caption.trim().length > 0, `${s.id} needs a caption with no companies`);
       assert.ok(s.target, `${s.id} needs a target`);
     }
   });
