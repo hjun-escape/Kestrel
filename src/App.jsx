@@ -14,6 +14,7 @@ import CompanyDetail from '@/pages/CompanyDetail';
 const Assistant = lazy(() => import('@/pages/Assistant'));
 // Example replay of a news check (no data sources called); load only when visited.
 const DevProgression = lazy(() => import('@/pages/DevProgression'));
+const DevAudit = lazy(() => import('@/pages/DevAudit'));
 // The welcome page pulls in animejs; load it only when visited.
 const Landing = lazy(() => import('@/pages/Landing'));
 // About: a plain page; load it only when visited.
@@ -41,6 +42,7 @@ const AppRoutes = () => (
     <Route path="/borrower/:id" element={<CompanyDetail />} />
     <Route path="/assistant" element={<Suspense fallback={null}><Assistant /></Suspense>} />
     <Route path="/dev/progression" element={<Suspense fallback={null}><DevProgression /></Suspense>} />
+    <Route path="/dev/audit" element={<Suspense fallback={null}><DevAudit /></Suspense>} />
     <Route path="*" element={<PageNotFound />} />
   </Routes>
 );
