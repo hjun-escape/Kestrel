@@ -6,11 +6,17 @@ import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider } from '@/lib/AuthContext';
 import ScrollToTop from './components/ScrollToTop';
+import PresenterMode from '@/components/presenter/PresenterMode';
 // Add page imports here
 import LoanBook from '@/pages/LoanBook';
 import CompanyDetail from '@/pages/CompanyDetail';
 // The Assistant page pulls in assistant-ui; load it only when visited.
 const Assistant = lazy(() => import('@/pages/Assistant'));
+// Example replay of a news check (no data sources called); load only when visited.
+const DevProgression = lazy(() => import('@/pages/DevProgression'));
+// The welcome page pulls in animejs; load it only when visited.
+const Landing = lazy(() => import('@/pages/Landing'));
+import WelcomeGate from '@/components/landing/WelcomeGate';
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
 import ForgotPassword from '@/pages/ForgotPassword';
@@ -27,9 +33,11 @@ const AppRoutes = () => (
     <Route path="/register" element={<Register />} />
     <Route path="/forgot-password" element={<ForgotPassword />} />
     <Route path="/reset-password" element={<ResetPassword />} />
-    <Route path="/" element={<LoanBook />} />
+    <Route path="/welcome" element={<Suspense fallback={null}><Landing /></Suspense>} />
+    <Route path="/" element={<WelcomeGate><LoanBook /></WelcomeGate>} />
     <Route path="/borrower/:id" element={<CompanyDetail />} />
     <Route path="/assistant" element={<Suspense fallback={null}><Assistant /></Suspense>} />
+    <Route path="/dev/progression" element={<Suspense fallback={null}><DevProgression /></Suspense>} />
     <Route path="*" element={<PageNotFound />} />
   </Routes>
 );
@@ -43,6 +51,7 @@ function App() {
         <Router>
           <ScrollToTop />
           <AppRoutes />
+          <PresenterMode />
         </Router>
         <Toaster />
       </QueryClientProvider>

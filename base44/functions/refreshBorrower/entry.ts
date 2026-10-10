@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
+import { canAccessCompany } from './access.ts';
 
 // refreshBorrower(borrower_id). Owner: P1. See docs/PLAN.md §2 and CLAUDE.md "Refresh flow".
 //
@@ -46,6 +47,12 @@ const SCORING_ENABLED = true;
 // (about 150 s at most), so the id reaches us and the next refresh can resume.
 const SOURCE_TIMEOUT_MS = 200_000;
 
+// A company checked more recently than this is not checked again (see the cooldown below).
+const COOLDOWN_MS = 2 * 60_000;
+
+// findCompanyPages usually answers in 5-10 s; its own budget is 55 s.
+const PROFILE_TIMEOUT_MS = 60_000;
+
 // Seed data (src/lib/seedData.js) marks every fake signal this way. A real
 // refresh deletes them so they are never scored as if they were real.
 const PLACEHOLDER_PREFIX = '[placeholder]';
@@ -82,6 +89,35 @@ export default async function(req: Request): Promise<Response> {
     const db = base44.asServiceRole.entities;
     const borrower = await db.Borrower.get(borrowerId);
 
+    // Per-user companies (added by the ownership change; access.ts): a
+    // signed-in caller may refresh only their own companies; a signed-out
+    // caller only the unowned shared demo book (as before for Sense testers).
+    // App admins pass too, so refreshAll (admin-only) can refresh every company.
+    const caller = await base44.auth.me().catch(() => null);
+    if (!canAccessCompany(borrower, caller) && caller?.role !== 'admin') {
+      return Response.json({ error: 'You do not have access to this company.' }, { status: 403 });
+    }
+
+    // Sample companies (src/lib/seedData.js) have made-up names, profile URLs and
+    // signals on the reserved .example domain. A live check would find nothing,
+    // delete their sample signals and mark them Green, so they are never refreshed.
+    if (/\.example$/i.test(String(borrower.website_domain || '').trim())) {
+      return Response.json(
+        { error: 'Sample company with made-up data, so it is not checked live. Screen a real company to see live checks.' },
+        { status: 409 },
+      );
+    }
+
+    // Cooldown: every check spends Bright Data credits and the app is open
+    // without login, so a company checked in the last two minutes is not checked
+    // again. A refresh that only resumes a still-building snapshot is allowed,
+    // and so are app admins.
+    const lastChecked = borrower.last_refreshed ? Date.parse(borrower.last_refreshed) : NaN;
+    const resuming = Object.values(borrower.pending_snapshots || {}).some((id) => typeof id === 'string' && id !== '');
+    if (Date.now() - lastChecked < COOLDOWN_MS && !resuming && caller?.role !== 'admin') {
+      return Response.json({ error: 'Checked less than two minutes ago. Try again shortly.' }, { status: 429 });
+    }
+
     const enabled = SIGNAL_FUNCTIONS.filter((f) => f.enabled);
     if (enabled.length === 0) {
       if (!borrower.last_refreshed) {
@@ -109,13 +145,37 @@ export default async function(req: Request): Promise<Response> {
     const saveProgress = () =>
       db.Borrower.update(borrowerId, { sources_unavailable: [...unavailable], pending_snapshots: { ...pending } });
 
+    // Jobs and Reviews need the company's LinkedIn and Glassdoor pages. When one is missing,
+    // findCompanyPages looks it up and saves what it verifies, while News runs. It is called with the
+    // caller's own identity (not the service role), so its access check sees the same caller as ours.
+    const needsProfiles =
+      enabled.some((f) => f.name === 'hiringSignal' || f.name === 'reviewSignals') &&
+      (!borrower.linkedin_url || !borrower.glassdoor_url);
+    const profiled: Promise<typeof borrower> = needsProfiles
+      ? withTimeout<any>(
+          base44.functions.invoke('findCompanyPages', { borrower_id: borrowerId }),
+          PROFILE_TIMEOUT_MS,
+          'findCompanyPages',
+        )
+          .then((res) => res?.data?.borrower ?? borrower)
+          .catch((error) => {
+            console.error('findCompanyPages failed:', errorInfo(error).message);
+            return borrower;
+          })
+      : Promise.resolve(borrower);
+
     const runs = enabled.map(async (fn) => {
       const types = Object.keys(fn.sources);
       const sourceNames = Object.values(fn.sources);
       const snapshotId = pending[fn.name];
       try {
+        // News needs only the name; the other sources wait for the page lookup.
+        const target = fn.name === 'newsSignals' ? borrower : await profiled;
         const res = await withTimeout<any>(
-          base44.asServiceRole.functions.invoke(fn.name, snapshotId ? { borrower, snapshot_id: snapshotId } : { borrower }),
+          base44.asServiceRole.functions.invoke(
+            fn.name,
+            snapshotId ? { borrower: target, snapshot_id: snapshotId } : { borrower: target },
+          ),
           SOURCE_TIMEOUT_MS,
           fn.name,
         );

@@ -4,7 +4,7 @@ import { format, formatDistanceToNowStrict } from "date-fns";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import StatusBadge, { STATUS_STYLES } from "@/components/StatusBadge";
 import { SIGNAL_TYPES } from "@/lib/signalTypes";
-import { formatRelative, formatUsd, parseSignalDate, reasonText, statusKey } from "@/lib/borrowerUtils";
+import { formatRelative, formatUsd, isSampleCompany, parseSignalDate, reasonText, statusKey } from "@/lib/borrowerUtils";
 
 const COLUMNS = [
   { key: "status", label: "Status", className: "w-[120px]" },
@@ -35,7 +35,7 @@ export default function LoanBookTable({ rows, sort, onSort, loading }) {
   }
 
   return (
-    <div className="border border-ew-rule bg-ew-surface">
+    <div data-demo="loanbook-table" className="border border-ew-rule bg-ew-surface">
       <table className="w-full table-fixed border-collapse text-[13px]">
         <caption className="sr-only">
           Companies in the loan book. Use the column buttons to sort; use Arrow Up and Down to move between rows.
@@ -98,6 +98,7 @@ function BookRow({ borrower: b, topSignal, onOpen }) {
   const typeLabel = topSignal ? SIGNAL_TYPES[topSignal.type]?.label || topSignal.type : null;
   return (
     <tr
+      data-demo={`row-${b.id}`}
       onClick={onOpen}
       className="group cursor-pointer border-b border-ew-rule-soft align-top last:border-0 hover:bg-ew-hover focus-within:bg-ew-hover"
     >
@@ -117,7 +118,14 @@ function BookRow({ borrower: b, topSignal, onOpen }) {
         >
           {b.name}
         </Link>
-        <div className="truncate text-xs text-ew-muted">{b.website_domain}</div>
+        <div className="flex min-w-0 items-center gap-1.5">
+          {isSampleCompany(b) && (
+            <span title="Sample company with made-up data. It is not checked live." className="shrink-0 rounded-sm border border-ew-rule bg-ew-surface px-1.5 text-[11px] font-semibold leading-[18px] text-ew-muted">
+              Sample
+            </span>
+          )}
+          <span className="truncate text-xs text-ew-muted">{b.website_domain}</span>
+        </div>
       </td>
       <td className="px-3 py-2.5 capitalize text-ew-ink-soft">{b.stage}</td>
       <td className="px-3 py-2.5 text-ew-ink-soft">

@@ -1,0 +1,157 @@
+// CheckRun (P2): one record per newsSignals run, written as it works. Shown on the company page under
+// Sources ("How this was checked"). Display only: never read by scoring or status.
+{
+  "name": "CheckRun",
+  "type": "object",
+  "properties": {
+    "borrower_id": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "News"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "running",
+        "done",
+        "failed"
+      ]
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "finished_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "error": {
+      "type": "string"
+    },
+    "searches": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "query_type": {
+            "type": "string"
+          },
+          "query": {
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "count": {
+            "type": "number"
+          },
+          "error": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "articles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "query": {
+            "type": "string"
+          },
+          "read": {
+            "type": "boolean"
+          },
+          "relevant": {
+            "type": "boolean"
+          },
+          "same_company": {
+            "type": "boolean"
+          },
+          "signal_type": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "decision": {
+            "type": "string"
+          },
+          "why": {
+            "type": "string"
+          },
+          "snippet": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "linkedin_status": {
+      "type": "string",
+      "enum": [
+        "off",
+        "running",
+        "done",
+        "skipped"
+      ]
+    },
+    "linkedin": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "exec": {
+            "type": "string"
+          },
+          "profile_url": {
+            "type": "string"
+          },
+          "result": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "log": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "signal_count": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "borrower_id",
+    "source",
+    "status",
+    "started_at"
+  ]
+}

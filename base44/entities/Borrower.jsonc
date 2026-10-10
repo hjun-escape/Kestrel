@@ -61,6 +61,20 @@
         ]
       }
     },
+    "owner_email": {
+      "type": "string",
+      "description": "Email of the signed-in user who added the company. Empty = the shared demo book, shown only to signed-out visitors. Signed-in users see and use only their own companies. Set on create (client: AddCompanyDialog; server: confirmAction from auth.me()); never changed afterwards."
+    },
+    "profile_search": {
+      "type": "object",
+      "description": "Written only by findCompanyPages: outcome of the automatic LinkedIn / Glassdoor page lookup for website_domain (user, found, not_found or error per page). A domain already settled is not searched again.",
+      "properties": {
+        "linkedin": { "type": "string", "enum": ["user", "found", "not_found", "error"] },
+        "glassdoor": { "type": "string", "enum": ["user", "found", "not_found", "error"] },
+        "domain": { "type": "string" },
+        "checked_at": { "type": "string", "format": "date-time" }
+      }
+    },
     "pending_snapshots": {
       "type": "object",
       "description": "Written only by refreshBorrower: Bright Data snapshot_id per signal function that is still building, passed back on the next refresh. Not shown on screens.",

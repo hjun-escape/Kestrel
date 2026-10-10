@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import SourceChip from "@/components/SourceChip";
 import { SOURCES } from "@/lib/signalTypes";
-import { sourceOfSignal } from "@/lib/borrowerUtils";
+import { sourceNote, sourceOfSignal } from "@/lib/borrowerUtils";
 
 const DESCRIPTIONS = {
   News: "Executive departures",
@@ -23,7 +23,7 @@ function useElapsed(startedAt, running) {
 
 // Four sources side by side with their state. While a check runs, a progress
 // bar shows how many sources have answered and how long the check has run.
-export default function SourceStatusRow({ states, recentSignals, running, startedAt }) {
+export default function SourceStatusRow({ borrower, states, recentSignals, running, startedAt }) {
   const answered = SOURCES.filter((s) => states[s] !== "checking").length;
   const elapsed = useElapsed(startedAt, running);
   const pct = Math.round((answered / SOURCES.length) * 100);
@@ -68,6 +68,7 @@ export default function SourceStatusRow({ states, recentSignals, running, starte
             description={DESCRIPTIONS[src]}
             state={states[src]}
             recentCount={recentSignals.filter((s) => sourceOfSignal(s) === src).length}
+            note={sourceNote(borrower, src)?.note}
           />
         ))}
       </ul>

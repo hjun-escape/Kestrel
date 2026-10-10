@@ -18,11 +18,16 @@ export default async function(req: Request): Promise<Response> {
 
     const sr = base44.asServiceRole;
     const deps: ConfirmDeps = {
+      // Ownership comes from the server-side user, never from the action.
+      caller: user,
       createBorrower: (data) => sr.entities.Borrower.create(data),
       getBorrower: (id) => sr.entities.Borrower.get(id).catch(() => null),
+      // Invoked as the signed-in user (not the service role) so refreshBorrower
+      // and analyzeBorrower see who is asking and can apply their own access
+      // checks; a service-role invoke carries no user identity.
       // functions.invoke is not response-intercepted: it resolves to the axios
       // response (body in .data) and throws on non-2xx with error.response.
-      invoke: async (name, payload) => (await sr.functions.invoke(name, payload))?.data,
+      invoke: async (name, payload) => (await base44.functions.invoke(name, payload))?.data,
     };
 
     const result = await executeAction((body as { action?: unknown }).action, deps);

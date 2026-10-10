@@ -1,8 +1,8 @@
 import React from "react";
-import { Check, CircleSlash, Loader2, Minus } from "lucide-react";
+import { Check, CircleSlash, Clock, Loader2, Minus } from "lucide-react";
 
 // One cell in the source-status row (News, Legal, Jobs, Reviews).
-// state: "ok" | "unavailable" | "checking" | "not_checked"
+// state: "ok" | "unavailable" | "collecting" | "checking" | "not_checked"
 const STATES = {
   ok: {
     label: "Checked",
@@ -15,6 +15,12 @@ const STATES = {
     Icon: CircleSlash,
     cell: "bg-ew-none-bg",
     text: "text-ew-muted",
+  },
+  collecting: {
+    label: "Collecting",
+    Icon: Clock,
+    cell: "bg-ew-surface",
+    text: "text-ew-ink-soft",
   },
   checking: {
     label: "Checking",
@@ -34,11 +40,12 @@ const STATES = {
 const DETAIL = {
   ok: (n) => (n === 0 ? "No signals in 90 days" : `${n} signal${n === 1 ? "" : "s"} in 90 days`),
   unavailable: () => "Did not answer on the last check",
+  collecting: () => "Data is still being gathered. Refresh in a minute.",
   checking: () => "Waiting for results",
   not_checked: () => "Runs on first check",
 };
 
-export default function SourceChip({ source, description, state = "not_checked", recentCount = 0 }) {
+export default function SourceChip({ source, description, state = "not_checked", recentCount = 0, note }) {
   const s = STATES[state] || STATES.not_checked;
   const { Icon } = s;
   return (
@@ -52,7 +59,7 @@ export default function SourceChip({ source, description, state = "not_checked",
       </div>
       <span className="text-xs text-ew-muted">{description}</span>
       <span className={`text-xs ${state === "ok" && recentCount > 0 ? "font-medium text-ew-ink-soft" : "text-ew-muted"}`}>
-        {DETAIL[state](recentCount)}
+        {state === "unavailable" && note ? note : DETAIL[state](recentCount)}
       </span>
     </li>
   );

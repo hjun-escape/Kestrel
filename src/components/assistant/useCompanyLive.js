@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { POLL_INTERVAL_MS } from "@/lib/borrowerUtils";
+import { useAuth } from "@/lib/AuthContext";
+import { canSeeCompany, normalizeEmail } from "@/lib/ownership";
 import { asList } from "./assistantData";
 
 async function latest(entity, borrowerId) {
@@ -12,13 +14,16 @@ async function latest(entity, borrowerId) {
   }
 }
 
-async function findByDomain(domain) {
-  const res = await base44.entities.Borrower.filter({ website_domain: domain }, { limit: 1, sort: "-created_date" });
-  return asList(res)[0] || null;
+// Per-user companies (src/lib/ownership.js): only companies the viewer may see.
+async function findByDomain(domain, me) {
+  const query = me ? { website_domain: domain, owner_email: me } : { website_domain: domain };
+  const res = await base44.entities.Borrower.filter(query, { limit: 5, sort: "-created_date" });
+  return asList(res).find((b) => canSeeCompany(b, me)) || null;
 }
 
-async function fetchCompany(id, domain, withExtras) {
-  const borrower = id ? await base44.entities.Borrower.get(id) : domain ? await findByDomain(domain) : null;
+async function fetchCompany(id, domain, withExtras, me) {
+  const found = id ? await base44.entities.Borrower.get(id) : domain ? await findByDomain(domain, me) : null;
+  const borrower = canSeeCompany(found, me) ? found : null;
   if (!borrower) return { borrower: null, signals: [] };
   const sigRes = await base44.entities.Signal.filter({ borrower_id: borrower.id }, { limit: 200, sort: "-date" });
   const out = { borrower, signals: asList(sigRes) };
@@ -34,6 +39,8 @@ async function fetchCompany(id, domain, withExtras) {
 // Loads one company (by id, or by website domain while a new applicant is
 // being created) and polls every POLL_INTERVAL_MS while `poll` is true.
 export function useCompanyLive(companyId, { domain = null, poll = false, extras = false } = {}) {
+  const { email, isAuthenticated } = useAuth();
+  const me = isAuthenticated ? normalizeEmail(email) : "";
   const [state, setState] = useState({ data: null, loading: Boolean(companyId || domain), error: null });
   const reqRef = useRef(0);
 
@@ -44,14 +51,14 @@ export function useCompanyLive(companyId, { domain = null, poll = false, extras 
     }
     const req = ++reqRef.current;
     try {
-      const data = await fetchCompany(companyId, domain, extras);
+      const data = await fetchCompany(companyId, domain, extras, me);
       if (req === reqRef.current) setState({ data, loading: false, error: null });
     } catch {
       if (req === reqRef.current) {
         setState((prev) => ({ ...prev, loading: false, error: "Could not load this company. It will retry shortly." }));
       }
     }
-  }, [companyId, domain, extras]);
+  }, [companyId, domain, extras, me]);
 
   useEffect(() => {
     setState({ data: null, loading: Boolean(companyId || domain), error: null });

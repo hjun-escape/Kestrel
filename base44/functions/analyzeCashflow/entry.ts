@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
+import { canAccessCompany } from './access.ts';
 import { runCashflowAnalysis } from './logic.ts';
 import { parseAllowedHosts } from './fileUrl.ts';
 import { MAX_SANDBOX_FILE_BYTES, createDaytonaRestClient } from './sandbox.ts';
@@ -57,16 +58,19 @@ export default async function(req: Request): Promise<Response> {
     }
 
     const base44 = createClientFromRequest(req);
-    try {
-      await base44.auth.me();
-    } catch {
+    const user = await base44.auth.me().catch(() => null);
+    if (!user) {
       return Response.json({ error: 'Sign in to run a cash-flow check' }, { status: 401 });
     }
     const db = base44.asServiceRole.entities;
+    let borrower;
     try {
-      await db.Borrower.get(borrowerId);
+      borrower = await db.Borrower.get(borrowerId);
     } catch {
       return Response.json({ error: 'Company not found' }, { status: 404 });
+    }
+    if (!canAccessCompany(borrower, user)) {
+      return Response.json({ error: 'You do not have access to this company.' }, { status: 403 });
     }
 
     const core = base44.asServiceRole.integrations.Core;

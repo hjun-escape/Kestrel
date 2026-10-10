@@ -55,6 +55,12 @@ export default function AppHeader({ children }) {
                 {SHORTCUT_LABEL}
               </kbd>
             </NavLink>
+            <Link
+              to="/welcome"
+              className="hidden h-11 items-center border-b-2 border-transparent px-1 text-sm text-white/75 hover:text-white focus-visible:outline-white sm:inline-flex"
+            >
+              About
+            </Link>
           </nav>
         </div>
         <div className="flex items-center gap-3">
