@@ -51,8 +51,8 @@ const SIGNALS = [
 type Scripted = unknown | Error;
 
 function fakeLLM(script: Scripted[]) {
-  const calls: Array<Record<string, unknown>> = [];
-  const fn = async (params: Record<string, unknown>) => {
+  const calls: Array<{ prompt: string; response_json_schema?: object }> = [];
+  const fn = async (params: { prompt: string; response_json_schema?: object }) => {
     calls.push(params);
     if (calls.length > script.length) throw new Error('fake LLM script exhausted');
     const next = script[calls.length - 1];
@@ -435,6 +435,13 @@ describe('runAnalyst', () => {
     assert.equal(result.ok, false);
     if (result.ok) return;
     assert.equal(result.code, 'llm_malformed');
+  });
+
+  test('does not retry the brief call once the time budget is spent', async () => {
+    const llm = fakeLLM([{ action: 'finish' }, '{bad']);
+    const result = await runAnalyst(deps(llm, fakeFetch({}), clock(40_000)));
+    assert.equal(result.ok, false);
+    assert.equal(llm.calls.length, 2);
   });
 
   test('LLM unavailable returns llm_unavailable', async () => {
