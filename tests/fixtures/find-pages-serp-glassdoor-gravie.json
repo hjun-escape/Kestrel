@@ -1,0 +1,9 @@
+{
+  "general": { "search_engine": "google", "query": "\"Gravie\" Glassdoor reviews" },
+  "organic": [
+    { "title": "Gravie Minneapolis reviews | Glassdoor", "link": "https://www.glassdoor.com/Reviews/Gravie-Minneapolis-Reviews-EI_IE1055527.0,6_IL.7,18_IC1142551.htm", "description": "Location-filtered reviews.", "rank": 1 },
+    { "title": "Gravie reviews page 2 | Glassdoor", "link": "https://www.glassdoor.com/Reviews/Gravie-Reviews-E1055527_P2.htm", "description": "Page 2.", "rank": 2 },
+    { "title": "Gravie jobs | Glassdoor", "link": "https://www.glassdoor.com/Jobs/Gravie-Jobs-E1055527.htm", "description": "Jobs.", "rank": 3 },
+    { "title": "Working at Gravie | Glassdoor", "link": "https://www.glassdoor.co.uk/Reviews/Gravie-Reviews-E1055527.htm", "description": "19 Gravie reviews. A free inside look at company reviews.", "rank": 4 }
+  ]
+}
