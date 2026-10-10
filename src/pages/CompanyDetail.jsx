@@ -12,6 +12,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { formatTimeToFlag, timeToFirstFlag } from "@/lib/timeToFlag.ts";
 import AnalystBrief from "@/components/AnalystBrief";
 import CheckTrace from "@/components/CheckTrace";
+import WarningScore from "@/components/WarningScore";
 import {
   POLL_INTERVAL_MS,
   deriveSourceStates,
@@ -149,6 +150,7 @@ export default function CompanyDetail() {
           onRefresh={() => handleRefresh()}
         />
         <SourceStatusRow states={sourceStates} recentSignals={recentSignals} running={running} startedAt={run?.startedAt} />
+        <WarningScore borrower={borrower} signals={signals} />
         <CheckTrace
           run={checkRun}
           refreshing={running}
