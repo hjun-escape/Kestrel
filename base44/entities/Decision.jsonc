@@ -1,0 +1,55 @@
+{
+  "name": "Decision",
+  "type": "object",
+  "properties": {
+    "borrower_id": {
+      "type": "string"
+    },
+    "decision": {
+      "type": "string",
+      "enum": [
+        "request_documents",
+        "decline",
+        "proceed",
+        "watchlist"
+      ]
+    },
+    "note": {
+      "type": "string"
+    },
+    "documents_requested": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "source_url": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "decided_by": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "follow_up_date": {
+      "type": "string",
+      "format": "date"
+    }
+  },
+  "required": [
+    "borrower_id",
+    "decision",
+    "decided_by",
+    "created_at"
+  ]
+}

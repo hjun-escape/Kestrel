@@ -1,0 +1,109 @@
+{
+  "name": "LenderCheck",
+  "type": "object",
+  "properties": {
+    "borrower_id": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "lender_count": {
+      "type": "number"
+    },
+    "lenders": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "kinds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "lien",
+                "lender_lawsuit",
+                "judgment",
+                "new_loan",
+                "mca"
+              ]
+            }
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "quote": {
+                  "type": "string"
+                },
+                "source_url": {
+                  "type": "string"
+                },
+                "source_name": {
+                  "type": "string"
+                },
+                "date": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "late_payment_evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "quote": {
+            "type": "string"
+          },
+          "source_url": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "lender": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "searched": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "tool": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "borrower_id",
+    "created_at",
+    "lender_count",
+    "summary"
+  ]
+}

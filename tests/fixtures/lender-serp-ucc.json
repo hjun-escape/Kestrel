@@ -1,0 +1,19 @@
+{
+  "general": { "search_engine": "google", "query": "\"Acme Widgets\" UCC" },
+  "organic": [
+    {
+      "title": "UCC Financing Statement 2025-001234 - Acme Widgets Inc",
+      "link": "https://opencorporates.example/ucc/acme-widgets-2025-001234",
+      "description": "Debtor: Acme Widgets Inc, Dayton OH. Secured party: First Harbor Bank, N.A. Collateral: all inventory and equipment.",
+      "rank": 1
+    },
+    {
+      "title": "Acme Widgets (Phoenix, AZ) - UCC filings",
+      "link": "https://ucc.example.com/acme-widgets-phoenix",
+      "description": "Secured party: Desert Sun Capital LLC for Acme Widgets of Phoenix, a different company.",
+      "rank": 2
+    },
+    { "title": "", "link": "javascript:alert(1)" },
+    "garbage"
+  ]
+}

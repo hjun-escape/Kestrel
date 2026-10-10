@@ -1,0 +1,11 @@
+{
+  "news": [
+    {
+      "title": "Acme Widgets closes $5 million credit facility with Lakeshore Bank",
+      "link": "https://www.dayton-business.example/news/acme-lakeshore-facility",
+      "source": "Dayton Business Journal",
+      "date": "Jan 12, 2026",
+      "description": "Acme Widgets Inc. said it closed a $5 million revolving credit facility with Lakeshore Bank to refinance existing debt."
+    }
+  ]
+}
