@@ -11,6 +11,7 @@ import {
   buildNewsSearchUrl,
   buildTagPrompt,
   parseNewsDate,
+  dateFromUrl,
   judge,
   parseTag,
   runNewsSignals,
@@ -498,4 +499,22 @@ test('an empty search reply is retried once before the search counts as failed',
   });
   assert.deepEqual(signals, []);
   assert.equal(legalCalls, 2);
+});
+
+describe('dateFromUrl', () => {
+  const cases: Array<[string, string | null]> = [
+    ['https://nypost.com/2026/08/22/business/stone-brewing-layoffs/', '2026-08-22'],
+    ['https://www.sandiegouniontribune.com/2026/08/21/stone-brewing/', '2026-08-21'],
+    ['https://example.com/news/2026/10/10', '2026-10-10'],
+    ['https://example.com/2026/10/11/tomorrow/', null],
+    ['https://example.com/2026/02/30/bad-day/', null],
+    ['https://example.com/2026/08/stone-brewing/', null],
+    ['https://example.com/id/20260822/story', null],
+    ['', null],
+  ];
+  for (const [input, expected] of cases) {
+    test(`${JSON.stringify(input)} -> ${expected}`, () => {
+      assert.equal(dateFromUrl(input, TODAY), expected);
+    });
+  }
 });
