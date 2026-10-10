@@ -1,230 +1,237 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
-import { formatDistanceToNow } from "date-fns";
-import { RefreshCw, ExternalLink } from "lucide-react";
+import { ArrowLeft, ExternalLink } from "lucide-react";
 import { base44 } from "@/api/base44Client";
-import { Button } from "@/components/ui/button";
-import StatusBadge from "@/components/StatusBadge";
-import SourceChip from "@/components/SourceChip";
+import AppHeader from "@/components/AppHeader";
+import CompanyHeader from "@/components/CompanyHeader";
+import SourceStatusRow from "@/components/SourceStatusRow";
 import SignalTimeline from "@/components/SignalTimeline";
-import { SOURCES } from "@/lib/signalTypes";
-import { filterRecentSignals, formatRelative } from "@/lib/borrowerUtils";
+import DecisionBar from "@/components/DecisionBar";
+import {
+  POLL_INTERVAL_MS,
+  deriveSourceStates,
+  filterRecentSignals,
+  getActiveRefresh,
+  isAtRisk,
+  startRefresh,
+} from "@/lib/borrowerUtils";
+
+async function fetchCompany(id) {
+  const [borrower, sigRes] = await Promise.all([
+    base44.entities.Borrower.get(id),
+    base44.entities.Signal.filter({ borrower_id: id }, { limit: 200, sort: "-date" }),
+  ]);
+  return { borrower, signals: sigRes.items || [] };
+}
 
 export default function CompanyDetail() {
   const { id } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
-  const autoScreened = useRef(false);
+  const idRef = useRef(id);
   const [borrower, setBorrower] = useState(null);
   const [signals, setSignals] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [refreshError, setRefreshError] = useState(null);
   const [notFound, setNotFound] = useState(false);
+  const [run, setRun] = useState(null);
+  const [refreshError, setRefreshError] = useState(null);
 
   async function loadData() {
-    try {
-      const b = await base44.entities.Borrower.get(id);
-      setBorrower(b);
-      const { items } = await base44.entities.Signal.filter(
-        { borrower_id: id },
-        { limit: 200, sort: "-date" }
-      );
-      setSignals(items);
-    } catch (e) {
-      setNotFound(true);
-    } finally {
-      setLoading(false);
-    }
+    const requestedId = id;
+    const data = await fetchCompany(requestedId);
+    if (idRef.current !== requestedId) return null;
+    setBorrower(data.borrower);
+    setSignals(data.signals);
+    return data;
+  }
+
+  // Follow a refresh run (started here or by the "Screen new applicant" dialog).
+  function attach(activeRun) {
+    setRun(activeRun);
+    setRefreshError(null);
+    activeRun.promise.then(async (result) => {
+      if (idRef.current !== activeRun.borrowerId) return;
+      if (!result.ok) setRefreshError(result.error);
+      try {
+        await loadData();
+      } catch {
+        // keep what is on screen; the next refresh will reload
+      }
+      if (idRef.current === activeRun.borrowerId) setRun(null);
+    });
+  }
+
+  function handleRefresh(current = { borrower, signals }) {
+    const activeRun = startRefresh(id, {
+      unavailableBefore: current.borrower?.sources_unavailable || [],
+      signalIdsBefore: (current.signals || []).map((s) => s.id),
+    });
+    attach(activeRun);
   }
 
   useEffect(() => {
+    idRef.current = id;
     setLoading(true);
     setNotFound(false);
     setBorrower(null);
     setSignals([]);
-    loadData();
+    setRun(null);
+    setRefreshError(null);
+    (async () => {
+      let data = null;
+      try {
+        data = await loadData();
+      } catch {
+        if (idRef.current === id) setNotFound(true);
+      } finally {
+        if (idRef.current === id) setLoading(false);
+      }
+      if (!data) return;
+      document.title = `${data.borrower.name} | Early Warning`;
+      const active = getActiveRefresh(id);
+      if (active) attach(active);
+      else if (searchParams.get("checking") === "1" && !data.borrower.last_refreshed) handleRefresh(data);
+      if (searchParams.has("checking")) setSearchParams({}, { replace: true });
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  // Coming from "Screen new applicant": run the first check once.
+  // refreshBorrower saves after each source, so poll while it runs and the
+  // source row and timeline fill in as sources answer.
   useEffect(() => {
-    if (searchParams.get("screen") === "1" && !autoScreened.current) {
-      autoScreened.current = true;
-      setSearchParams({}, { replace: true });
-      handleRefresh();
-    }
-  }, [searchParams]);
-
-  // refreshBorrower saves after each source, so reload while it runs and the
-  // timeline fills in as sources answer.
-  useEffect(() => {
-    if (!refreshing) return;
-    const timer = setInterval(loadData, 3000);
+    if (!run) return undefined;
+    const timer = setInterval(() => {
+      loadData().catch(() => {});
+    }, POLL_INTERVAL_MS);
     return () => clearInterval(timer);
-  }, [refreshing, id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [run, id]);
 
-  async function handleRefresh() {
-    setRefreshing(true);
-    setRefreshError(null);
-    try {
-      await base44.functions.invoke("refreshBorrower", { borrower_id: id });
-    } catch (e) {
-      setRefreshError(e?.response?.data?.error || "Refresh failed. Please try again.");
-    } finally {
-      await loadData();
-      setRefreshing(false);
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-white">
-        <div className="mx-auto max-w-6xl px-6 py-10">
-          <p className="text-sm text-gray-500">Loading…</p>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <DetailShell><DetailSkeleton /></DetailShell>;
 
   if (notFound || !borrower) {
     return (
-      <div className="min-h-screen bg-white">
-        <header className="border-b border-gray-200">
-          <div className="mx-auto max-w-6xl px-6 py-3">
-            <Link to="/" className="text-sm font-semibold tracking-tight text-gray-900">
-              Early Warning
-            </Link>
-          </div>
-        </header>
-        <div className="mx-auto max-w-6xl px-6 py-10">
-          <p className="text-sm text-gray-500">Company not found.</p>
-          <Link to="/" className="mt-2 inline-block text-sm text-gray-700 underline">
+      <DetailShell>
+        <div className="border border-ew-rule bg-ew-surface px-6 py-10">
+          <p className="font-heading text-lg font-semibold text-ew-ink">Company not found</p>
+          <p className="mt-1 text-sm text-ew-muted">It may have been removed from the loan book.</p>
+          <Link to="/" className="mt-3 inline-block rounded-sm text-sm font-medium text-ew-ink underline underline-offset-2">
             Back to loan book
           </Link>
         </div>
-      </div>
+      </DetailShell>
     );
   }
 
+  const running = !!run;
+  const sourceStates = deriveSourceStates(borrower, signals, run);
   const recentSignals = filterRecentSignals(signals);
-  const meta = [
-    borrower.hq_city && borrower.hq_state
-      ? `${borrower.hq_city}, ${borrower.hq_state}`
-      : borrower.hq_city || borrower.hq_state || "",
-    borrower.industry,
-    borrower.website_domain,
-  ].filter(Boolean).join(" · ");
+  const olderCount = signals.length - recentSignals.length;
+  const newIds = run ? new Set(signals.map((s) => s.id).filter((sid) => !run.snapshot.signalIdsBefore.includes(sid))) : null;
+  const showDecision = borrower.stage === "applicant" && isAtRisk(borrower);
 
   return (
-    <div className="min-h-screen bg-white">
-      <header className="border-b border-gray-200">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
-          <Link to="/" className="text-sm font-semibold tracking-tight text-gray-900">
-            Early Warning
-          </Link>
-          <Link to="/" className="text-xs text-gray-500 hover:text-gray-800">
-            ← Loan book
-          </Link>
-        </div>
-      </header>
+    <DetailShell>
+      <div className="border border-ew-rule bg-ew-surface">
+        <CompanyHeader
+          borrower={borrower}
+          sourceStates={sourceStates}
+          running={running}
+          refreshError={refreshError}
+          onRefresh={() => handleRefresh()}
+        />
+        <SourceStatusRow states={sourceStates} recentSignals={recentSignals} running={running} />
+      </div>
 
-      <main className="mx-auto max-w-6xl px-6 py-8">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-6">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-2xl font-semibold text-gray-900">{borrower.name}</h1>
-              <span className="rounded border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs font-medium capitalize text-gray-600">
-                {borrower.stage}
-              </span>
-              <StatusBadge
-                status={borrower.status}
-                lastRefreshed={borrower.last_refreshed}
-              />
-            </div>
-            {borrower.why && (
-              <p className="mt-2 max-w-2xl text-sm text-gray-600">{borrower.why}</p>
-            )}
-            {meta && <p className="mt-1.5 text-xs text-gray-500">{meta}</p>}
-            <p className="mt-1.5 text-xs text-gray-500">
-              Last refreshed:{" "}
-              {borrower.last_refreshed ? (
-                <span title={formatRelative(borrower.last_refreshed)}>
-                  {formatDistanceToNow(new Date(borrower.last_refreshed), {
-                    addSuffix: true,
-                  })}
-                </span>
-              ) : (
-                "Not checked yet"
-              )}
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_380px]">
+        <section aria-labelledby="evidence-heading" className="min-w-0">
+          <div className="mb-3 flex items-baseline justify-between gap-4">
+            <h2 id="evidence-heading" className="font-heading text-xl font-bold tracking-tight text-ew-ink">
+              Evidence
+            </h2>
+            <p className="font-mono text-xs text-ew-muted">
+              {recentSignals.length} in last 90 days{olderCount > 0 ? `, ${olderCount} older` : ""}
             </p>
-            {(borrower.linkedin_url || borrower.glassdoor_url) && (
-              <div className="mt-2 flex gap-4">
-                {borrower.linkedin_url && (
-                  <a
-                    href={borrower.linkedin_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800"
-                  >
-                    LinkedIn <ExternalLink className="h-3 w-3" />
-                  </a>
-                )}
-                {borrower.glassdoor_url && (
-                  <a
-                    href={borrower.glassdoor_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800"
-                  >
-                    Glassdoor <ExternalLink className="h-3 w-3" />
-                  </a>
-                )}
-              </div>
-            )}
           </div>
-
-          <div className="flex shrink-0 flex-col items-end gap-2">
-            <Button onClick={handleRefresh} disabled={refreshing}>
-              <RefreshCw
-                className={`mr-1.5 h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
-              />
-              {refreshing ? "Refreshing…" : "Refresh"}
-            </Button>
-            {refreshError && (
-              <p className="text-xs text-red-600">{refreshError}</p>
-            )}
-          </div>
-        </div>
-
-        {/* Sources checked */}
-        <div className="mt-8">
-          <h2 className="mb-3 text-xs font-medium uppercase tracking-wide text-gray-500">
-            Sources checked
-          </h2>
-          <div className="flex flex-wrap gap-2">
-            {SOURCES.map((src) => (
-              <SourceChip
-                key={src}
-                source={src}
-                lastRefreshed={borrower.last_refreshed}
-                sourcesUnavailable={borrower.sources_unavailable}
-                checking={refreshing}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* Signal timeline */}
-        <div className="mt-8">
-          <h2 className="mb-4 text-xs font-medium uppercase tracking-wide text-gray-500">
-            Signals
-          </h2>
           <SignalTimeline
-            signals={recentSignals}
+            signals={signals}
             neverRefreshed={!borrower.last_refreshed}
+            checking={running}
+            newIds={newIds}
           />
-        </div>
+        </section>
+
+        <aside aria-label="Analysis and decision" className="flex min-w-0 flex-col gap-4">
+          {showDecision && <DecisionBar key={borrower.id} companyName={borrower.name} />}
+          {/* ANALYST_BRIEF_SLOT */}
+          <CompanyLinks borrower={borrower} />
+        </aside>
+      </div>
+    </DetailShell>
+  );
+}
+
+function DetailShell({ children }) {
+  return (
+    <div className="min-h-screen bg-ew-paper text-ew-ink">
+      <AppHeader />
+      <main className="mx-auto max-w-[1360px] px-6 pb-16 pt-4">
+        <nav aria-label="Breadcrumb" className="mb-3">
+          <Link
+            to="/"
+            className="inline-flex items-center gap-1 rounded-sm text-sm text-ew-muted hover:text-ew-ink"
+          >
+            <ArrowLeft aria-hidden="true" className="h-3.5 w-3.5" />
+            Loan book
+          </Link>
+        </nav>
+        {children}
       </main>
+    </div>
+  );
+}
+
+function CompanyLinks({ borrower }) {
+  const links = [
+    { label: "Website", href: borrower.website_domain ? `https://${borrower.website_domain}` : null },
+    { label: "LinkedIn", href: borrower.linkedin_url },
+    { label: "Glassdoor", href: borrower.glassdoor_url },
+  ].filter((l) => l.href && /^https?:\/\//.test(l.href));
+  if (links.length === 0) return null;
+  return (
+    <section aria-labelledby="links-heading" className="border border-ew-rule bg-ew-surface px-4 py-3">
+      <h2 id="links-heading" className="text-xs font-semibold text-ew-muted">
+        Company profiles
+      </h2>
+      <ul className="mt-2 flex flex-wrap gap-2">
+        {links.map((l) => (
+          <li key={l.label}>
+            <a
+              href={l.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`${l.label} (opens in a new tab)`}
+              className="inline-flex items-center gap-1.5 rounded-sm border border-ew-rule px-2 py-1 text-xs font-medium text-ew-ink hover:border-ew-ink-soft hover:bg-ew-hover"
+            >
+              {l.label}
+              <ExternalLink aria-hidden="true" className="h-3 w-3" />
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function DetailSkeleton() {
+  return (
+    <div className="border border-ew-rule bg-ew-surface p-5" aria-busy="true" aria-label="Loading company">
+      <div className="h-7 w-1/3 animate-pulse rounded-sm bg-ew-rule-soft" />
+      <div className="mt-4 h-4 w-2/3 animate-pulse rounded-sm bg-ew-rule-soft" />
+      <div className="mt-6 grid grid-cols-6 gap-6">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="h-8 animate-pulse rounded-sm bg-ew-rule-soft" />
+        ))}
+      </div>
     </div>
   );
 }
