@@ -4,12 +4,16 @@ import React from "react";
 // "Checked" if last_refreshed is set and the source isn't in sources_unavailable.
 // "Unavailable" if it is in sources_unavailable.
 // "Not checked yet" if last_refreshed is empty.
-export default function SourceChip({ source, lastRefreshed, sourcesUnavailable }) {
+// "Checking…" while a refresh is running.
+export default function SourceChip({ source, lastRefreshed, sourcesUnavailable, checking }) {
   const unavailable = (sourcesUnavailable || []).includes(source);
 
   let state;
   let stateClass;
-  if (!lastRefreshed) {
+  if (checking) {
+    state = "Checking…";
+    stateClass = "border-gray-200 bg-white text-gray-500";
+  } else if (!lastRefreshed) {
     state = "Not checked yet";
     stateClass = "border-gray-200 bg-gray-50 text-gray-400";
   } else if (unavailable) {
