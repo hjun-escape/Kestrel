@@ -11,6 +11,7 @@ import CashflowReview from "@/components/CashflowReview";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { formatTimeToFlag, timeToFirstFlag } from "@/lib/timeToFlag.ts";
 import AnalystBrief from "@/components/AnalystBrief";
+import CheckTrace from "@/components/CheckTrace";
 import {
   POLL_INTERVAL_MS,
   deriveSourceStates,
@@ -20,11 +21,13 @@ import {
 } from "@/lib/borrowerUtils";
 
 async function fetchCompany(id) {
-  const [borrower, sigRes] = await Promise.all([
+  const [borrower, sigRes, runRes] = await Promise.all([
     base44.entities.Borrower.get(id),
     base44.entities.Signal.filter({ borrower_id: id }, { limit: 200, sort: "-date" }),
+    // Latest news check, for "How News and Legal were checked". Optional: never blocks the page.
+    base44.entities.CheckRun.filter({ borrower_id: id }, { limit: 1, sort: "-started_at" }).catch(() => null),
   ]);
-  return { borrower, signals: sigRes.items || [] };
+  return { borrower, signals: sigRes.items || [], checkRun: runRes?.items?.[0] || null };
 }
 
 export default function CompanyDetail() {
@@ -38,6 +41,7 @@ export default function CompanyDetail() {
   const [run, setRun] = useState(null);
   const [refreshError, setRefreshError] = useState(null);
   const [cashflowReview, setCashflowReview] = useState(null);
+  const [checkRun, setCheckRun] = useState(null);
 
   async function loadData() {
     const requestedId = id;
@@ -45,6 +49,7 @@ export default function CompanyDetail() {
     if (idRef.current !== requestedId) return null;
     setBorrower(data.borrower);
     setSignals(data.signals);
+    setCheckRun(data.checkRun);
     return data;
   }
 
@@ -144,6 +149,12 @@ export default function CompanyDetail() {
           onRefresh={() => handleRefresh()}
         />
         <SourceStatusRow states={sourceStates} recentSignals={recentSignals} running={running} startedAt={run?.startedAt} />
+        <CheckTrace
+          run={checkRun}
+          refreshing={running}
+          // A run saved before this refresh started belongs to the previous check.
+          stale={!!run && !!checkRun && Date.parse(checkRun.started_at) < run.startedAt - 5000}
+        />
         {flagLine && (
           <p className="border-t border-ew-rule-soft px-5 py-2 font-mono text-xs text-ew-ink-soft">{flagLine}</p>
         )}
