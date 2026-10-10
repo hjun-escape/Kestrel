@@ -230,8 +230,19 @@ const SOURCE_FUNCTION = { News: "newsSignals", Legal: "newsSignals", Jobs: "hiri
 // resumes (refreshBorrower keeps its id in pending_snapshots).
 export function sourceNote(borrower, src) {
   if (borrower?.pending_snapshots?.[SOURCE_FUNCTION[src]]) return { collecting: true };
-  if (src === "Jobs" && !borrower?.linkedin_url) return { note: "Needs the company's LinkedIn page" };
-  if (src === "Reviews" && !borrower?.glassdoor_url) return { note: "Needs the company's Glassdoor page" };
+  // profile_search is written by findCompanyPages, the automatic page lookup.
+  const lookup = borrower?.profile_search || {};
+  const domain = lookup.domain || borrower?.website_domain;
+  if (src === "Jobs" && !borrower?.linkedin_url) {
+    if (lookup.linkedin === "not_found") return { note: `No LinkedIn page found that lists ${domain}` };
+    if (lookup.linkedin === "error") return { note: "LinkedIn page lookup failed. Refresh to try again." };
+    return { note: "Needs the company's LinkedIn page" };
+  }
+  if (src === "Reviews" && !borrower?.glassdoor_url) {
+    if (lookup.glassdoor === "not_found") return { note: "No Glassdoor page could be confirmed for this company" };
+    if (lookup.glassdoor === "error") return { note: "Glassdoor page lookup failed. Refresh to try again." };
+    return { note: "Needs the company's Glassdoor page" };
+  }
   return null;
 }
 

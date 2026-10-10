@@ -256,6 +256,11 @@ function CompanyLinks({ borrower }) {
     { label: "Glassdoor", href: borrower.glassdoor_url },
   ].filter((l) => l.href && /^https?:\/\//.test(l.href));
   if (links.length === 0) return null;
+  const lookup = borrower.profile_search || {};
+  const autoFound = [
+    lookup.linkedin === "found" && borrower.linkedin_url ? "LinkedIn" : null,
+    lookup.glassdoor === "found" && borrower.glassdoor_url ? "Glassdoor" : null,
+  ].filter(Boolean);
   return (
     <section aria-labelledby="links-heading" className="border border-ew-rule bg-ew-surface px-4 py-3">
       <h2 id="links-heading" className="text-xs font-semibold text-ew-muted">
@@ -277,6 +282,11 @@ function CompanyLinks({ borrower }) {
           </li>
         ))}
       </ul>
+      {autoFound.length > 0 && (
+        <p className="mt-2 text-xs text-ew-muted">
+          {autoFound.join(" and ")} found automatically: the LinkedIn page lists {borrower.website_domain}.
+        </p>
+      )}
     </section>
   );
 }

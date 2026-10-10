@@ -47,6 +47,7 @@ Borrower:
 - last_refreshed: ISO timestamp, empty until the first refresh that actually checked something
 - sources_unavailable: list of strings, only these values: News | Legal | Jobs | Reviews
 - pending_snapshots: internal, written only by refreshBorrower. Bright Data snapshot_id per signal function that is still building.
+- profile_search: internal, written only by findCompanyPages. Outcome of the automatic LinkedIn / Glassdoor page lookup for website_domain (user | found | not_found | error per page).
 - owner_email: email of the signed-in user who added the company (set on create, never from client input in backend functions). Empty = the shared demo book, which only signed-out visitors (Sense testers) see; signed-in users see and can use only their own companies, and backend functions enforce this (`access.ts` in each function folder).
 
 Signal:
@@ -86,7 +87,7 @@ Build the "why" line from the rules, e.g. "Red: CFO departure (Sep 12) + Job pos
 
 ## Refresh flow
 refreshBorrower(borrower_id):
-1. Runs the signal functions that are switched on: newsSignals (P2; exec_departure + legal_layoffs), hiringSignal and reviewSignals (P3).
+1. Runs the signal functions that are switched on: newsSignals (P2; exec_departure + legal_layoffs), hiringSignal and reviewSignals (P3). If linkedin_url or glassdoor_url is missing, findCompanyPages first looks the page up (in parallel with News) and saves it only when the LinkedIn page lists the company's website domain; it never replaces a URL someone entered.
 2. Skips any source that fails or is switched off, and adds its name to sources_unavailable (exec_departure → News, legal_layoffs → Legal, hiring_drop → Jobs, review_distress → Reviews).
 3. For each source that answers, replaces that source's Signals, saving after each one so the screen fills in. A failed source keeps its previous Signals, and its chip shows "Unavailable".
 4. Deletes placeholder seed signals (snippet starts with "[placeholder]") and exact duplicates, calls scoreBorrower (P3), and saves status, why and last_refreshed. If no source answered, or scoring fails, it keeps status, why and last_refreshed as they were and returns an error.

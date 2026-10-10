@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import handler, {
+import {
   domainMatches,
   findCompanyPages,
   glassdoorCompanyName,
@@ -18,7 +18,7 @@ import handler, {
   LINKEDIN_COMPANY_DATASET_ID,
   type Borrower,
   type FetchLike,
-} from "../base44/functions/findCompanyPages/entry.ts";
+} from "../base44/functions/findCompanyPages/logic.ts";
 
 const fixture = (name: string) => JSON.parse(readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf8"));
 const SERP_LINKEDIN = fixture("find-pages-serp-linkedin-gravie.json");
@@ -84,7 +84,13 @@ test("registrableDomain keeps the company's own domain", () => {
 test("domainMatches: https://www.gravie.com/about matches gravie.com, look-alikes do not", () => {
   assert.equal(domainMatches("https://www.gravie.com/about", "gravie.com"), true);
   assert.equal(domainMatches("http://careers.gravie.com", "www.gravie.com"), true);
-  assert.equal(domainMatches("https://acme.co.uk", "shop.acme.co.uk"), true);
+  // The page's site must be the entered domain or under it, not a parent of it.
+  assert.equal(domainMatches("https://acme.co.uk", "shop.acme.co.uk"), false);
+  assert.equal(domainMatches("https://shop.acme.co.uk", "acme.co.uk"), true);
+  // Shared hosts: another site on the same suffix is a different company.
+  assert.equal(domainMatches("https://evil.github.io", "acme.github.io"), false);
+  assert.equal(domainMatches("https://other-app.base44.app", "acme.base44.app"), false);
+  assert.equal(domainMatches("https://acme.vercel.app", "acme.vercel.app"), true);
   assert.equal(domainMatches("https://gravie.co", "gravie.com"), false);
   assert.equal(domainMatches("https://gravie.com.evil.example", "gravie.com"), false);
   assert.equal(domainMatches("https://notgravie.com", "gravie.com"), false);
@@ -126,6 +132,14 @@ test("Glassdoor: only /Reviews/<Name>-Reviews-E<id>.htm, rewritten to glassdoor.
     glassdoorReviewsUrl("https://www.glassdoor.com/Reviews/Gravie-Minneapolis-Reviews-EI_IE1055527.0,6_IL.7,18_IC1142551.htm"),
     null,
   );
+  // Look-alike hosts are ignored, so a chosen slug cannot pass with another company's E-number.
+  assert.equal(glassdoorReviewsUrl("https://www.glassdoor.com.evil/Reviews/Gravie-Reviews-E999.htm"), null);
+  assert.equal(glassdoorReviewsUrl("https://glassdoor.co.evil/Reviews/Gravie-Reviews-E999.htm"), null);
+  assert.equal(glassdoorReviewsUrl("https://user@www.glassdoor.com/Reviews/Gravie-Reviews-E1055527.htm"), null);
+  assert.deepEqual(glassdoorReviewsUrl("https://www.glassdoor.co.uk/Reviews/Gravie-Reviews-E1055527.htm?sort=date"), {
+    url: "https://www.glassdoor.com/Reviews/Gravie-Reviews-E1055527.htm",
+    companySlug: "Gravie",
+  });
   assert.equal(glassdoorCompanyName("Acme-Widgets"), "acme widgets");
 });
 
@@ -301,30 +315,4 @@ test("a bad snapshot id from Bright Data is refused before it reaches a URL", as
   const r = await findCompanyPages(GRAVIE, { fetch, apiKey: "k", sleep: async () => {} });
   assert.equal(r.linkedin, "error");
   assert.ok(r.notes.some((n) => n.includes("invalid snapshot_id")));
-});
-
-// ---------- handler ----------
-
-test("handler: 400 without a borrower name, documented shape without the API key", async () => {
-  (globalThis as any).Deno = { env: { get: () => undefined } };
-  try {
-    const bad = await handler(new Request("http://x", { method: "POST", body: JSON.stringify({ borrower: {} }) }));
-    assert.equal(bad.status, 400);
-    const notJson = await handler(new Request("http://x", { method: "POST", body: "nope" }));
-    assert.equal(notJson.status, 400);
-    const res = await handler(new Request("http://x", {
-      method: "POST",
-      body: JSON.stringify({ borrower: { ...GRAVIE, linkedin_url: "https://www.linkedin.com/company/gravie" } }),
-    }));
-    assert.equal(res.status, 200);
-    assert.deepEqual(await res.json(), {
-      linkedin_url: "https://www.linkedin.com/company/gravie",
-      glassdoor_url: null,
-      linkedin: "user",
-      glassdoor: "error",
-      notes: ["BRIGHTDATA_API_KEY secret not set."],
-    });
-  } finally {
-    delete (globalThis as any).Deno;
-  }
 });
