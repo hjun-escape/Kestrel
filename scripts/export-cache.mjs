@@ -4,8 +4,9 @@
 //
 // Run: node scripts/export-cache.mjs [--include-samples]
 //
-// Reads the published app's public API the way a signed-out visitor does, so
-// it needs no keys and only sees the shared demo book. Sample companies (made-up
+// Reads the published app's public API, so it needs no keys. Only the shared
+// demo book is exported (companies with no owner_email, the ones signed-out
+// visitors see); teammates' own books are left out. Sample companies (made-up
 // data on the .example domain) are skipped unless --include-samples is given.
 // Internal fields (owner, pending Bright Data snapshot ids, audit fields) are
 // left out. Re-run it just before submitting so the files match the live app.
@@ -35,6 +36,7 @@ const isSample = (b) => /\.example$/i.test(String(b.website_domain || "").trim()
 
 const [borrowers, signals] = await Promise.all([list("Borrower"), list("Signal")]);
 const companies = borrowers
+  .filter((b) => !b.owner_email)
   .filter((b) => includeSamples || !isSample(b))
   .sort((a, b) => a.name.localeCompare(b.name));
 
