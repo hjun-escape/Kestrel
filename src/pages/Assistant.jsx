@@ -1,9 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MessagesSquare, PanelRight, X } from "lucide-react";
+import { MessagesSquare, MoreHorizontal, PanelRight, Trash2, X } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { useAuth } from "@/lib/AuthContext";
 import AppHeader from "@/components/AppHeader";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import DeleteChatDialog from "@/components/assistant/DeleteChatDialog";
+import { canDeleteConversation, normalizeEmail } from "@/lib/ownership";
 import { AssistantPageProvider, useAssistantPage } from "@/components/assistant/AssistantContext";
 import AssistantThread, { COMPOSER_ID } from "@/components/assistant/AssistantThread";
 import ConversationRuntime from "@/components/assistant/ConversationRuntime";
@@ -17,6 +20,9 @@ const MAX_CONVERSATIONS = 50;
 let newChatCounter = 0;
 const freshSession = () => ({ key: `new-${++newChatCounter}`, id: null, initial: [] });
 
+// Chats are per user: loaded with created_by = the signed-in email (and the
+// Conversation entity's RLS enforces the same on the server). Signed out,
+// nothing is loaded or saved.
 function useConversations(email) {
   const [conversations, setConversations] = useState(null);
   const [loadError, setLoadError] = useState(null);
@@ -24,9 +30,14 @@ function useConversations(email) {
 
   useEffect(() => {
     let active = true;
-    const query = email ? { created_by: email } : {};
-    base44.entities.Conversation.filter(query, { limit: MAX_CONVERSATIONS, sort: "-updated_date" })
-      .then((res) => active && setConversations(asList(res)))
+    setLoadError(null);
+    if (!email) {
+      setConversations([]);
+      return undefined;
+    }
+    setConversations(null);
+    base44.entities.Conversation.filter({ created_by: email }, { limit: MAX_CONVERSATIONS, sort: "-updated_date" })
+      .then((res) => active && setConversations(asList(res).filter((c) => canDeleteConversation(c, email))))
       .catch(() => {
         if (!active) return;
         setConversations([]);
@@ -39,6 +50,7 @@ function useConversations(email) {
 
   // Returns the saved id; never throws (a failed save is shown, not fatal).
   const save = useCallback(async (id, record) => {
+    if (!email) return null;
     try {
       if (id) {
         await base44.entities.Conversation.update(id, record);
@@ -58,9 +70,21 @@ function useConversations(email) {
       setSaveError("This chat could not be saved. Answers still work; it will retry after the next reply.");
       return id;
     }
-  }, []);
+  }, [email]);
 
-  return { conversations, loadError, saveError, save };
+  // Resolves to an error message, or null once the chat is gone.
+  const remove = useCallback(async (conversation) => {
+    if (!canDeleteConversation(conversation, email)) return "You can only delete your own chats.";
+    try {
+      await base44.entities.Conversation.delete(conversation.id);
+    } catch {
+      return "This chat could not be deleted. Try again.";
+    }
+    setConversations((prev) => (prev || []).filter((c) => c.id !== conversation.id));
+    return null;
+  }, [email]);
+
+  return { conversations, loadError, saveError, save, remove };
 }
 
 function DrawerButton({ onClick, label, Icon, className }) {
@@ -77,10 +101,12 @@ function DrawerButton({ onClick, label, Icon, className }) {
 }
 
 function Workspace() {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
+  const email = isAuthenticated ? normalizeEmail(user?.email) : "";
   const page = useAssistantPage();
   const { companies, byId, pinnedId, setPinned, setMentionedId, live } = page;
-  const { conversations, loadError, saveError, save } = useConversations(user?.email || null);
+  const { conversations, loadError, saveError, save, remove } = useConversations(isAuthenticated ? user?.email || null : null);
+  const [pendingDelete, setPendingDelete] = useState(null);
   const [session, setSession] = useState(freshSession);
   const [chatsOpen, setChatsOpen] = useState(false);
   const [contextOpen, setContextOpen] = useState(false);
@@ -131,6 +157,16 @@ function Workspace() {
     setChatsOpen(false);
   }
 
+  const canDelete = (c) => canDeleteConversation(c, email);
+
+  async function confirmDelete(conversation) {
+    const problem = await remove(conversation);
+    if (problem) return problem;
+    if (conversation.id === session.id) newChat();
+    setPendingDelete(null);
+    return null;
+  }
+
   const active = (conversations || []).find((c) => c.id === session.id);
   const pinned = pinnedId ? byId[pinnedId] : null;
   const sidebar = (
@@ -141,6 +177,9 @@ function Workspace() {
         loadError={loadError}
         onSelect={openConversation}
         onNew={newChat}
+        onDelete={setPendingDelete}
+        canDelete={canDelete}
+        signedIn={!!email}
       />
       <PortfolioList />
     </>
@@ -174,6 +213,22 @@ function Workspace() {
             </span>
           )}
           <DrawerButton onClick={() => setContextOpen(true)} label="Company" Icon={PanelRight} className="xl:hidden" />
+          {active && canDelete(active) && (
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                aria-label="Chat options"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-sm border border-transparent text-ew-ink-soft hover:border-ew-rule hover:text-ew-ink"
+              >
+                <MoreHorizontal aria-hidden="true" className="h-4 w-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="rounded-sm">
+                <DropdownMenuItem onSelect={() => setPendingDelete(active)} className="text-ew-red focus:text-ew-red">
+                  <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
+                  Delete chat
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
         {saveError && (
           <p role="status" className="border-b border-ew-amber-rule bg-ew-amber-bg px-4 py-1.5 text-xs text-ew-amber">
@@ -197,6 +252,12 @@ function Workspace() {
       <aside aria-label="Company context" className="hidden min-h-0 overflow-y-auto border-l border-ew-rule bg-ew-surface xl:block">
         <ContextPanel />
       </aside>
+
+      <DeleteChatDialog
+        conversation={pendingDelete}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={confirmDelete}
+      />
 
       <Sheet open={chatsOpen} onOpenChange={setChatsOpen}>
         <SheetContent side="left" className="flex w-[300px] flex-col gap-0 bg-ew-paper p-0">

@@ -11,6 +11,12 @@ export function reasonText(why) {
   return text ? text.charAt(0).toUpperCase() + text.slice(1) : "";
 }
 
+// Seeded sample companies use the reserved .example domain (src/lib/seedData.js).
+// refreshBorrower refuses to check them live; screens tag them "Sample".
+export function isSampleCompany(borrower) {
+  return /\.example$/i.test(String(borrower?.website_domain || "").trim());
+}
+
 export function parseSignalDate(dateStr) {
   return parseISO(dateStr);
 }

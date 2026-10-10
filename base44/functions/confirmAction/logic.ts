@@ -7,6 +7,13 @@
 // This file intentionally does not import from askPortfolio, so each function
 // deploys on its own; tests check that every action askPortfolio proposes is
 // accepted here.
+//
+// Ownership (access.ts): a screened company is owned by the signed-in caller
+// (deps.caller, from auth.me() on the server, never from the action), and
+// refresh / deep_check only run on companies the caller may access.
+
+import { canAccessCompany, ownerEmailFor } from './access.ts';
+import type { Caller } from './access.ts';
 
 export type ActionKind = 'screen' | 'refresh' | 'deep_check';
 
@@ -18,6 +25,8 @@ export interface ValidAction {
 export type Validation = { ok: true; action: ValidAction } | { ok: false; error: string };
 
 export interface ConfirmDeps {
+  // The signed-in user (from auth.me() in entry.ts); null or missing = shared only.
+  caller?: Caller | null;
   createBorrower(data: Record<string, unknown>): Promise<{ id: string } & Record<string, unknown>>;
   getBorrower(id: string): Promise<({ id: string; name?: string } & Record<string, unknown>) | null>;
   // Invokes a backend function and returns its JSON body; throws on non-2xx
@@ -124,8 +133,10 @@ function upstreamFailure(error: unknown): ConfirmResult {
 }
 
 async function screen(params: Record<string, string | number>, deps: ConfirmDeps): Promise<ConfirmResult> {
+  const owner = ownerEmailFor(deps.caller);
   const borrower = await deps.createBorrower({
     ...params,
+    ...(owner ? { owner_email: owner } : {}),
     stage: 'applicant',
     status: 'green',
     why: '',
@@ -153,6 +164,9 @@ export async function executeAction(raw: unknown, deps: ConfirmDeps): Promise<Co
   const id = params.id as string;
   const borrower = await deps.getBorrower(id);
   if (!borrower) return { status: 404, body: { error: `company ${id} not found` } };
+  if (!canAccessCompany(borrower, deps.caller)) {
+    return { status: 403, body: { error: 'You do not have access to this company.' } };
+  }
 
   if (kind === 'refresh') {
     try {

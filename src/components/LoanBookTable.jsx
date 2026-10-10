@@ -4,7 +4,7 @@ import { format, formatDistanceToNowStrict } from "date-fns";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import StatusBadge, { STATUS_STYLES } from "@/components/StatusBadge";
 import { SIGNAL_TYPES } from "@/lib/signalTypes";
-import { formatRelative, formatUsd, parseSignalDate, reasonText, statusKey } from "@/lib/borrowerUtils";
+import { formatRelative, formatUsd, isSampleCompany, parseSignalDate, reasonText, statusKey } from "@/lib/borrowerUtils";
 
 const COLUMNS = [
   { key: "status", label: "Status", className: "w-[120px]" },
@@ -117,7 +117,14 @@ function BookRow({ borrower: b, topSignal, onOpen }) {
         >
           {b.name}
         </Link>
-        <div className="truncate text-xs text-ew-muted">{b.website_domain}</div>
+        <div className="flex min-w-0 items-center gap-1.5">
+          {isSampleCompany(b) && (
+            <span title="Sample company with made-up data. It is not checked live." className="shrink-0 rounded-sm border border-ew-rule bg-ew-surface px-1.5 text-[11px] font-semibold leading-[18px] text-ew-muted">
+              Sample
+            </span>
+          )}
+          <span className="truncate text-xs text-ew-muted">{b.website_domain}</span>
+        </div>
       </td>
       <td className="px-3 py-2.5 capitalize text-ew-ink-soft">{b.stage}</td>
       <td className="px-3 py-2.5 text-ew-ink-soft">

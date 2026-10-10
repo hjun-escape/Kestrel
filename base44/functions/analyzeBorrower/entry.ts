@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
+import { canAccessCompany } from './access.ts';
 import { runAnalyst } from './logic.ts';
 import type { LLMParams } from './logic.ts';
 
@@ -37,6 +38,9 @@ export default async function(req: Request): Promise<Response> {
       borrower = await db.Borrower.get(borrowerId);
     } catch {
       return Response.json({ error: 'Company not found' }, { status: 404 });
+    }
+    if (!canAccessCompany(borrower, user)) {
+      return Response.json({ error: 'You do not have access to this company.' }, { status: 403 });
     }
     const storedSignals = await db.Signal.filter({ borrower_id: borrowerId }, '-date', 200);
     const signals = Array.isArray(storedSignals) ? storedSignals : [];

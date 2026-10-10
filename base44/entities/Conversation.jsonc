@@ -68,5 +68,14 @@
   "required": [
     "title",
     "messages"
-  ]
+  ],
+  // Chats are private to the user who created them (Base44 entity RLS; syntax
+  // from docs.base44.com/developers/backend/resources/entities/security).
+  // Rules that use {{user.*}} block signed-out callers outright.
+  "rls": {
+    "create": true,
+    "read": { "created_by": "{{user.email}}" },
+    "update": { "created_by": "{{user.email}}" },
+    "delete": { "created_by": "{{user.email}}" }
+  }
 }

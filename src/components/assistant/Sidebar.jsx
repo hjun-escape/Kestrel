@@ -1,5 +1,5 @@
 import React from "react";
-import { Pin, Plus } from "lucide-react";
+import { Pin, Plus, Trash2 } from "lucide-react";
 import { STATUS_STYLES } from "@/components/StatusBadge";
 import { statusKey } from "@/lib/borrowerUtils";
 import { useAssistantPage } from "./AssistantContext";
@@ -16,7 +16,9 @@ function SectionHeading({ id, children, aside }) {
   );
 }
 
-export function ConversationList({ conversations, activeId, loadError, onSelect, onNew }) {
+// canDelete(c) -> bool; onDelete(c) opens the confirm. Signed out (signedIn
+// false): chats are not saved, so the list only explains that.
+export function ConversationList({ conversations, activeId, loadError, onSelect, onNew, onDelete, canDelete, signedIn = true }) {
   return (
     <nav aria-labelledby="chats-heading" className="flex min-h-0 flex-col">
       <div className="px-3 pt-3">
@@ -31,7 +33,9 @@ export function ConversationList({ conversations, activeId, loadError, onSelect,
       </div>
       <SectionHeading id="chats-heading">Chats</SectionHeading>
       {loadError && <p className="px-4 pb-2 text-xs text-ew-red">{loadError}</p>}
-      {conversations === null ? (
+      {!signedIn ? (
+        <p className="px-4 pb-3 text-xs text-ew-muted">Sign in to save your chats. Chats are private to you.</p>
+      ) : conversations === null ? (
         <p className="px-4 pb-3 text-xs text-ew-muted">Loading chats</p>
       ) : conversations.length === 0 ? (
         <p className="px-4 pb-3 text-xs text-ew-muted">Your chats are saved here after the first answer.</p>
@@ -39,21 +43,36 @@ export function ConversationList({ conversations, activeId, loadError, onSelect,
         <ul className="max-h-[38vh] overflow-y-auto px-2 pb-2">
           {conversations.map((c) => {
             const active = c.id === activeId;
+            const title = c.title || "Untitled chat";
+            const deletable = Boolean(onDelete && canDelete?.(c));
             return (
-              <li key={c.id}>
+              <li key={c.id} className="group relative">
                 <button
                   type="button"
                   onClick={() => onSelect(c)}
                   aria-current={active ? "page" : undefined}
-                  className={`block w-full rounded-sm px-2 py-1.5 text-left transition-colors ${
+                  className={`block w-full rounded-sm px-2 py-1.5 text-left transition-colors ${deletable ? "pr-9" : ""} ${
                     active ? "bg-ew-surface shadow-[inset_2px_0_0_var(--ew-ink)]" : "hover:bg-ew-surface/70"
                   }`}
                 >
                   <span className={`block truncate text-[13px] ${active ? "font-semibold text-ew-ink" : "text-ew-ink-soft"}`}>
-                    {c.title || "Untitled chat"}
+                    {title}
                   </span>
                   <span className="block text-[11px] text-ew-muted">{relativeTime(c.updated_at || c.updated_date)}</span>
                 </button>
+                {deletable && (
+                  // Always visible on touch screens; on hover-capable screens it
+                  // appears on row hover or keyboard focus.
+                  <button
+                    type="button"
+                    onClick={() => onDelete(c)}
+                    aria-label={`Delete chat ${title}`}
+                    title="Delete chat"
+                    className="absolute right-1 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-sm text-ew-muted hover:bg-ew-red-bg hover:text-ew-red focus-visible:opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100"
+                  >
+                    <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
+                  </button>
+                )}
               </li>
             );
           })}

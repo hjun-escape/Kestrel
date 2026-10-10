@@ -2,6 +2,8 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { useSearchParams } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { sortBorrowers } from "@/lib/borrowerUtils";
+import { useAuth } from "@/lib/AuthContext";
+import { normalizeEmail, visibleCompanies } from "@/lib/ownership";
 import { asList } from "./assistantData";
 
 // Page-level state shared by the three Assistant columns: the portfolio list,
@@ -16,17 +18,22 @@ export function AssistantPageProvider({ children }) {
   const [companies, setCompanies] = useState(null);
   const [loadError, setLoadError] = useState(null);
   const [mentionedId, setMentionedId] = useState(null);
+  const { email, isAuthenticated, isLoadingAuth } = useAuth();
+  const me = isAuthenticated ? normalizeEmail(email) : "";
 
+  // Signed in: only the user's own companies; signed out: the shared demo book.
   const reloadCompanies = useCallback(async () => {
+    if (isLoadingAuth) return;
     try {
-      const res = await base44.entities.Borrower.filter({}, { limit: 500, sort: "-created_date" });
-      setCompanies(sortBorrowers(asList(res)));
+      const query = me ? { owner_email: me } : {};
+      const res = await base44.entities.Borrower.filter(query, { limit: 500, sort: "-created_date" });
+      setCompanies(sortBorrowers(visibleCompanies(asList(res), me)));
       setLoadError(null);
     } catch {
       setCompanies((prev) => prev || []);
       setLoadError("Could not load the portfolio. Reload the page to try again.");
     }
-  }, []);
+  }, [isLoadingAuth, me]);
 
   useEffect(() => {
     reloadCompanies();
