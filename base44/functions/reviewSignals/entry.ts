@@ -77,6 +77,15 @@ function firstOf(raw: Record<string, unknown>, keys: string[]): unknown {
   return undefined;
 }
 
+// The dataset returns review_url as null, so link to the single review the way Glassdoor does:
+// /Reviews/Employee-Review-Gravie-E1055527-RVW105854004.htm
+function reviewLink(raw: Record<string, unknown>): string | undefined {
+  const { review_id, overview_id, company_name } = raw;
+  if (!review_id || !overview_id) return undefined;
+  const slug = String(company_name ?? "Company").replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  return `https://www.glassdoor.com/Reviews/Employee-Review-${slug}-E${overview_id}-RVW${review_id}.htm`;
+}
+
 // Maps a scraped record to a Review, or null if it has no usable date.
 export function normalizeReview(raw: Record<string, unknown>): Review | null {
   const dateRaw = firstOf(raw, ["rating_date", "review_date", "date", "date_of_review", "review_date_time", "reviewDateTime", "date_posted"]);
@@ -86,7 +95,7 @@ export function normalizeReview(raw: Record<string, unknown>): Review | null {
   const texts = ["review_title", "title", "summary", "pros", "cons", "review_pros", "review_cons", "advice", "review_advice", "advice_to_management"]
     .map((k) => raw[k])
     .filter((v): v is string => typeof v === "string" && v.trim() !== "");
-  const url = firstOf(raw, ["review_url", "url"]);
+  const url = firstOf(raw, ["review_url"]) ?? reviewLink(raw) ?? firstOf(raw, ["url"]);
   return { date: iso(t), rating: Number.isFinite(r) && r > 0 ? r : null, texts, url: typeof url === "string" ? url : undefined };
 }
 

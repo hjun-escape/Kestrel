@@ -56,3 +56,34 @@ test("real review quote 'Countless layoffs.' is caught with an exact snippet", (
   const r = normalizeReview({ date: "Oct 1, 2026", rating: 2, cons: "Countless layoffs." })!;
   assert.deepEqual(findDistress(r), { label: "layoffs", snippet: "Countless layoffs." });
 });
+
+// Real Bright Data snapshot (dataset gd_l7j1po0921hbu0ri1z, days=455) for Gravie, trimmed to the fields we read.
+// QA'd by hand: the review link opens the Sep 1, 2026 review and the snippet appears in its Cons verbatim.
+test("real Bright Data snapshot: strong layoffs review + weak rating drop", async () => {
+  const { readFileSync } = await import("node:fs");
+  const raw = JSON.parse(readFileSync(new URL("./fixtures/gravie-glassdoor-2026-10-10.json", import.meta.url), "utf8"));
+  assert.equal(raw.length, 19);
+  assert.deepEqual(await reviewSignalsFromReviews(GRAVIE, raw, TODAY), [
+    {
+      borrower_id: "gravie",
+      type: "review_distress",
+      severity: "strong",
+      date: "2026-09-01",
+      title: "Employee review mentions layoffs",
+      snippet:
+        "Layoffs and organizational restructuring have become regular enough that it is difficult to feel any real sense of stability or long-term investment in employees.",
+      source_name: "Glassdoor",
+      source_url: "https://www.glassdoor.com/Reviews/Employee-Review-Gravie-E1055527-RVW105414289.htm",
+    },
+    {
+      borrower_id: "gravie",
+      type: "review_distress",
+      severity: "weak",
+      date: TODAY,
+      title: "Glassdoor rating down 1.4 in 90 days",
+      snippet: "2.2 average over 6 reviews in last 90 days vs 3.6 over 13 in the prior 12 months",
+      source_name: "Glassdoor",
+      source_url: GRAVIE.glassdoor_url,
+    },
+  ]);
+});
