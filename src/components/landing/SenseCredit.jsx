@@ -1,7 +1,7 @@
 import React from "react";
 
-// Credit for the user interviews: run with Sense AI (testwithsenseai.com). Their wordmark is white, so it sits
-// on a small dark chip.
+// Credit for the user interviews: run with Sense AI (testwithsenseai.com). Their wordmark file is white, so it is
+// drawn in dark ink with a filter to sit on the light background.
 export default function SenseCredit({ className = "" }) {
   return (
     <a
@@ -11,9 +11,7 @@ export default function SenseCredit({ className = "" }) {
       className={`inline-flex items-center gap-2 text-[12px] text-ew-muted hover:text-ew-ink ${className}`}
     >
       Tested with
-      <span className="inline-flex items-center rounded-sm bg-[#0b1220] px-2 py-1">
-        <img src="/brand/sense-logo-white.png" alt="Sense AI" className="h-[14px] w-auto" loading="lazy" />
-      </span>
+      <img src="/brand/sense-logo-white.png" alt="Sense AI" className="h-[16px] w-auto opacity-85 [filter:brightness(0)]" loading="lazy" />
     </a>
   );
 }

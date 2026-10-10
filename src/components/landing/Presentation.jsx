@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
-import { UserRound } from "lucide-react";
 import { Frame, MATTE, SURFACE_A, SectionHeader } from "./Frame";
 import { CheckDemo, DecideDemo, LeadTimeline, RaceBars, ScreenDemo } from "./showScenes";
 import { prefersReducedMotion } from "./motion";
@@ -8,6 +7,7 @@ import ProofStrip from "./ProofStrip";
 import TrustPrinciples from "./TrustPrinciples";
 import WhiteSheet from "./WhiteSheet";
 import SenseCredit from "./SenseCredit";
+import { VOICES, VoiceCard } from "./Voices";
 
 // Below the hero, as a presentation. A white sheet rises out of the dark hero and widens to fill the screen,
 // then stays pinned while scrolling steps through slides: each step moves the current slide's pieces out to the
@@ -110,32 +110,18 @@ function StepPiece({ i, state, children }) {
 
 function SlideQuote() {
   return (
-    <div className="mx-auto w-full max-w-[720px]">
-      <Piece i={0}>
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ew-muted">What we heard</h2>
+    <div className="w-full">
+      <Piece i={0} className="flex flex-wrap items-end justify-between gap-4">
+        <SectionHeader kicker="What we heard" title="Two testers, in their words." id="heard-heading" />
+        <SenseCredit />
       </Piece>
-      <figure className="mt-4 flex items-start gap-3">
-        <Piece i={1} className="mt-1 shrink-0">
-          <span aria-hidden="true" className="flex h-9 w-9 items-center justify-center rounded-full bg-[#e0f2fe]">
-            <UserRound className="h-[18px] w-[18px] text-[#0369a1]" />
-          </span>
-        </Piece>
-        <div className="min-w-0">
-          <Piece i={2}>
-            <blockquote className="rounded-lg rounded-tl-sm border border-ew-rule bg-white px-4 py-3 text-[15.5px] leading-relaxed">
-              &ldquo;I wish I woulda asked the cash flow documents a lot earlier in the process.&rdquo;
-            </blockquote>
+      <div className="mt-8 grid gap-x-10 gap-y-7 lg:grid-cols-2">
+        {VOICES.map((v, i) => (
+          <Piece key={v.quote} i={i + 1}>
+            <VoiceCard voice={v} />
           </Piece>
-          <Piece i={3}>
-            <figcaption className="mt-2 text-[13px] text-ew-muted">
-              Credit officer, user interview · <span className="text-ew-ink-soft">so cash flow is now part of the first screening.</span>
-            </figcaption>
-          </Piece>
-          <Piece i={4}>
-            <SenseCredit className="mt-3" />
-          </Piece>
-        </div>
-      </figure>
+        ))}
+      </div>
     </div>
   );
 }
