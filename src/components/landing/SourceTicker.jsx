@@ -29,18 +29,18 @@ export default function SourceTicker({ className = "" }) {
   }, []);
 
   return (
-    <div className={`text-[13px] text-white/70 ${className}`}>
-      <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        {SOURCES.map((s, i) => (
-          <React.Fragment key={s}>
-            {i > 0 && <span aria-hidden="true" className="text-white/30">·</span>}
-            <span className={`transition-colors duration-300 ${i === active ? "text-white" : ""}`}>{s}</span>
+    <div className={`text-[13px] leading-relaxed text-white/60 ${className}`}>
+      <p>
+        <span className="text-white/45">Checked in parallel: </span>
+        {SOURCES.map((src, i) => (
+          <React.Fragment key={src}>
+            {i > 0 && <span aria-hidden="true" className="px-1.5 text-white/25">·</span>}
+            <span className={`transition-colors duration-500 ${i === active ? "text-white/95" : ""}`}>{src}</span>
           </React.Fragment>
         ))}
-        <span className="text-white/50">checked in parallel</span>
       </p>
-      <p className="mt-1 font-mono text-[12px] tabular-nums text-white/55">
-        <span className="text-white/85">{count.toLocaleString("en-US")}</span> items read for the sample file
+      <p className="mt-0.5 tabular-nums text-white/45">
+        <span className="text-white/75">{count.toLocaleString("en-US")}</span> items read for the sample file
       </p>
     </div>
   );
