@@ -59,6 +59,15 @@ function parseDay(s: unknown): number | null {
   return m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) : null;
 }
 
+const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+
+// Glassdoor's "Oct 5, 2026", parsed as UTC so the day never shifts with the server's time zone.
+function parseMonthDay(s: unknown): number | null {
+  const m = /^([A-Za-z]{3})[a-z]*\.? (\d{1,2}),? (\d{4})/.exec(typeof s === "string" ? s.trim() : "");
+  const month = m ? MONTHS.indexOf(m[1].toLowerCase()) : -1;
+  return m && month >= 0 ? Date.UTC(+m[3], month, +m[2]) : null;
+}
+
 function iso(t: number): string {
   return new Date(t).toISOString().slice(0, 10);
 }
@@ -71,11 +80,7 @@ function firstOf(raw: Record<string, unknown>, keys: string[]): unknown {
 // Maps a scraped record to a Review, or null if it has no usable date.
 export function normalizeReview(raw: Record<string, unknown>): Review | null {
   const dateRaw = firstOf(raw, ["review_date", "date", "date_of_review", "review_date_time", "reviewDateTime", "date_posted"]);
-  let t = parseDay(dateRaw);
-  if (t === null && typeof dateRaw === "string") {
-    const d = Date.parse(dateRaw); // "Sep 12, 2026"
-    if (!Number.isNaN(d)) t = parseDay(new Date(d).toISOString());
-  }
+  const t = parseDay(dateRaw) ?? parseMonthDay(dateRaw);
   if (t === null) return null;
   const r = Number(firstOf(raw, ["rating", "overall_rating", "rating_overall", "review_rating", "ratingOverall"]));
   const texts = ["review_title", "title", "summary", "pros", "cons", "review_pros", "review_cons", "advice", "advice_to_management"]
