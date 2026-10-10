@@ -355,7 +355,7 @@ describe('sample statement end to end', () => {
   const rows = parseCsvStatement(SAMPLE_CSV);
   const review = buildCashflowReview({
     borrowerId: 'b1',
-    fileUrl: 'https://files.example/sample-cashflow.csv',
+    fileUrl: 'https://media.base44.com/sample-cashflow.csv',
     rows,
     now: () => new Date('2026-10-10T12:00:00Z'),
   });
@@ -410,7 +410,7 @@ describe('runCashflowAnalysis', () => {
     let extractCalls = 0;
     const result = await runCashflowAnalysis({
       ...base,
-      fileUrl: 'https://files.example/u/abc_statement.csv',
+      fileUrl: 'https://media.base44.com/u/abc_statement.csv',
       fetchText: async () => SAMPLE_CSV,
       extract: async () => { extractCalls += 1; return {}; },
       invokeLLM: async () => ({}),
@@ -428,7 +428,7 @@ describe('runCashflowAnalysis', () => {
     let schemaSeen: unknown = null;
     const result = await runCashflowAnalysis({
       ...base,
-      fileUrl: 'https://files.example/u/statement.pdf',
+      fileUrl: 'https://media.base44.com/u/statement.pdf',
       fetchText: async () => { throw new Error('should not fetch'); },
       extract: async (p) => { schemaSeen = p.json_schema; return { status: 'success', output: { transactions: tx } }; },
       invokeLLM: async () => { throw new Error('should not call LLM'); },
@@ -443,20 +443,20 @@ describe('runCashflowAnalysis', () => {
     let fileUrls: string[] | undefined;
     const result = await runCashflowAnalysis({
       ...base,
-      fileUrl: 'https://files.example/u/statement.png',
+      fileUrl: 'https://media.base44.com/u/statement.png',
       fetchText: async () => '',
       extract: async () => ({ status: 'error', details: 'unsupported' }),
       invokeLLM: async (p) => { fileUrls = p.file_urls; return { transactions: tx }; },
     });
     assert.equal(result.ok, true);
-    assert.deepEqual(fileUrls, ['https://files.example/u/statement.png']);
+    assert.deepEqual(fileUrls, ['https://media.base44.com/u/statement.png']);
     if (result.ok) assert.equal(result.review.extraction_method, 'llm');
   });
 
   test('returns extraction_failed when every path fails', async () => {
     const result = await runCashflowAnalysis({
       ...base,
-      fileUrl: 'https://files.example/u/statement.pdf',
+      fileUrl: 'https://media.base44.com/u/statement.pdf',
       fetchText: async () => '',
       extract: async () => { throw new Error('boom'); },
       invokeLLM: async () => { throw new Error('down'); },

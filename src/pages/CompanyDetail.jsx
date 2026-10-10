@@ -1,19 +1,21 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { ArrowLeft, ChevronRight, ExternalLink } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import AppHeader from "@/components/AppHeader";
 import CompanyHeader from "@/components/CompanyHeader";
 import SourceStatusRow from "@/components/SourceStatusRow";
 import SignalTimeline from "@/components/SignalTimeline";
-import DecisionBar from "@/components/DecisionBar";
+import ApplicantDecision from "@/components/ApplicantDecision";
+import CashflowReview from "@/components/CashflowReview";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { formatTimeToFlag, timeToFirstFlag } from "@/lib/timeToFlag.ts";
 import AnalystBrief from "@/components/AnalystBrief";
 import {
   POLL_INTERVAL_MS,
   deriveSourceStates,
   filterRecentSignals,
   getActiveRefresh,
-  isAtRisk,
   startRefresh,
 } from "@/lib/borrowerUtils";
 
@@ -35,6 +37,7 @@ export default function CompanyDetail() {
   const [notFound, setNotFound] = useState(false);
   const [run, setRun] = useState(null);
   const [refreshError, setRefreshError] = useState(null);
+  const [cashflowReview, setCashflowReview] = useState(null);
 
   async function loadData() {
     const requestedId = id;
@@ -77,6 +80,7 @@ export default function CompanyDetail() {
     setSignals([]);
     setRun(null);
     setRefreshError(null);
+    setCashflowReview(null);
     (async () => {
       let data = null;
       try {
@@ -126,7 +130,8 @@ export default function CompanyDetail() {
   const recentSignals = filterRecentSignals(signals);
   const olderCount = signals.length - recentSignals.length;
   const newIds = run ? new Set(signals.map((s) => s.id).filter((sid) => !run.snapshot.signalIdsBefore.includes(sid))) : null;
-  const showDecision = borrower.stage === "applicant" && isAtRisk(borrower);
+  const isApplicant = borrower.stage === "applicant";
+  const flagLine = formatTimeToFlag(timeToFirstFlag(borrower, signals, cashflowReview ? [cashflowReview] : []));
 
   return (
     <DetailShell>
@@ -139,7 +144,22 @@ export default function CompanyDetail() {
           onRefresh={() => handleRefresh()}
         />
         <SourceStatusRow states={sourceStates} recentSignals={recentSignals} running={running} />
+        {flagLine && (
+          <p className="border-t border-ew-rule-soft px-5 py-2 font-mono text-xs text-ew-ink-soft">{flagLine}</p>
+        )}
       </div>
+
+      {isApplicant && (
+        <section aria-labelledby="applicant-review-heading" className="mt-6">
+          <h2 id="applicant-review-heading" className="mb-3 font-heading text-xl font-bold tracking-tight text-ew-ink">
+            Applicant review
+          </h2>
+          <div className="flex flex-col gap-4">
+            <CashflowReview borrower={borrower} onReviewChange={setCashflowReview} />
+            <ApplicantDecision borrower={borrower} signals={signals} />
+          </div>
+        </section>
+      )}
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_380px]">
         <section aria-labelledby="evidence-heading" className="min-w-0">
@@ -157,12 +177,23 @@ export default function CompanyDetail() {
             checking={running}
             newIds={newIds}
           />
+          {!isApplicant && (
+            <Collapsible className="mt-6 border border-ew-rule bg-ew-surface">
+              <CollapsibleTrigger className="group flex w-full items-center gap-2 px-4 py-3 text-left font-heading text-sm font-bold text-ew-ink">
+                <ChevronRight aria-hidden="true" className="h-4 w-4 transition-transform group-data-[state=open]:rotate-90" />
+                Upload latest statement
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <CashflowReview borrower={borrower} onReviewChange={setCashflowReview} />
+              </CollapsibleContent>
+            </Collapsible>
+          )}
         </section>
 
         <aside aria-label="Analysis and decision" className="flex min-w-0 flex-col gap-4">
-          {showDecision && <DecisionBar key={borrower.id} companyName={borrower.name} />}
           <AnalystBrief borrower={borrower} />
           <CompanyLinks borrower={borrower} />
+          {!isApplicant && <ApplicantDecision key={borrower.id} borrower={borrower} signals={signals} />}
         </aside>
       </div>
     </DetailShell>

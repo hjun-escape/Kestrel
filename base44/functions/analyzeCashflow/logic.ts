@@ -7,7 +7,8 @@
 // Evidence rows are always copies of extracted statement lines.
 // It never sets Borrower.status and never writes Signal records.
 
-import { normaliseUrl, withTimeout } from '../analyzeBorrower/logic.ts';
+import { checkFileUrl } from './fileUrl.ts';
+import { withTimeout } from './shared.ts';
 import { classifyLender, isLateFeeLine, isNsfLine } from './classify.ts';
 import { TRANSACTIONS_SCHEMA, parseCsvStatement, parseExtractionResult } from './parse.ts';
 import type { Row } from './parse.ts';
@@ -421,6 +422,8 @@ export interface CashflowDeps {
   fileUrl: string;
   /** GET a file as text (used for CSV statements only). */
   fetchText: (url: string) => Promise<string>;
+  /** Hosts file_url may point to; defaults to Base44 file storage. */
+  allowedHosts?: readonly string[];
   /** base44.asServiceRole.integrations.Core.ExtractDataFromUploadedFile */
   extract: (params: ExtractParams) => Promise<unknown>;
   /** base44.asServiceRole.integrations.Core.InvokeLLM with file_urls */
@@ -493,8 +496,9 @@ async function readRows(deps: CashflowDeps, attempts: string[]): Promise<{ rows:
 /** Read a statement and build a CashflowReview record. Never throws. */
 export async function runCashflowAnalysis(deps: CashflowDeps): Promise<CashflowResult> {
   const attempts: string[] = [];
-  if (!normaliseUrl(deps.fileUrl)) {
-    return { ok: false, code: 'bad_request', error: 'file_url must be an http(s) URL', attempts };
+  const urlCheck = checkFileUrl(deps.fileUrl, deps.allowedHosts);
+  if (!urlCheck.ok) {
+    return { ok: false, code: 'bad_request', error: urlCheck.reason, attempts };
   }
   try {
     const read = await readRows(deps, attempts);

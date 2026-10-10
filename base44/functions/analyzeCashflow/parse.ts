@@ -1,7 +1,7 @@
 // Statement parsing: CSV text, Base44 extraction output and LLM fallback output all end
 // up as validated, date-sorted Row[]. No npm: imports and no Deno globals.
 
-import { coerceJson } from '../analyzeBorrower/logic.ts';
+import { coerceJson } from './shared.ts';
 
 export type Direction = 'in' | 'out';
 

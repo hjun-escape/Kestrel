@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import {
   formatTimeToFlag,
   timeToFirstFlag,
-} from "../../base44/functions/analyzeCashflow/timeToFlag.ts";
+} from "@/lib/timeToFlag.ts";
 
 // Cash-flow document check. The officer uploads a bank or cash-flow statement;
 // analyzeCashflow extracts the transaction lines and plain code finds every
@@ -45,7 +45,7 @@ function itemsOf(res) {
   return Array.isArray(res) ? res : res?.items || [];
 }
 
-export default function CashflowReview({ borrower }) {
+export default function CashflowReview({ borrower, onReviewChange }) {
   const borrowerId = borrower?.id;
   const [review, setReview] = useState(null);
   const [signals, setSignals] = useState([]);
@@ -68,6 +68,10 @@ export default function CashflowReview({ borrower }) {
       setLoading(false);
     }
   }, [borrowerId]);
+
+  useEffect(() => {
+    if (onReviewChange) onReviewChange(review);
+  }, [review, onReviewChange]);
 
   useEffect(() => {
     setLoading(true);

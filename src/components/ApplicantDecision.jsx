@@ -11,7 +11,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import {
   buildDocumentRequest,
   documentRequestToText,
-} from "../../base44/functions/lenderCheck/documents.ts";
+} from "@/lib/documents.ts";
 
 // Applicant decision panel, from lender user testing:
 // - "loans at many other banks and small, slightly late payments to them" were

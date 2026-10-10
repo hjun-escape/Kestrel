@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { runCashflowAnalysis } from './logic.ts';
+import { parseAllowedHosts } from './fileUrl.ts';
 import type { ExtractParams, LLMFileParams } from './logic.ts';
 
 // analyzeCashflow({ borrower_id, file_url }) -> { review }
@@ -15,7 +16,7 @@ import type { ExtractParams, LLMFileParams } from './logic.ts';
 const MAX_CSV_BYTES = 5_000_000;
 
 async function fetchText(url: string): Promise<string> {
-  const res = await fetch(url, { redirect: 'follow' });
+  const res = await fetch(url, { redirect: 'error' });
   if (!res.ok) throw new Error(`File download failed (HTTP ${res.status})`);
   const length = Number(res.headers.get('content-length') ?? 0);
   if (length > MAX_CSV_BYTES) throw new Error('File is too large to read');
@@ -61,6 +62,7 @@ export default async function(req: Request): Promise<Response> {
       borrowerId,
       fileUrl,
       fetchText,
+      allowedHosts: parseAllowedHosts(Deno.env.get('ALLOWED_FILE_HOSTS')),
       extract: (params: ExtractParams) => core.ExtractDataFromUploadedFile(params),
       invokeLLM: (params: LLMFileParams) => core.InvokeLLM(params),
       now: () => new Date(),

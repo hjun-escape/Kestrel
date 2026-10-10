@@ -2,7 +2,7 @@
 // No npm: imports and no Deno globals, so it runs under Node's test runner.
 // The LLM never decides what counts as a lender payment; these rules do.
 
-import { normaliseForMatch } from '../analyzeBorrower/logic.ts';
+import { normaliseForMatch } from './shared.ts';
 
 /** Known small-business lenders: pattern -> canonical display name. */
 const KNOWN_LENDERS: ReadonlyArray<readonly [RegExp, string]> = [

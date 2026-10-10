@@ -9,8 +9,8 @@
 //
 // It never sets status and never writes Signal records.
 //
-// Bright Data, SERP, HTML and quote-verification helpers are reused from the
-// analyzeBorrower function, not copied.
+// Bright Data, SERP, HTML and quote-verification helpers are copied (shared.ts) from the
+// analyzeBorrower function, since Base44 bundles each function folder separately.
 
 import {
   BRIGHTDATA_ENDPOINT,
@@ -21,8 +21,8 @@ import {
   normaliseUrl,
   verifyFindings,
   withTimeout,
-} from '../analyzeBorrower/logic.ts';
-import type { Borrower, FetchLike, Finding, LLMParams, NewsResult } from '../analyzeBorrower/logic.ts';
+} from './shared.ts';
+import type { Borrower, FetchLike, Finding, LLMParams, NewsResult } from './shared.ts';
 
 export type { Borrower, FetchLike, LLMParams };
 
