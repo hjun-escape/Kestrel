@@ -5,12 +5,16 @@ import { Button } from "@/components/ui/button";
 import StatusBadge from "@/components/StatusBadge";
 import { SOURCES } from "@/lib/signalTypes";
 import { formatRelative, formatUsdFull, isSampleCompany, reasonText } from "@/lib/borrowerUtils";
+import { coverageText, sourceCoverage } from "@/lib/sourceCoverage";
 
 // Detail header: identity, status with the reason, key facts, the Refresh
 // control with per-source progress, and Edit / Delete.
 export default function CompanyHeader({ borrower, sourceStates, running, refreshError, onRefresh, onEdit, onDelete }) {
   const hq = [borrower.hq_city, borrower.hq_state].filter(Boolean).join(", ");
   const isApplicant = borrower.stage === "applicant";
+  // Partial check: say how many of the four sources the status rests on.
+  // Not for samples (never checked live) or while a check is running.
+  const coverage = !running && !isSampleCompany(borrower) ? coverageText(sourceCoverage(borrower)) : null;
   const facts = [
     { term: "Domain", value: borrower.website_domain },
     { term: "Headquarters", value: hq || "—" },
@@ -43,6 +47,9 @@ export default function CompanyHeader({ borrower, sourceStates, running, refresh
                   : "Not checked yet. Refresh to run the first check."}
             </p>
           </div>
+          {coverage && (
+            <p className="mt-1.5 text-xs text-ew-muted">{coverage}</p>
+          )}
         </div>
         <div className="flex w-[220px] shrink-0 flex-col gap-2">
           <RefreshControl sourceStates={sourceStates} running={running} error={refreshError} onRefresh={onRefresh} sample={isSampleCompany(borrower)} />
