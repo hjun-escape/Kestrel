@@ -4,6 +4,7 @@ import { FLAGS, SAMPLE_COMPANY } from "./heroData";
 import { LANES, LANE_COLORS, RING_EDGES, encodeText, pipelineScene, sandpileScene, wavesScene } from "./caScenes";
 import { prefersReducedMotion } from "./motion";
 import { useCanvasScene, useFlagProgress } from "./useCanvasScene";
+import { BANDS as SCORE_BANDS, warningScore } from "@/lib/warningScore.ts";
 
 // Three hero proposals, each a full-bleed cellular automaton that runs the product's workflow.
 // The intro is kept to the name, one line and the buttons; stage and source labels sit outside the
@@ -330,6 +331,8 @@ export function PipelineHero() {
       : { kicker: `Verify · ${source}`, title: item, body: "Failed the check: dropped." };
   }, []);
   const { tip, handlers } = useProbe(sceneRef, describe);
+  // The report's warning score and status, from the app's own scoring rules for the flags landed so far.
+  const score = useMemo(() => warningScore(progress.flags.map(flagSignal)), [progress.flags]);
 
   return (
     <div className="bg-ew-ink text-white">
@@ -337,9 +340,9 @@ export function PipelineHero() {
       <style>{"@keyframes kestrelPulse{0%{color:#fff;text-shadow:0 0 14px rgba(255,255,255,.9)}100%{text-shadow:0 0 0 rgba(255,255,255,0)}}"}</style>
       <section aria-labelledby="hero-heading" className="mx-auto max-w-[1280px] px-4 pb-16 pt-8 sm:px-8">
         <h1 id="hero-heading" className="font-heading text-[clamp(1.6rem,1.2rem+1.4vw,2.3rem)] font-bold leading-tight tracking-[-0.015em]">
-          See the trouble before you lend.
+          Kestrel
         </h1>
-        <p className="mt-1 text-[15px] text-white/65">Kestrel screens private-company borrowers: every flag with a source.</p>
+        <p className="mt-0.5 text-[15px] text-white/65">Private company screener</p>
 
         {/* The pipeline, in a padded frame. */}
         <figure aria-label="How Kestrel checks one applicant: input, search, read, tag, verify, report" className="relative mt-6 h-[clamp(560px,72vh,720px)] overflow-hidden rounded-sm border border-white/10 bg-black/10">
@@ -387,10 +390,11 @@ export function PipelineHero() {
                     <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-ew-muted">Report · sample</p>
                     <p className="font-heading text-[15px] font-bold leading-tight">{SAMPLE_COMPANY.name}</p>
                   </div>
-                  <StatusChip status={progress.status} />
+                  <StatusChip status={score.band} />
                 </div>
+                <ReportScore score={score} />
                 <p aria-live="polite" className="border-b border-ew-rule-soft px-4 py-2 text-[12.5px] text-ew-ink-soft">
-                  {progress.why}
+                  {score.why}
                 </p>
                 <ul className="min-h-[86px] px-4 py-2">
                   {progress.flags.length === 0 && <li className="py-1 text-[12.5px] text-ew-muted">Waiting for a verified signal…</li>}
@@ -428,25 +432,48 @@ export function PipelineHero() {
           </div>
         </figure>
 
-        {/* Description below the pipeline. */}
-        <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)]">
-          <p className="text-[15px] leading-relaxed text-white/75">
-            Enter an applicant and Kestrel checks five public sources at once. Every item is read, judged by AI and then
-            verified in code: the same company, and a quote found word for word in the source. Only what survives reaches
-            the report, with its source attached. Hover any cell above to see what it is.
-          </p>
-          <dl className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {STAGE_DETAILS.map((d, i) => (
-              <div key={d.title} className="border-t border-white/15 pt-3">
-                <dt className="text-[11px] font-semibold tracking-[0.14em] text-white/45">
-                  0{i + 1} <span className="text-white">{d.title}</span>
-                </dt>
-                <dd className="mt-1 text-[13.5px] leading-relaxed text-white/65">{d.body}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
       </section>
+    </div>
+  );
+}
+
+// Sample flags as the app would store them: the CFO exit and WARN notice are strong, late payments weak.
+const FLAG_SEVERITY = { cfo: "strong", warn: "strong", late: "weak" };
+const FLAG_DATE = { cfo: "2026-09-10", warn: "2026-09-24", late: "2026-08-31" };
+function flagSignal(f) {
+  return {
+    type: f.id === "cfo" ? "exec_departure" : "legal_layoffs",
+    severity: FLAG_SEVERITY[f.id] ?? "weak",
+    date: FLAG_DATE[f.id] ?? "2026-09-01",
+    title: f.title,
+    source_name: f.source,
+  };
+}
+
+const SCORE_BAR = { red: "bg-ew-red", yellow: "bg-ew-amber", green: "bg-ew-green" };
+
+/** Warning score in the report: number, bar with the Yellow and Red lines. */
+function ReportScore({ score }) {
+  return (
+    <div className="border-b border-ew-rule-soft px-4 py-2.5">
+      <div className="flex items-baseline gap-1.5">
+        <span className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-ew-muted">Warning score</span>
+        <span className="ml-auto font-heading text-[22px] font-bold tabular-nums leading-none">{score.score}</span>
+        <span className="text-[12px] text-ew-muted">/ 100</span>
+      </div>
+      <div
+        role="meter"
+        aria-label="Warning score"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={score.score}
+        className="relative mt-1.5 h-1.5 rounded-sm bg-ew-rule"
+      >
+        <div className={`h-full rounded-sm transition-[width] duration-700 ${SCORE_BAR[score.band]}`} style={{ width: `${Math.max(score.score, 1)}%` }} />
+        {[SCORE_BANDS.yellow, SCORE_BANDS.red].map((t) => (
+          <span key={t} aria-hidden="true" className="absolute top-[-2px] h-[10px] w-px bg-ew-ink-soft" style={{ left: `${t}%` }} />
+        ))}
+      </div>
     </div>
   );
 }
@@ -475,12 +502,6 @@ function ApplicantInput() {
   );
 }
 
-const STAGE_DETAILS = [
-  { title: "Search", body: "News, court filings, job posts, reviews and LinkedIn, searched in parallel for the last 180 days." },
-  { title: "Read", body: "Each result is opened in full through Bright Data, not judged from a headline." },
-  { title: "Tag", body: "AI marks what is a real warning sign about this company and says why. It never sets the status." },
-  { title: "Verify", body: "Code drops anything about a different company, or whose quote is not word for word in the source." },
-];
 
 function shorten(text, max = 40) {
   const t = String(text).replace(/\s*·.*$/, "");
