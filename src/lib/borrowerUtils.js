@@ -141,19 +141,17 @@ export function groupSignalsByMonth(signals) {
 
 // --- Sorting for the loan book table -------------------------------------
 
-const RISK_RANK = { red: 0, yellow: 1, green: 2, not_checked: 3 };
-
 const SORTERS = {
-  risk: null, // uses sortBorrowers
   company: (a, b) => (a.borrower.name || "").localeCompare(b.borrower.name || ""),
   stage: (a, b) => (a.borrower.stage || "").localeCompare(b.borrower.stage || ""),
   signal: (a, b) => (a.topSignal?.date || "").localeCompare(b.topSignal?.date || ""),
   amount: (a, b) => (Number(a.borrower.loan_amount_usd) || 0) - (Number(b.borrower.loan_amount_usd) || 0),
   checked: (a, b) => (a.borrower.last_refreshed || "").localeCompare(b.borrower.last_refreshed || ""),
-  status: (a, b) => RISK_RANK[statusKey(a.borrower)] - RISK_RANK[statusKey(b.borrower)],
 };
 
-// rows: [{ borrower, topSignal }]. Returns a new sorted array.
+// rows: [{ borrower, topSignal }]. Returns a new sorted array. "status" (or any
+// unknown key) uses the loan book risk order: red, yellow, green, not checked,
+// larger amounts first within each.
 export function sortRows(rows, key, dir) {
   if (!SORTERS[key]) {
     const order = sortBorrowers(rows.map((r) => r.borrower));

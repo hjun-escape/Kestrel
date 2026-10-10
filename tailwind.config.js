@@ -16,6 +16,7 @@ module.exports = {
   				'ink-soft': 'var(--ew-ink-soft)',
   				muted: 'var(--ew-muted)',
   				paper: 'var(--ew-paper)',
+  				hover: 'var(--ew-hover)',
   				surface: 'var(--ew-surface)',
   				rule: 'var(--ew-rule)',
   				'rule-soft': 'var(--ew-rule-soft)',
