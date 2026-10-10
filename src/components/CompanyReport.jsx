@@ -7,6 +7,7 @@ import ApplicantDecision from "@/components/ApplicantDecision";
 import CashflowReview from "@/components/CashflowReview";
 import AnalystBrief from "@/components/AnalystBrief";
 import CheckTrace from "@/components/CheckTrace";
+import AutoResumeNote from "@/components/AutoResumeNote";
 import WarningScore from "@/components/WarningScore";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { formatTimeToFlag, timeToFirstFlag } from "@/lib/timeToFlag.ts";
@@ -30,6 +31,8 @@ export default function CompanyReport({
   checkRun = null,
   checkRunStale = false,
   newIds = null,
+  autoResume = null,
+  onStopAutoResume,
 }) {
   const [cashflowReview, setCashflowReview] = useState(null);
   const recentSignals = filterRecentSignals(signals);
@@ -43,8 +46,7 @@ export default function CompanyReport({
         <CompanyHeader
           borrower={borrower}
           sourceStates={sourceStates}
-          running={running}
-          refreshError={refreshError}
+          running={running}          refreshError={refreshError}
           onRefresh={onRefresh}
           onEdit={onEdit}
           onDelete={onDelete}
@@ -55,6 +57,7 @@ export default function CompanyReport({
           </p>
         )}
         <SourceStatusRow borrower={borrower} states={sourceStates} recentSignals={recentSignals} running={running} startedAt={startedAt} />
+        <AutoResumeNote state={autoResume} onStop={onStopAutoResume} />
         <WarningScore borrower={borrower} signals={signals} />
         <CheckTrace run={checkRun} refreshing={running} stale={checkRunStale} />
         {flagLine && (
