@@ -241,6 +241,11 @@ export function linkedinQuery(b: Borrower): string {
   return [`"${b.name.trim()}"`, b.hq_city?.trim(), 'LinkedIn'].filter(Boolean).join(' ');
 }
 
+/** Second try when the first search shows no company page: LinkedIn company pages only, name only. */
+export function linkedinFallbackQuery(b: Borrower): string {
+  return `site:linkedin.com/company "${b.name.trim()}"`;
+}
+
 export function glassdoorQuery(b: Borrower): string {
   return `"${b.name.trim()}" Glassdoor reviews`;
 }
@@ -344,7 +349,15 @@ export async function findCompanyPages(b: Borrower, deps: Deps): Promise<FindRes
     notes.push(`LinkedIn search failed: ${(linkedinSearch.reason as Error)?.message ?? linkedinSearch.reason}`);
   } else {
     candidates = pickLinkedInCandidates(linkedinSearch.value);
-    if (candidates.length === 0) notes.push('LinkedIn: no company page in the search results.');
+    if (candidates.length === 0) {
+      // Names with apostrophes or a city that is not on the page can hide the company page; try once more.
+      try {
+        candidates = pickLinkedInCandidates(await searchWeb(linkedinFallbackQuery(b), deps));
+      } catch (e) {
+        notes.push(`LinkedIn second search failed: ${(e as Error)?.message ?? e}`);
+      }
+      if (candidates.length === 0) notes.push('LinkedIn: no company page in the search results.');
+    }
   }
 
   let verified: LinkedInCompany | null = null;
