@@ -11,6 +11,7 @@ export interface Borrower {
   why?: string;
   loan_amount_usd?: number;
   last_refreshed?: string;
+  owner_email?: string;
 }
 
 export interface Signal {

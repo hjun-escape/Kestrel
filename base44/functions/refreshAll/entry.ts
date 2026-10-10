@@ -26,7 +26,9 @@ export default async function(req: Request): Promise<Response> {
     const results: Array<{ id: string; name: string; ok: boolean; status?: string; error?: string }> = [];
     for (const b of borrowers) {
       try {
-        const res = await base44.asServiceRole.functions.invoke('refreshBorrower', { borrower_id: b.id });
+        // Invoked as the signed-in admin (not the service role): refreshBorrower
+        // lets admins refresh companies owned by any user.
+        const res = await base44.functions.invoke('refreshBorrower', { borrower_id: b.id });
         results.push({ id: b.id, name: b.name, ok: true, status: res?.data?.borrower?.status });
       } catch (error) {
         const err = error as { response?: { data?: { error?: string } }; message?: string };

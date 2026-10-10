@@ -47,6 +47,7 @@ Borrower:
 - last_refreshed: ISO timestamp, empty until the first refresh that actually checked something
 - sources_unavailable: list of strings, only these values: News | Legal | Jobs | Reviews
 - pending_snapshots: internal, written only by refreshBorrower. Bright Data snapshot_id per signal function that is still building.
+- owner_email: email of the signed-in user who added the company (set on create, never from client input in backend functions). Empty = the shared demo book, which only signed-out visitors (Sense testers) see; signed-in users see and can use only their own companies, and backend functions enforce this (`access.ts` in each function folder).
 
 Signal:
 - borrower_id

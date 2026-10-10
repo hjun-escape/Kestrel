@@ -11,6 +11,8 @@ import CashflowReview from "@/components/CashflowReview";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { formatTimeToFlag, timeToFirstFlag } from "@/lib/timeToFlag.ts";
 import AnalystBrief from "@/components/AnalystBrief";
+import { useAuth } from "@/lib/AuthContext";
+import { canSeeCompany, normalizeEmail } from "@/lib/ownership";
 import {
   POLL_INTERVAL_MS,
   deriveSourceStates,
@@ -27,14 +29,23 @@ async function fetchCompany(id) {
   return { borrower, signals: sigRes.items || [] };
 }
 
+// Thrown by loadData when the company belongs to someone else (or, signed in,
+// to the shared demo book): the page shows "no access" and keeps no data.
+const NO_ACCESS = "no_access";
+
 export default function CompanyDetail() {
   const { id } = useParams();
+  const { email, isAuthenticated, isLoadingAuth } = useAuth();
+  const me = isAuthenticated ? normalizeEmail(email) : "";
+  const meRef = useRef(me);
+  meRef.current = me;
   const [searchParams, setSearchParams] = useSearchParams();
   const idRef = useRef(id);
   const [borrower, setBorrower] = useState(null);
   const [signals, setSignals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [noAccess, setNoAccess] = useState(false);
   const [run, setRun] = useState(null);
   const [refreshError, setRefreshError] = useState(null);
   const [cashflowReview, setCashflowReview] = useState(null);
@@ -43,6 +54,7 @@ export default function CompanyDetail() {
     const requestedId = id;
     const data = await fetchCompany(requestedId);
     if (idRef.current !== requestedId) return null;
+    if (!canSeeCompany(data.borrower, meRef.current)) throw new Error(NO_ACCESS);
     setBorrower(data.borrower);
     setSignals(data.signals);
     return data;
@@ -76,17 +88,22 @@ export default function CompanyDetail() {
     idRef.current = id;
     setLoading(true);
     setNotFound(false);
+    setNoAccess(false);
     setBorrower(null);
     setSignals([]);
     setRun(null);
     setRefreshError(null);
     setCashflowReview(null);
+    if (isLoadingAuth) return;
     (async () => {
       let data = null;
       try {
         data = await loadData();
-      } catch {
-        if (idRef.current === id) setNotFound(true);
+      } catch (error) {
+        if (idRef.current === id) {
+          if (error?.message === NO_ACCESS) setNoAccess(true);
+          else setNotFound(true);
+        }
       } finally {
         if (idRef.current === id) setLoading(false);
       }
@@ -97,7 +114,7 @@ export default function CompanyDetail() {
       else if (searchParams.get("checking") === "1" && !data.borrower.last_refreshed) handleRefresh(data);
       if (searchParams.has("checking")) setSearchParams({}, { replace: true });
     })();
-  }, [id]);
+  }, [id, isLoadingAuth, me]);
 
   // refreshBorrower saves after each source, so poll while it runs and the
   // source row and timeline fill in as sources answer.
@@ -110,6 +127,24 @@ export default function CompanyDetail() {
   }, [run, id]);
 
   if (loading) return <DetailShell><DetailSkeleton /></DetailShell>;
+
+  if (noAccess) {
+    return (
+      <DetailShell>
+        <div role="alert" className="border border-ew-rule bg-ew-surface px-6 py-10">
+          <p className="font-heading text-lg font-semibold text-ew-ink">Company not found</p>
+          <p className="mt-1 text-sm text-ew-muted">
+            {me
+              ? "This company is not in your loan book. You can only open companies you added."
+              : "This company is not in the shared demo book. Sign in with the account that added it."}
+          </p>
+          <Link to="/" className="mt-3 inline-block rounded-sm text-sm font-medium text-ew-ink underline underline-offset-2">
+            Back to loan book
+          </Link>
+        </div>
+      </DetailShell>
+    );
+  }
 
   if (notFound || !borrower) {
     return (
