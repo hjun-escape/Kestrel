@@ -6,7 +6,9 @@ import handler, {
   sourceQuote,
   findDistress,
   normalizeReview,
-  ratingTrend,
+  glassdoorEmployerId,
+  overallRatingFromSerp,
+  recentRating,
   reviewSignalsFromReviews,
   type Borrower,
 } from "../base44/functions/reviewSignals/entry.ts";
@@ -82,41 +84,66 @@ test("distress older than 90 days is ignored", async () => {
   assert.deepEqual(await reviewSignalsFromReviews(B, [rev(90, 4, "Layoffs.")], TODAY), []);
 });
 
-test("ratingTrend splits 0-89 and 90-454 days", () => {
-  const t = ratingTrend([rev(0, 2) as any, rev(89, 4), rev(90, 5), rev(454, 3), rev(455, 1), rev(-1, 1)].map((r) => normalizeReview(r)!), TODAY);
-  assert.deepEqual(t, { recentAvg: 3, recentCount: 2, priorAvg: 4, priorCount: 2 });
+test("recentRating averages reviews dated 0-89 days ago", () => {
+  const r = recentRating([rev(0, 2), rev(89, 4), rev(90, 5), rev(-1, 1)].map((x) => normalizeReview(x)!), TODAY);
+  assert.deepEqual(r, { avg: 3, count: 2 });
 });
 
-test("weak: 90-day average 0.5+ below prior 12 months", async () => {
-  const raw = [rev(10, 3), rev(20, 3), rev(30, 3.5), rev(120, 4), rev(200, 3.5), rev(300, 4)];
-  const s = await reviewSignalsFromReviews(B, raw, TODAY);
-  assert.deepEqual(s, [
+test("weak: 90-day average 0.5+ below the overall Glassdoor rating", async () => {
+  const raw = [rev(10, 3), rev(20, 3), rev(30, 3.5)];
+  assert.deepEqual(await reviewSignalsFromReviews(B, raw, TODAY, undefined, 3.8), [
     {
       borrower_id: "b1",
       type: "review_distress",
       severity: "weak",
       date: TODAY,
-      title: "Glassdoor rating down 0.7 in 90 days",
-      snippet: "3.2 average over 3 reviews in last 90 days vs 3.8 over 3 in the prior 12 months",
+      title: "Recent Glassdoor rating 0.6 below overall",
+      snippet: "3.2 average over 3 reviews in the last 90 days vs 3.8 overall on Glassdoor",
       source_name: "Glassdoor",
       source_url: B.glassdoor_url,
     },
   ]);
 });
 
-test("weak: needs a 0.5 drop and 3 reviews in each window", async () => {
-  // drop of exactly 0.5 counts
-  assert.equal((await reviewSignalsFromReviews(B, [rev(1, 3.5), rev(2, 3.5), rev(3, 3.5), rev(100, 4), rev(101, 4), rev(102, 4)], TODAY)).length, 1);
-  // drop of 0.4 does not
-  assert.equal((await reviewSignalsFromReviews(B, [rev(1, 3.6), rev(2, 3.6), rev(3, 3.6), rev(100, 4), rev(101, 4), rev(102, 4)], TODAY)).length, 0);
-  // only 2 recent reviews
-  assert.equal((await reviewSignalsFromReviews(B, [rev(1, 1), rev(2, 1), rev(100, 5), rev(101, 5), rev(102, 5)], TODAY)).length, 0);
+test("weak: needs a 0.5 gap, 3 recent reviews, and a known overall rating", async () => {
+  const three = (r: number) => [rev(1, r), rev(2, r), rev(3, r)];
+  assert.equal((await reviewSignalsFromReviews(B, three(3.5), TODAY, undefined, 4.0)).length, 1); // exactly 0.5
+  assert.equal((await reviewSignalsFromReviews(B, three(3.6), TODAY, undefined, 4.0)).length, 0); // 0.4
+  assert.equal((await reviewSignalsFromReviews(B, [rev(1, 1), rev(2, 1)], TODAY, undefined, 4.5)).length, 0); // 2 reviews
+  assert.equal((await reviewSignalsFromReviews(B, three(1), TODAY, undefined, null)).length, 0); // overall unknown
+  assert.equal((await reviewSignalsFromReviews(B, three(1), TODAY)).length, 0);
 });
 
 test("strong and weak together", async () => {
-  const raw = [rev(10, 1, "Massive layoffs."), rev(20, 2), rev(30, 2), rev(120, 4), rev(200, 4), rev(300, 4)];
-  const s = await reviewSignalsFromReviews(B, raw, TODAY);
+  const raw = [rev(10, 1, "Massive layoffs."), rev(20, 2), rev(30, 2)];
+  const s = await reviewSignalsFromReviews(B, raw, TODAY, undefined, 3.6);
   assert.deepEqual(s.map((x) => x.severity), ["strong", "weak"]);
+});
+
+test("glassdoorEmployerId reads Reviews and Overview URLs", () => {
+  assert.equal(glassdoorEmployerId("https://www.glassdoor.com/Reviews/Gravie-Reviews-E1055527.htm"), "1055527");
+  assert.equal(glassdoorEmployerId("https://www.glassdoor.com/Overview/Working-at-Rivian-EI_IE630579.11,17.htm"), "630579");
+  assert.equal(glassdoorEmployerId("https://www.glassdoor.com/Reviews/Gravie-Minneapolis-Reviews-EI_IE1055527.0,6_IL.7,18_IM567.htm"), "1055527");
+  assert.equal(glassdoorEmployerId("https://www.glassdoor.com/"), null);
+});
+
+test("overallRatingFromSerp: company-wide Glassdoor page with the same id only (real results, 2026-10-10)", () => {
+  const serp = {
+    organic: [
+      { link: "https://www.glassdoor.com/Reviews/Rivian-Irvine-Reviews-EI_IE630579.0,6_IL.7,13_IM1120.htm", description: "Employees in Irvine have given Rivian a rating of 3.9 out of 5 stars" },
+      { link: "https://www.glassdoor.com/Reviews/Rivio-Reviews-E999.htm", description: "Rivio has an employee rating of 1.2 out of 5 stars" },
+      { link: "https://www.glassdoor.com/Reviews/Rivian-Reviews-E630579.htm", description: "Rivian has an overall rating of 3.5 out of 5, based on over 1,928 reviews left anonymously by employees." },
+    ],
+  };
+  assert.equal(overallRatingFromSerp(serp, "630579"), 3.5);
+  const overview = { organic: [{ link: "https://www.glassdoor.com/Overview/Working-at-Gravie-EI_IE1055527.11,17.htm", description: "Gravie has an employee rating of 3.1 out of 5 stars, based on 113 company reviews" }] };
+  assert.equal(overallRatingFromSerp(overview, "1055527"), 3.1);
+  // Only a city page, a foreign site, or a page with no rating text: no answer.
+  assert.equal(overallRatingFromSerp({ organic: [serp.organic[0]] }, "630579"), null);
+  assert.equal(overallRatingFromSerp({ organic: [{ link: "https://www.glassdoor.sg/Reviews/Rivian-Reviews-E630579.htm", description: "rating of 3.5 out of 5" }] }, "630579"), null);
+  assert.equal(overallRatingFromSerp({ organic: [{ link: "https://www.glassdoor.com/Reviews/Rivian-Reviews-E630579.htm", description: "Read reviews" }] }, "630579"), null);
+  assert.equal(overallRatingFromSerp({}, "630579"), null);
+  assert.equal(overallRatingFromSerp(null, "630579"), null);
 });
 
 test("tagger can veto a match; the stored snippet is always the source text", async () => {

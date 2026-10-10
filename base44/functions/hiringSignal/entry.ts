@@ -8,14 +8,17 @@
 // Input:  { borrower: Borrower, today?: "YYYY-MM-DD", snapshot_id?: string }  (refreshBorrower sends { borrower })
 // Output: Signal[] (0 or 1 hiring_drop). Never writes status.
 // On failure it throws an Error whose message starts with "Jobs" (the sources_unavailable value).
-// If Bright Data is still building the jobs snapshot, the error carries snapshot_id so a later call can resume.
+// If Bright Data is still building the company snapshot, the error carries snapshot_id so a later call can resume.
 //
-// Data (Bright Data Web Scraper API, confirmed live 2026-10-10 on Gravie):
-//   - LinkedIn job listings, discovered by company keyword: 34 open postings in ~45 s, all Gravie's own.
-//   - LinkedIn company information, collected by URL: employees_in_linkedin 490, industries "Insurance", ~3 s.
+// Data (Bright Data, confirmed live 2026-10-10), about 5-10 s in total:
+//   1. LinkedIn company information dataset, collected by URL (~3 s): employees_in_linkedin, industries, company_id.
+//   2. LinkedIn's public jobs page for that company_id, through the Web Unlocker (~2-6 s). Its title states the exact
+//      open count, e.g. "Jobs at Gravie in Worldwide (34 Open Roles)". A company with none has no count in the
+//      title and a no-results list. Anything else (blocked page, new layout) fails as Jobs unavailable.
+// This replaced the LinkedIn job listings dataset (~40 s, and capped at 200 results: Rivian has 994 open roles but
+// was counted as 200 and wrongly flagged).
 // Known limits: a company that posts jobs only on its own site or Indeed looks like it is not hiring, and
-// employees_in_linkedin undercounts staff who are not on LinkedIn. Zero postings comes back from Bright Data as
-// an empty result, which counts as a failed search (Jobs unavailable), never as a strong signal.
+// employees_in_linkedin undercounts staff who are not on LinkedIn.
 
 export interface Borrower {
   id?: string;
@@ -38,22 +41,17 @@ export interface Signal {
   source_url: string;
 }
 
-export interface Job {
-  company_name?: string;
-  company_url?: string;
-  url?: string;
-  [k: string]: unknown;
-}
-
 export interface Company {
   employees_in_linkedin?: unknown;
   company_size?: unknown;
   industries?: unknown;
+  company_id?: unknown;
   [k: string]: unknown;
 }
 
 const API = "https://api.brightdata.com/datasets/v3";
-export const JOBS_DATASET_ID = "gd_lpfll7v5hcqtkxl6l"; // "Linkedin job listings information"
+const UNLOCKER = "https://api.brightdata.com/request";
+const UNLOCKER_ZONE = "mcp_unlocker"; // same zone as newsSignals
 export const COMPANY_DATASET_ID = "gd_l1vikfnt1wgvvqz95w"; // "LinkedIn company information"
 // refreshBorrower gives each source 120 s: up to ~60 s for the sync scrape plus this budget.
 const POLL_BUDGET_MS = 50_000;
@@ -98,41 +96,32 @@ export function employeeCount(c: Company): number | null {
   return lo > 0 ? Math.round((lo + hi) / 2) : null;
 }
 
-function norm(s: string): string {
-  return (s ?? "")
-    .toLowerCase()
-    .replace(/[^a-z0-9 ]/g, " ")
-    .replace(/\b(inc|llc|ltd|corp|corporation|co|company|group|holdings)\b/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 function linkedinSlug(url?: string): string | null {
   const m = /linkedin\.com\/company\/([^/?#]+)/i.exec(url ?? "");
   return m ? m[1].toLowerCase() : null;
 }
 
-// Keyword discovery returns other companies too. Keep a job only if its company URL slug matches the
-// borrower's LinkedIn page, or (when either has no URL) the normalized company names match exactly.
-export function isSameCompany(job: Job, b: Borrower): boolean {
-  const want = linkedinSlug(b.linkedin_url);
-  const got = linkedinSlug(job.company_url);
-  if (want && got) return want === got;
-  return !!job.company_name && norm(job.company_name) === norm(b.name);
+// LinkedIn's public jobs page for one company. f_C filters to that company exactly; geoId 92000000 = worldwide.
+export function jobsPageUrl(companyId: string): string {
+  return `https://www.linkedin.com/jobs/search?f_C=${encodeURIComponent(companyId)}&geoId=92000000`;
 }
 
-// The borrower's own open postings, each counted once.
-export function openPostings(jobs: Job[], b: Borrower): number {
-  const seen = new Set<string>();
-  let n = 0;
-  for (const j of jobs) {
-    if (!isSameCompany(j, b)) continue;
-    const key = j.url ? String(j.url).replace(/[?#].*$/, "") : "";
-    if (key && seen.has(key)) continue;
-    if (key) seen.add(key);
-    n++;
-  }
-  return n;
+// The open-role count from that page. LinkedIn serves two layouts (both seen live 2026-10-10):
+//   A: title "Jobs at Gravie in Worldwide (34 Open Roles)"; with none: "Jobs at X in Worldwide" + a no-results list
+//   B: title "34 Jobs jobs in Worldwide";                     with none: "0 Jobs jobs in Worldwide" + no-results
+// With openings both also carry a results-context-header__job-count element. Read that first, then either title
+// form, then no-results as 0. Anything else (sign-in wall, new layout) throws rather than reading as 0.
+export function parseOpenRoles(html: string): number {
+  const num = (s: string) => Number(s.replace(/[,+\s]/g, ""));
+  const span = /results-context-header__job-count[^>]*>\s*([\d,]+)\+?\s*</.exec(html);
+  if (span) return num(span[1]);
+  const title = (/<title>([^<]*)<\/title>/i.exec(html)?.[1] ?? "").replace(/\s+/g, " ").trim();
+  const a = /\(([\d,]+)\+?\s+Open Roles?\)/i.exec(title);
+  if (a) return num(a[1]);
+  const b = /^([\d,]+)\+?\s+.*\bjobs?\s+in\b/i.exec(title);
+  if (b) return num(b[1]);
+  if (/\bjobs?\b/i.test(title) && /no-results/.test(html)) return 0;
+  throw new Error(`Jobs: could not read the open-role count from LinkedIn (title: ${title.slice(0, 80) || "none"})`);
 }
 
 // Below this many expected openings a gap is noise (a 60-person company "should" have ~2.5).
@@ -154,10 +143,10 @@ export function hiringGap(open: number, employees: number, industry: unknown): H
   return { open, employees, sector, rate, expected, gapPct };
 }
 
-export function hiringSignalFromData(b: Borrower, jobs: Job[], company: Company, today: string): Signal[] {
+export function hiringSignalFromData(b: Borrower, open: number, company: Company, today: string): Signal[] {
   const employees = employeeCount(company);
   if (employees === null) throw new Error("Jobs: LinkedIn company page has no employee count");
-  const g = hiringGap(openPostings(jobs, b), employees, company.industries ?? b.industry);
+  const g = hiringGap(open, employees, company.industries ?? b.industry);
   if (g.expected < MIN_EXPECTED || g.gapPct < 50) return [];
   return [
     {
@@ -168,7 +157,7 @@ export function hiringSignalFromData(b: Borrower, jobs: Job[], company: Company,
       title: `Job postings ${g.gapPct}% below normal for company size`,
       snippet: `${g.open} open postings vs ~${Math.round(g.expected)} expected for ${g.employees} employees (${g.sector}: ${g.rate}% openings rate, BLS)`,
       source_name: "LinkedIn Jobs",
-      source_url: b.linkedin_url ? `${b.linkedin_url.replace(/\/+$/, "")}/jobs/` : "https://www.linkedin.com/jobs/",
+      source_url: company.company_id ? jobsPageUrl(String(company.company_id)) : "https://www.linkedin.com/jobs/",
     },
   ];
 }
@@ -201,7 +190,7 @@ function isNotReady(body: unknown): boolean {
 // A Bright Data reply must be a list holding at least one real record. Error records (include_errors), an empty
 // list, or any other shape is a failure, so refreshBorrower keeps the old signals and marks Jobs unavailable
 // instead of replacing them with "nothing found".
-export function usableRecords(body: unknown): Job[] {
+export function usableRecords(body: unknown): Company[] {
   if (!Array.isArray(body)) throw new Error(`Jobs: unexpected Bright Data reply ${JSON.stringify(body).slice(0, 120)}`);
   const records = body.filter((r) => r && typeof r === "object" && !("error" in r) && !("error_code" in r));
   if (records.length === 0) {
@@ -223,7 +212,7 @@ async function bd(apiKey: string, path: string, init: RequestInit = {}): Promise
   return res;
 }
 
-async function waitForSnapshot(apiKey: string, rawId: unknown): Promise<Job[]> {
+async function waitForSnapshot(apiKey: string, rawId: unknown): Promise<Company[]> {
   const id = encodeURIComponent(checkSnapshotId(rawId));
   const deadline = Date.now() + POLL_BUDGET_MS;
   while (Date.now() < deadline) {
@@ -240,36 +229,35 @@ async function waitForSnapshot(apiKey: string, rawId: unknown): Promise<Job[]> {
   throw new JobsPendingError(id);
 }
 
-export async function fetchJobs(b: Borrower, apiKey: string, snapshotId?: unknown): Promise<Job[]> {
-  if (snapshotId !== undefined) return waitForSnapshot(apiKey, snapshotId);
-  const qs = new URLSearchParams({
-    dataset_id: JOBS_DATASET_ID,
-    format: "json",
-    include_errors: "true",
-    type: "discover_new",
-    discover_by: "keyword",
-  });
-  const input = [{ keyword: b.name, company: b.name, location: "United States", time_range: "Any time" }];
-  const res = await bd(apiKey, `/scrape?${qs}`, { method: "POST", body: JSON.stringify({ input, limit_per_input: 200 }) });
-  const body = await res.json();
-  if (res.status === 202) return waitForSnapshot(apiKey, body?.snapshot_id);
-  return usableRecords(body);
-}
-
-// LinkedIn company information for the borrower's page: employee count and industry. Usually ~3 s.
-export async function fetchCompany(b: Borrower, apiKey: string): Promise<Company> {
+// LinkedIn company information for the borrower's page: employees, industry and company_id. Usually ~3 s.
+export async function fetchCompany(b: Borrower, apiKey: string, snapshotId?: unknown): Promise<Company> {
+  if (snapshotId !== undefined) return (await waitForSnapshot(apiKey, snapshotId))[0];
   if (!linkedinSlug(b.linkedin_url)) throw new Error("Jobs: borrower needs a linkedin.com/company/ URL");
   const url = `https://www.linkedin.com/company/${linkedinSlug(b.linkedin_url)}`;
   const qs = new URLSearchParams({ dataset_id: COMPANY_DATASET_ID, format: "json", include_errors: "true" });
   const res = await bd(apiKey, `/scrape?${qs}`, { method: "POST", body: JSON.stringify({ input: [{ url }] }) });
   const body = await res.json();
-  if (res.status === 202) return (await waitForSnapshot(apiKey, body?.snapshot_id))[0] as Company;
-  return usableRecords(body)[0] as Company;
+  if (res.status === 202) return (await waitForSnapshot(apiKey, body?.snapshot_id))[0];
+  return usableRecords(body)[0];
+}
+
+// Open roles on LinkedIn for one company_id, read from its public jobs page through the Web Unlocker.
+export async function fetchOpenRoles(companyId: string, apiKey: string): Promise<number> {
+  const res = await fetch(UNLOCKER, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ zone: UNLOCKER_ZONE, url: jobsPageUrl(companyId), format: "raw" }),
+    signal: AbortSignal.timeout(60_000),
+  });
+  if (!res.ok) throw new Error(`Jobs: Bright Data unlocker ${res.status} ${(await res.text()).slice(0, 200)}`);
+  return parseOpenRoles(await res.text());
 }
 
 export async function hiringSignal(b: Borrower, apiKey: string, today: string, snapshotId?: unknown): Promise<Signal[]> {
-  const [jobs, company] = await Promise.all([fetchJobs(b, apiKey, snapshotId), fetchCompany(b, apiKey)]);
-  return hiringSignalFromData(b, jobs, company, today);
+  const company = await fetchCompany(b, apiKey, snapshotId);
+  const companyId = /^\d+$/.test(String(company?.company_id ?? "")) ? String(company.company_id) : null;
+  if (!companyId) throw new Error("Jobs: LinkedIn company page has no company_id");
+  return hiringSignalFromData(b, await fetchOpenRoles(companyId, apiKey), company, today);
 }
 
 // Base44 backend function. Reads the BRIGHTDATA_API_KEY secret.

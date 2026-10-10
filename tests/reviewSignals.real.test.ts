@@ -57,13 +57,15 @@ test("real review quote 'Countless layoffs.' is caught with an exact snippet", (
   assert.deepEqual(findDistress(r), { label: "layoffs", snippet: "Countless layoffs." });
 });
 
-// Real Bright Data snapshot (dataset gd_l7j1po0921hbu0ri1z, days=455) for Gravie, trimmed to the fields we read.
+// Real Bright Data snapshot (dataset gd_l7j1po0921hbu0ri1z, days=455 at the time) for Gravie, trimmed to the
+// fields we read. Only its last-90-days reviews count now.
 // QA'd by hand: the review link opens the Sep 1, 2026 review and the snippet appears in its Cons verbatim.
-test("real Bright Data snapshot: strong layoffs review + weak rating drop", async () => {
+test("real Bright Data snapshot: strong layoffs review + weak rating below overall", async () => {
   const { readFileSync } = await import("node:fs");
   const raw = JSON.parse(readFileSync(new URL("./fixtures/gravie-glassdoor-2026-10-10.json", import.meta.url), "utf8"));
   assert.equal(raw.length, 19);
-  assert.deepEqual(await reviewSignalsFromReviews(GRAVIE, raw, TODAY), [
+  // 3.1 = Gravie's overall Glassdoor rating on its reviews page the same day.
+  assert.deepEqual(await reviewSignalsFromReviews(GRAVIE, raw, TODAY, undefined, 3.1), [
     {
       borrower_id: "gravie",
       type: "review_distress",
@@ -80,8 +82,8 @@ test("real Bright Data snapshot: strong layoffs review + weak rating drop", asyn
       type: "review_distress",
       severity: "weak",
       date: TODAY,
-      title: "Glassdoor rating down 1.4 in 90 days",
-      snippet: "2.2 average over 6 reviews in last 90 days vs 3.6 over 13 in the prior 12 months",
+      title: "Recent Glassdoor rating 0.9 below overall",
+      snippet: "2.2 average over 6 reviews in the last 90 days vs 3.1 overall on Glassdoor",
       source_name: "Glassdoor",
       source_url: GRAVIE.glassdoor_url,
     },

@@ -4,7 +4,7 @@
 //
 // Run: node --env-file=.env scripts/p3-live-check.mjs '<borrower JSON>'
 //   e.g. '{"name":"Acme Widgets","linkedin_url":"https://www.linkedin.com/company/acme-widgets/","glassdoor_url":"https://www.glassdoor.com/Reviews/Acme-Reviews-E123.htm"}'
-// Add "jobs" or "reviews" after the JSON to run only one. Needs BRIGHTDATA_API_KEY in .env (never commit it).
+// Add "jobs" or "reviews" after the JSON to run only one, and a snapshot id after "reviews" to collect a finished job. Needs BRIGHTDATA_API_KEY in .env (never commit it).
 
 import { existsSync } from "node:fs";
 
@@ -39,19 +39,27 @@ async function check(label, file, run) {
   }
 }
 
-const jobs = await check("jobs", "../base44/functions/hiringSignal/entry.ts", (m) => m.fetchJobs(borrower, key));
-if (jobs) {
-  const company = await jobs.mod.fetchCompany(borrower, key);
-  const employees = jobs.mod.employeeCount(company);
-  console.log(`company page: ${employees} employees, industry "${company.industries}"`);
-  console.log("gap:", jobs.mod.hiringGap(jobs.mod.openPostings(jobs.records, borrower), employees, company.industries));
-  console.log("signals:", JSON.stringify(jobs.mod.hiringSignalFromData(borrower, jobs.records, company, today), null, 2));
+if (!only || only === "jobs") {
+  const m = await import("../base44/functions/hiringSignal/entry.ts");
+  console.log("\n## jobs");
+  const t0 = Date.now();
+  try {
+    const company = await m.fetchCompany(borrower, key);
+    const open = await m.fetchOpenRoles(String(company.company_id), key);
+    const employees = m.employeeCount(company);
+    console.log(`${((Date.now() - t0) / 1000).toFixed(1)} s: company_id ${company.company_id}, ${employees} employees, "${company.industries}", ${open} open roles`);
+    console.log("gap:", m.hiringGap(open, employees, company.industries));
+    console.log("signals:", JSON.stringify(m.hiringSignalFromData(borrower, open, company, today), null, 2));
+  } catch (e) {
+    console.log(`FAILED after ${((Date.now() - t0) / 1000).toFixed(1)} s: ${e.message}`);
+  }
 }
 
-const reviews = await check("reviews", "../base44/functions/reviewSignals/entry.ts", (m) => m.fetchReviews(borrower, key));
+const reviews = await check("reviews", "../base44/functions/reviewSignals/entry.ts", (m) => m.fetchReviews(borrower, key, process.argv[4]));
 if (reviews) {
   const parsed = reviews.records.map(reviews.mod.normalizeReview).filter(Boolean);
-  console.log(`reviews with a usable date: ${parsed.length}`);
-  console.log("rating trend:", reviews.mod.ratingTrend(parsed, today));
-  console.log("signals:", JSON.stringify(await reviews.mod.reviewSignalsFromReviews(borrower, reviews.records, today), null, 2));
+  const overall = await reviews.mod.fetchOverallRating(borrower, key);
+  console.log(`reviews with a usable date: ${parsed.length}; overall Glassdoor rating: ${overall}`);
+  console.log("last 90 days:", reviews.mod.recentRating(parsed, today));
+  console.log("signals:", JSON.stringify(await reviews.mod.reviewSignalsFromReviews(borrower, reviews.records, today, undefined, overall), null, 2));
 }
