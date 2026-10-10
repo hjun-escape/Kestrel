@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import StatusBadge from "@/components/StatusBadge";
 import AddCompanyDialog from "@/components/AddCompanyDialog";
-import { sortBorrowers, getTopSignal, filterRecentSignals, formatUsd, formatRelative } from "@/lib/borrowerUtils";
+import { sortBorrowers, getTopSignal, filterRecentSignals, formatUsd, formatRelative, parseSignalDate } from "@/lib/borrowerUtils";
 import { SIGNAL_TYPES } from "@/lib/signalTypes";
 import { ensureSeedData } from "@/lib/seed";
 
@@ -71,7 +71,7 @@ export default function LoanBook() {
       <main className="mx-auto max-w-7xl px-6 py-6">
         <div className="mb-4 flex items-center justify-between">
           <h1 className="text-lg font-semibold text-gray-900">Loan book</h1>
-          <Button onClick={() => setAddOpen(true)}>Add company</Button>
+          <Button onClick={() => setAddOpen(true)}>Screen new applicant</Button>
         </div>
 
         <Tabs value={tab} onValueChange={setTab} className="mb-4">
@@ -135,7 +135,7 @@ export default function LoanBook() {
                           <span className="text-gray-700">
                             {SIGNAL_TYPES[topSignal.type]?.label || topSignal.type}
                             <span className="text-gray-400"> · </span>
-                            {format(new Date(topSignal.date), "MMM d")}
+                            {format(parseSignalDate(topSignal.date), "MMM d")}
                           </span>
                         ) : (
                           <span className="text-gray-400">None</span>
@@ -167,7 +167,7 @@ export default function LoanBook() {
       <AddCompanyDialog
         open={addOpen}
         onOpenChange={setAddOpen}
-        onCreated={loadData}
+        onCreated={(created) => navigate(`/borrower/${created.id}?screen=1`)}
       />
     </div>
   );
