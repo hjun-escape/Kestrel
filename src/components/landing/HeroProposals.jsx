@@ -326,13 +326,13 @@ export function PipelineHero() {
       {/* Stage titles pulse when something happens in that stage. Self-contained keyframes. */}
       <style>{"@keyframes kestrelPulse{0%{color:#fff;text-shadow:0 0 14px rgba(255,255,255,.9)}100%{text-shadow:0 0 0 rgba(255,255,255,0)}}"}</style>
       <section aria-labelledby="hero-heading" className="mx-auto max-w-[1280px] px-4 pb-16 pt-8 sm:px-8">
-        <h1 id="hero-heading" className="font-heading text-[clamp(1.6rem,1.2rem+1.4vw,2.3rem)] font-bold leading-tight tracking-[-0.015em]">
-          Kestrel
+        {/* Visible heading removed by design (the nav shows Kestrel); kept for screen readers. */}
+        <h1 id="hero-heading" className="sr-only">
+          Kestrel, private company screener
         </h1>
-        <p className="mt-0.5 text-[15px] text-white/65">Private company screener</p>
 
         {/* The pipeline, in a padded frame. */}
-        <figure aria-label="How Kestrel checks one applicant: input, search, read, tag, verify, report" className="relative mt-6 h-[clamp(560px,72vh,720px)] overflow-hidden rounded-sm border border-white/10 bg-black/10">
+        <figure aria-label="How Kestrel checks one applicant: input, search, read, tag, verify, report" className="relative h-[clamp(560px,72vh,720px)] overflow-hidden rounded-sm border border-white/10 bg-black/10">
           {/* Input column: the applicant, then each source's example item sliding into its lane. */}
           <div className="absolute bottom-0 left-0 top-0 border-r border-white/10" style={{ width: GUTTER }}>
             <div className="flex flex-col justify-center px-3" style={{ height: HEADER }}>
