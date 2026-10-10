@@ -154,6 +154,13 @@ describe('askPortfolio agent loop', () => {
     assert.deepEqual(kept, []);
   });
 
+  test('verifyCitations drops non-http source urls even if fetched', () => {
+    const evidence = [
+      { company_id: 'b_x', signal_id: 's_js', source_url: 'javascript:alert(1)', texts: [] },
+    ];
+    assert.deepEqual(verifyCitations([{ company_id: 'b_x', source_url: 'javascript:alert(1)' }], evidence), []);
+  });
+
   test('a write request becomes a pending_action and nothing is written', async () => {
     const { data, writes } = fakeData();
     const { llm } = fakeLlm([
