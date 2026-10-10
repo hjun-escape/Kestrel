@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { prefersReducedMotion } from "./motion";
-import { FLAGS, STATUS_AFTER_FLAG, WHY_LINES } from "./heroData";
 
 /**
  * Runs a caScenes scene on a canvas: sizes it to the element (sharp on retina), steps it at `fps`,
@@ -76,35 +75,36 @@ export function useCanvasScene(makeScene, { fps = 15, warmup = 160, onLayout } =
 }
 
 /**
- * The sample credit file filling in: each signal from the automaton lands the next flag
- * (CFO departure, WARN notice, late payments) and moves the status by the app's real rules.
- * After the last flag it holds, then starts over for the next applicant.
+ * The sample report filling in: each verified signal from the automaton lands the applicant's next flag.
+ * After the last flag it holds, then starts over. A company with no flags never adds one.
  */
-export function useFlagProgress({ holdMs = 4500 } = {}) {
+export function useFlagProgress(flags, { holdMs = 6000 } = {}) {
   const [step, setStep] = useState(0);
+  const [cycle, setCycle] = useState(0);
   const stepRef = useRef(0);
   const holdRef = useRef(null);
+  const flagsRef = useRef(flags);
+  flagsRef.current = flags;
 
   useEffect(() => () => clearTimeout(holdRef.current), []);
 
+  /** Returns the flag that landed, or null. */
   const onSignal = () => {
-    if (holdRef.current || stepRef.current >= FLAGS.length) return;
+    const all = flagsRef.current;
+    if (holdRef.current || stepRef.current >= all.length) return null;
+    const flag = all[stepRef.current];
     stepRef.current += 1;
     setStep(stepRef.current);
-    if (stepRef.current >= FLAGS.length) {
+    if (stepRef.current >= all.length) {
       holdRef.current = setTimeout(() => {
         holdRef.current = null;
         stepRef.current = 0;
         setStep(0);
+        setCycle((c) => c + 1);
       }, holdMs);
     }
+    return flag;
   };
 
-  return {
-    step,
-    flags: FLAGS.slice(0, step),
-    status: STATUS_AFTER_FLAG[step],
-    why: WHY_LINES[step],
-    onSignal,
-  };
+  return { step, cycle, flags: flags.slice(0, step), done: step >= flags.length, onSignal };
 }
