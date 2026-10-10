@@ -32,9 +32,9 @@ export default function CompanyHeader({ borrower, signals = [], sourceStates, ru
 
   return (
     <div className="px-5 pb-4 pt-5">
-      <div className="flex items-start justify-between gap-6">
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between md:gap-6">
         <div className="min-w-0">
-          <h1 className="font-heading text-[32px] font-bold leading-[1.05] tracking-tight text-ew-ink">
+          <h1 className="break-words font-heading text-[28px] font-bold leading-[1.05] tracking-tight text-ew-ink md:text-[32px]">
             {borrower.name}
           </h1>
           {isSampleCompany(borrower) && (
@@ -43,7 +43,7 @@ export default function CompanyHeader({ borrower, signals = [], sourceStates, ru
               Made-up company and signals, shown so the screens have something in them. It is not checked live.
             </p>
           )}
-          <div data-demo="status-why" className="mt-3 flex items-start gap-3">
+          <div data-demo="status-why" className="mt-3 flex flex-col items-start gap-2 sm:flex-row sm:gap-3">
             <div className="flex shrink-0 items-center gap-1.5">
               <StatusBadge status={borrower.status} lastRefreshed={borrower.last_refreshed} size="lg" />
               <StatusLegendPopover iconOnly />
@@ -65,7 +65,7 @@ export default function CompanyHeader({ borrower, signals = [], sourceStates, ru
             <p className="mt-1.5 text-xs text-ew-muted">{coverage}</p>
           )}
         </div>
-        <div className="flex w-[220px] shrink-0 flex-col gap-2">
+        <div className="flex w-full shrink-0 flex-col gap-2 md:w-[220px]">
           <RefreshControl sourceStates={sourceStates} running={running} error={refreshError} onRefresh={onRefresh} sample={isSampleCompany(borrower)} />
           {(onEdit || onDelete) && (
             <div className="flex justify-end gap-1">
@@ -87,7 +87,7 @@ export default function CompanyHeader({ borrower, signals = [], sourceStates, ru
         </div>
       </div>
 
-      <dl className="mt-5 grid grid-cols-3 gap-x-6 gap-y-3 border-t border-ew-rule-soft pt-4 xl:grid-cols-6">
+      <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-3 border-t border-ew-rule-soft pt-4 sm:grid-cols-3 xl:grid-cols-6">
         {facts.map((f) => (
           <div key={f.term} className="min-w-0">
             <dt className="text-xs text-ew-muted">{f.term}</dt>

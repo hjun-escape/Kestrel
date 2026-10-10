@@ -74,7 +74,7 @@ export function DecideIllustration() {
     <div className={SURFACE}>
       <div className="flex items-baseline justify-between gap-2">
         <p className="text-[13px] font-semibold text-ew-ink">WARN notice, 125 jobs</p>
-        <p className="text-[12px] text-ew-muted">Nevada DETR</p>
+        <p className="text-[12px] text-ew-muted">State WARN notice</p>
       </div>
       <p className="relative mt-1.5 text-[13px] leading-snug text-ew-ink-soft">
         <span

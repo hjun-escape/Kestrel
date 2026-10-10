@@ -28,7 +28,7 @@ function Receipt() {
         <dt className="text-ew-muted">Date</dt>
         <dd className="text-ew-ink">Sep 10, 2026</dd>
         <dt className="text-ew-muted">Source</dt>
-        <dd className="text-ew-ink underline decoration-ew-rule underline-offset-2">Electrek</dd>
+        <dd className="text-ew-ink underline decoration-ew-rule underline-offset-2">Regional business news (sample)</dd>
         <dt className="text-ew-muted">Quote</dt>
         <dd className="text-ew-ink-soft">
           &ldquo;Chief financial officer Dana Whitlock has stepped down, effective immediately.&rdquo;
