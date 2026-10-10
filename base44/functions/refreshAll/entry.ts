@@ -4,8 +4,9 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 //
 // Refreshes every company (or only one stage, with { stage: 'applicant' | 'borrower' })
 // by calling refreshBorrower one company at a time, to keep Bright Data usage
-// predictable. Not wired to a button: run it before the demo, for example with
-// the Base44 MCP or from the browser console with
+// predictable. Not wired to a button, and only an app admin may run it (the app
+// is open without login, and every run spends Bright Data credits). Run it
+// before the demo while signed in as an admin, from the browser console:
 //   base44.functions.invoke('refreshAll', {})
 // With slow job/review snapshots this can take a while; if it times out,
 // refresh companies one by one instead.
@@ -15,10 +16,14 @@ export default async function(req: Request): Promise<Response> {
     const stage = body?.stage;
 
     const base44 = createClientFromRequest(req);
+    const user = await base44.auth.me().catch(() => null);
+    if (!user) return Response.json({ error: 'Sign in as an app admin to refresh every company.' }, { status: 401 });
+    if (user.role !== 'admin') return Response.json({ error: 'Only an app admin can refresh every company.' }, { status: 403 });
+
     const query = stage ? { stage } : {};
     const borrowers = await base44.asServiceRole.entities.Borrower.filter(query, '-created_date', 500);
 
-    const results = [];
+    const results: Array<{ id: string; name: string; ok: boolean; status?: string; error?: string }> = [];
     for (const b of borrowers) {
       try {
         const res = await base44.asServiceRole.functions.invoke('refreshBorrower', { borrower_id: b.id });
