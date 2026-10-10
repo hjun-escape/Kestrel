@@ -5,7 +5,7 @@
     "borrower_id": { "type": "string" },
     "created_at": { "type": "string", "format": "date-time" },
     "file_url": { "type": "string" },
-    "extraction_method": { "type": "string", "enum": ["csv", "extract", "llm"] },
+    "extraction_method": { "type": "string", "enum": ["csv", "sandbox", "extract", "llm"] },
     "transaction_count": { "type": "number" },
     "period_start": { "type": "string" },
     "period_end": { "type": "string" },

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useId, useRef, useState } from "react";
 import { format } from "date-fns";
-import { ChevronRight, FileUp, Loader2 } from "lucide-react";
+import { ChevronRight, FileUp, Loader2, ShieldCheck } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 
@@ -11,8 +11,10 @@ import { Button } from "@/components/ui/button";
 // This panel never changes the company's status.
 
 const ACCEPT = ".pdf,.csv,.xlsx,.xls,.png,.jpg,.jpeg,application/pdf,text/csv,image/png,image/jpeg";
-const SAMPLE_URL = "/samples/sample-cashflow.csv";
-const SAMPLE_NAME = "sample-cashflow.csv";
+const SAMPLES = {
+  csv: { url: "/samples/sample-cashflow.csv", name: "sample-cashflow.csv", type: "text/csv" },
+  pdf: { url: "/samples/sample-statement.pdf", name: "sample-statement.pdf", type: "application/pdf" },
+};
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
 
 const SEVERITY = {
@@ -95,13 +97,14 @@ export default function CashflowReview({ borrower, onReviewChange }) {
     }
   }
 
-  async function handleSample() {
+  async function handleSample(kind) {
+    const sample = SAMPLES[kind] || SAMPLES.csv;
     setError(null);
     try {
-      const res = await fetch(SAMPLE_URL);
+      const res = await fetch(sample.url);
       if (!res.ok) throw new Error("Could not load the sample statement.");
       const blob = await res.blob();
-      await analyzeFile(new File([blob], SAMPLE_NAME, { type: "text/csv" }));
+      await analyzeFile(new File([blob], sample.name, { type: sample.type }));
     } catch (e) {
       setError(errorText(e));
     }
@@ -196,9 +199,14 @@ function Dropzone({ busy, onFile, onSample }) {
           }}
         />
       </div>
-      <Button type="button" variant="outline" size="sm" className="self-center" onClick={onSample} disabled={busy}>
-        Use sample statement
-      </Button>
+      <div className="flex flex-col justify-center gap-1.5">
+        <Button type="button" variant="outline" size="sm" onClick={() => onSample("csv")} disabled={busy}>
+          Use sample statement
+        </Button>
+        <Button type="button" variant="outline" size="sm" onClick={() => onSample("pdf")} disabled={busy}>
+          Use sample PDF
+        </Button>
+      </div>
     </div>
   );
 }
@@ -210,10 +218,13 @@ function ReviewBody({ review }) {
   return (
     <div className="space-y-5">
       <div>
-        <p className="text-xs text-ew-muted">
-          Statement {shortDate(review.period_start)} to {shortDate(review.period_end)}
-          {review.transaction_count ? ` · ${review.transaction_count} lines` : ""}
-        </p>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <p className="text-xs text-ew-muted">
+            Statement {shortDate(review.period_start)} to {shortDate(review.period_end)}
+            {review.transaction_count ? ` · ${review.transaction_count} lines` : ""}
+          </p>
+          {review.extraction_method === "sandbox" && <SandboxBadge />}
+        </div>
         <p className="mt-1 max-w-3xl text-[15px] font-medium leading-snug text-ew-ink">{review.summary}</p>
       </div>
 
@@ -238,6 +249,18 @@ function ReviewBody({ review }) {
       <LendersTable lenders={lenders} />
       {exceptions.length > 0 && <Exceptions lines={exceptions} />}
     </div>
+  );
+}
+
+function SandboxBadge() {
+  return (
+    <span
+      className="inline-flex items-center gap-1 border border-ew-rule px-1.5 py-0.5 text-[11px] font-medium text-ew-ink-soft"
+      title="The file was opened only inside a throwaway sandbox and read by a fixed parser; every line below is copied from the statement."
+    >
+      <ShieldCheck className="h-3 w-3" aria-hidden="true" />
+      Parsed in an isolated sandbox
+    </span>
   );
 }
 

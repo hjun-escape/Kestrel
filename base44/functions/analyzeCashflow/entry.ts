@@ -1,13 +1,15 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { runCashflowAnalysis } from './logic.ts';
 import { parseAllowedHosts } from './fileUrl.ts';
+import { MAX_SANDBOX_FILE_BYTES, createDaytonaRestClient } from './sandbox.ts';
 import type { ExtractParams, LLMFileParams } from './logic.ts';
 
 // analyzeCashflow({ borrower_id, file_url }) -> { review }
 //
 // Cash-flow document check. Reads transactions from an uploaded bank or cash-flow
-// statement (CSV parsed in code; PDF/XLSX/images via ExtractDataFromUploadedFile,
-// with InvokeLLM + file_urls as a fallback), then code finds the lenders paid from
+// statement (CSV parsed in code; PDF/XLSX/XLS parsed by a fixed script in a throwaway
+// Daytona sandbox when DAYTONA_API_KEY is set; otherwise, or if that fails, via
+// ExtractDataFromUploadedFile, with InvokeLLM + file_urls as a fallback), then code finds the lenders paid from
 // the account, late and missed payments, NSF items and debt-service metrics.
 // Saves one CashflowReview record per run.
 //
@@ -23,6 +25,16 @@ async function fetchText(url: string): Promise<string> {
   const text = await res.text();
   if (text.length > MAX_CSV_BYTES) throw new Error('File is too large to read');
   return text;
+}
+
+async function fetchBytes(url: string): Promise<Uint8Array> {
+  const res = await fetch(url, { redirect: 'error' });
+  if (!res.ok) throw new Error(`File download failed (HTTP ${res.status})`);
+  const length = Number(res.headers.get('content-length') ?? 0);
+  if (length > MAX_SANDBOX_FILE_BYTES) throw new Error('File is too large for the sandbox');
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  if (bytes.byteLength > MAX_SANDBOX_FILE_BYTES) throw new Error('File is too large for the sandbox');
+  return bytes;
 }
 
 /** Base44 entity fields are typed as numbers; drop nulls rather than storing them. */
@@ -58,10 +70,13 @@ export default async function(req: Request): Promise<Response> {
     }
 
     const core = base44.asServiceRole.integrations.Core;
+    const daytonaKey = Deno.env.get('DAYTONA_API_KEY')?.trim();
     const result = await runCashflowAnalysis({
       borrowerId,
       fileUrl,
       fetchText,
+      fetchBytes,
+      daytona: daytonaKey ? createDaytonaRestClient({ apiKey: daytonaKey }) : null,
       allowedHosts: parseAllowedHosts(Deno.env.get('ALLOWED_FILE_HOSTS')),
       extract: (params: ExtractParams) => core.ExtractDataFromUploadedFile(params),
       invokeLLM: (params: LLMFileParams) => core.InvokeLLM(params),
@@ -75,7 +90,7 @@ export default async function(req: Request): Promise<Response> {
     }
 
     const saved = await db.CashflowReview.create(withoutNulls({ ...result.review }));
-    return Response.json({ review: { ...result.review, ...saved } });
+    return Response.json({ review: { ...result.review, ...saved }, attempts: result.attempts });
   } catch (error) {
     console.error('analyzeCashflow error:', (error as Error).message);
     return Response.json({ error: (error as Error).message }, { status: 500 });

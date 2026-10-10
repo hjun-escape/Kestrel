@@ -12,6 +12,8 @@ import { withTimeout } from './shared.ts';
 import { classifyLender, isLateFeeLine, isNsfLine } from './classify.ts';
 import { TRANSACTIONS_SCHEMA, parseCsvStatement, parseExtractionResult } from './parse.ts';
 import type { Row } from './parse.ts';
+import { SANDBOX_BUDGET_MS, extractRowsInSandbox, sandboxFileKind } from './sandbox.ts';
+import type { DaytonaClient } from './sandbox.ts';
 
 export { classifyLender, isLateFeeLine, isNsfLine, TRANSACTIONS_SCHEMA, parseCsvStatement, parseExtractionResult };
 export type { Row };
@@ -36,7 +38,7 @@ const DAY_MS = 86_400_000;
 
 export type Cadence = 'monthly' | 'weekly' | 'biweekly' | 'daily' | 'irregular';
 export type Severity = 'strong' | 'weak';
-export type ExtractionMethod = 'csv' | 'extract' | 'llm';
+export type ExtractionMethod = 'csv' | 'sandbox' | 'extract' | 'llm';
 
 export interface Evidence {
   date: string;
@@ -428,6 +430,12 @@ export interface CashflowDeps {
   extract: (params: ExtractParams) => Promise<unknown>;
   /** base44.asServiceRole.integrations.Core.InvokeLLM with file_urls */
   invokeLLM: (params: LLMFileParams) => Promise<unknown>;
+  /** Daytona client for parsing PDF/XLSX/XLS in a sandbox; null when DAYTONA_API_KEY is not set. */
+  daytona?: DaytonaClient | null;
+  /** GET a file as bytes (≤5 MB), used to hand the statement to the sandbox. */
+  fetchBytes?: (url: string) => Promise<Uint8Array>;
+  /** Total time for the sandbox path before falling back (default 60 s). */
+  sandboxBudgetMs?: number;
   now?: () => Date;
 }
 
@@ -456,6 +464,32 @@ function isCsvUrl(url: string): boolean {
   }
 }
 
+/** PDF/XLSX/XLS: parse in a throwaway Daytona sandbox. Returns null when skipped or failed. */
+async function readRowsInSandbox(deps: CashflowDeps, attempts: string[]): Promise<Row[] | null> {
+  const kind = sandboxFileKind(deps.fileUrl);
+  if (!kind) return null;
+  if (!deps.daytona || !deps.fetchBytes) {
+    attempts.push('sandbox skipped: DAYTONA_API_KEY not set');
+    return null;
+  }
+  const budgetMs = deps.sandboxBudgetMs ?? SANDBOX_BUDGET_MS;
+  const started = Date.now();
+  try {
+    const bytes = await withTimeout(deps.fetchBytes(deps.fileUrl), budgetMs, 'Sandbox download');
+    const run = await extractRowsInSandbox({
+      client: deps.daytona,
+      bytes,
+      kind,
+      budgetMs: Math.max(1, budgetMs - (Date.now() - started)),
+    });
+    attempts.push(`sandbox: ${run.rows.length} rows in ${(run.timings.total_ms / 1000).toFixed(1)} s`);
+    return run.rows;
+  } catch (error) {
+    attempts.push(`sandbox failed: ${errorMessage(error)}`);
+    return null;
+  }
+}
+
 async function readRows(deps: CashflowDeps, attempts: string[]): Promise<{ rows: Row[]; method: ExtractionMethod } | null> {
   if (isCsvUrl(deps.fileUrl)) {
     try {
@@ -466,6 +500,8 @@ async function readRows(deps: CashflowDeps, attempts: string[]): Promise<{ rows:
       attempts.push(`csv failed: ${errorMessage(error)}`);
     }
   }
+  const sandboxRows = await readRowsInSandbox(deps, attempts);
+  if (sandboxRows?.length) return { rows: sandboxRows, method: 'sandbox' };
   try {
     const raw = await withTimeout(
       deps.extract({ file_url: deps.fileUrl, json_schema: TRANSACTIONS_SCHEMA }),
