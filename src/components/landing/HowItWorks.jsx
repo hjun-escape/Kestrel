@@ -1,7 +1,5 @@
-import React, { useLayoutEffect, useRef } from "react";
-import { createScope, createTimeline, stagger, utils } from "animejs";
+import React from "react";
 import { ChecksIllustration, DecideIllustration, ScreenIllustration } from "./StepIllustrations";
-import { DISTANCE, DURATION, EASE, REVEAL_ROOT_MARGIN, prefersReducedMotion } from "./motion";
 
 const STEPS = [
   {
@@ -21,99 +19,48 @@ const STEPS = [
   },
 ];
 
-// From-state and entrance for each kind of illustration part.
-const PARTS = {
-  slide: { from: { opacity: 0, x: -DISTANCE.sm }, to: { opacity: [0, 1], x: [-DISTANCE.sm, 0], delay: stagger(140) } },
-  caret: { from: { opacity: 0 }, to: { opacity: [0, 1], duration: DURATION.fast } },
-  press: { from: { opacity: 0, scale: 0.92 }, to: { opacity: [0, 1], scale: [0.92, 1], ease: "outBack" } },
-  row: { from: { opacity: 0, x: -DISTANCE.sm }, to: { opacity: [0, 1], x: [-DISTANCE.sm, 0], delay: stagger(110) } },
-  highlight: { from: { scaleX: 0 }, to: { scaleX: [0, 1], duration: DURATION.slow, ease: EASE.settle } },
-  choice: { from: { opacity: 0, y: DISTANCE.sm }, to: { opacity: [0, 1], y: [DISTANCE.sm, 0], delay: stagger(80) } },
-};
+// Step accents, matching the hero pipeline's source colours (red/amber/green stay reserved for status).
+const ACCENTS = ["#38bdf8", "#c084fc", "#2dd4bf"];
 
-// Rewinds one step's illustration and returns a paused timeline that plays it.
-function buildStepReveal(stepEl) {
-  const tl = createTimeline({ defaults: { duration: DURATION.normal, ease: EASE.enter }, autoplay: false });
-  let at = 0;
-  Object.entries(PARTS).forEach(([kind, { from, to }]) => {
-    const els = stepEl.querySelectorAll(`[data-step-part="${kind}"]`);
-    if (!els.length) return;
-    utils.set(els, from);
-    tl.add(els, to, at);
-    at += 160;
-  });
-  return tl;
-}
-
-// Plays each step once, the first time it scrolls into view. An
-// IntersectionObserver (not a scroll-synced observer) so a fast scroll past
-// never leaves a reveal paused halfway.
-function useStepReveals(rootRef) {
-  useLayoutEffect(() => {
-    const root = rootRef.current;
-    if (prefersReducedMotion() || !root || typeof IntersectionObserver === "undefined") return undefined;
-    const reveals = new Map();
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (!entry.isIntersecting) return;
-          reveals.get(entry.target)?.play();
-          observer.unobserve(entry.target);
-        });
-      },
-      { rootMargin: REVEAL_ROOT_MARGIN },
-    );
-    const scope = createScope({ root }).add(() => {
-      root.querySelectorAll("[data-step]").forEach((stepEl) => {
-        reveals.set(stepEl, buildStepReveal(stepEl));
-        observer.observe(stepEl);
-      });
-    });
-    return () => {
-      observer.disconnect();
-      scope.revert();
-    };
-  }, [rootRef]);
-}
-
+// Static by design: the illustrations render their final state, no scroll-in animation.
 export default function HowItWorks() {
-  const rootRef = useRef(null);
-  useStepReveals(rootRef);
-
   return (
-    <section aria-labelledby="how-heading" className="bg-ew-paper py-20 sm:py-28">
+    <section aria-labelledby="how-heading" className="border-t border-white/10 bg-ew-ink py-20 text-white sm:py-28">
       <div className="mx-auto max-w-[1200px] px-4 sm:px-8">
-        <div className="max-w-2xl">
+        <div className="max-w-3xl">
           <h2
             id="how-heading"
-            className="font-heading text-[clamp(2rem,1.4rem+2.4vw,3.25rem)] font-bold leading-[1.02] tracking-[-0.02em] text-ew-ink [font-stretch:78%]"
+            className="font-heading text-[clamp(2.2rem,1.5rem+2.8vw,3.75rem)] font-bold leading-[1.02] tracking-[-0.02em] text-white [font-stretch:78%]"
           >
             A screening takes minutes, not a week of reading.
           </h2>
-          <p className="mt-4 max-w-xl text-[17px] leading-relaxed text-ew-ink-soft">
+          <p className="mt-4 max-w-xl text-[18px] leading-relaxed text-white/80">
             The same checks run before the bank lends and keep running after the loan closes.
           </p>
         </div>
 
-        <ol ref={rootRef} className="mt-14 grid gap-14 lg:grid-cols-3 lg:gap-10">
+        <ol className="mt-14 grid gap-6 lg:grid-cols-3">
           {STEPS.map(({ title, body, Illustration }, i) => (
-            <li key={title} data-step className="md:grid md:grid-cols-2 md:gap-x-10 lg:flex lg:flex-col">
-              <div className="md:col-start-1">
-                <div className="flex items-center gap-3 border-t-2 border-ew-ink pt-3">
-                  <span
-                    aria-hidden="true"
-                    className="font-heading text-[28px] font-bold leading-none text-ew-ink tnum [font-stretch:75%]"
-                  >
-                    {i + 1}
-                  </span>
-                  <h3 className="text-[17px] font-semibold leading-snug text-ew-ink">
-                    <span className="sr-only">Step {i + 1}: </span>
-                    {title}
-                  </h3>
-                </div>
-                <p className="mt-3 text-[15px] leading-relaxed text-ew-ink-soft">{body}</p>
+            <li
+              key={title}
+              className="flex flex-col rounded-sm border border-white/12 bg-white/[0.05] p-6"
+              style={{ borderTop: `3px solid ${ACCENTS[i]}` }}
+            >
+              <div className="flex items-start gap-4">
+                <span
+                  aria-hidden="true"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-sm font-heading text-[24px] font-bold leading-none text-ew-ink tnum [font-stretch:75%]"
+                  style={{ background: ACCENTS[i] }}
+                >
+                  {i + 1}
+                </span>
+                <h3 className="pt-1 text-[19px] font-semibold leading-snug text-white">
+                  <span className="sr-only">Step {i + 1}: </span>
+                  {title}
+                </h3>
               </div>
-              <div className="mt-6 min-h-[188px] md:col-start-2 md:row-start-1 md:mt-0 lg:mt-6" aria-hidden="true">
+              <p className="mt-4 text-[15.5px] leading-relaxed text-white/80">{body}</p>
+              <div className="mt-6 flex-1" aria-hidden="true">
                 <Illustration />
               </div>
             </li>

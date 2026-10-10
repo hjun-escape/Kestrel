@@ -1,8 +1,6 @@
 import React from "react";
 
-// Small illustrations for the three steps. Each renders its final state;
-// HowItWorks rewinds and plays them once when scrolled into view.
-// Elements marked data-step-part are what the reveal animates.
+// Small illustrations for the three steps, shown in their final state (no animation).
 
 const SURFACE =
   "h-full rounded-[3px] border border-ew-rule bg-white p-4 shadow-[0_10px_24px_-20px_rgba(20,32,46,0.55)]";
