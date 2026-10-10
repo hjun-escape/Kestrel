@@ -6,8 +6,12 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 // source by source, and saves after each source finishes so the detail screen
 // fills in progressively. Then applies status scoring (P3) and saves.
 //
-// While every entry below is disabled it only sets last_refreshed to now and
-// leaves everything else unchanged (the v1 stub behaviour).
+// While every entry below is disabled it only sets last_refreshed to now on a
+// company that was already checked (the seeded ones) and leaves everything
+// else unchanged (the v1 stub behaviour). A company that was never checked gets
+// an error instead, so a new applicant never shows a status nobody computed.
+// Once any function is enabled, a disabled one counts as unavailable, and a
+// refresh where no source answered is reported as a failure.
 //
 // The Bright Data key is a Base44 secret named BRIGHTDATA_API_KEY. Only the
 // signal functions read it, with Deno.env.get('BRIGHTDATA_API_KEY'). Never put
@@ -54,13 +58,26 @@ export default async function(req: Request): Promise<Response> {
     const db = base44.asServiceRole.entities;
     const borrower = await db.Borrower.get(borrowerId);
 
+    const enabled = SIGNAL_FUNCTIONS.filter((f) => f.enabled);
+    if (enabled.length === 0) {
+      if (!borrower.last_refreshed) {
+        return Response.json({ error: 'No data sources are connected yet.' }, { status: 503 });
+      }
+      const updated = await db.Borrower.update(borrowerId, { last_refreshed: new Date().toISOString() });
+      return Response.json({ borrower: updated });
+    }
+
     const unavailable = new Set<string>(borrower.sources_unavailable || []);
+    for (const fn of SIGNAL_FUNCTIONS.filter((f) => !f.enabled)) {
+      Object.values(fn.sources).forEach((s) => unavailable.add(s));
+    }
+    let answered = 0;
 
     // Saves run one after another so a slower write never overwrites a newer one.
     let saveChain: Promise<unknown> = Promise.resolve();
     const save = (fn: () => Promise<unknown>) => (saveChain = saveChain.then(fn));
 
-    const runs = SIGNAL_FUNCTIONS.filter((f) => f.enabled).map(async (fn) => {
+    const runs = enabled.map(async (fn) => {
       const types = Object.keys(fn.sources);
       const sourceNames = Object.values(fn.sources);
       try {
@@ -84,6 +101,7 @@ export default async function(req: Request): Promise<Response> {
           }
           if (signals.length > 0) await db.Signal.bulkCreate(signals);
           sourceNames.forEach((s) => unavailable.delete(s));
+          answered += 1;
           await db.Borrower.update(borrowerId, { sources_unavailable: [...unavailable] });
         });
       } catch (error) {
@@ -98,6 +116,11 @@ export default async function(req: Request): Promise<Response> {
 
     await Promise.all(runs);
     await saveChain;
+
+    if (answered === 0) {
+      // Nothing was checked: keep last_refreshed, status and why as they were.
+      return Response.json({ error: 'No data source responded. Try again in a minute.' }, { status: 502 });
+    }
 
     const finalUpdate: Record<string, unknown> = {
       last_refreshed: new Date().toISOString(),
