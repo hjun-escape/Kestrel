@@ -233,3 +233,24 @@ test("crafted snapshot_id or non-Glassdoor URL is refused before any request", a
     globalThis.fetch = realFetch;
   }
 });
+
+test("tagItem failing or giving no answer keeps the keyword match", async () => {
+  const raw = [rev(5, 3, "Layoffs coming, I heard. Management is weak.")];
+  const thrown = await reviewSignalsFromReviews(B, raw, TODAY, async () => {
+    throw new Error("tagItem 502");
+  });
+  assert.equal(thrown[0].snippet, "Layoffs coming, I heard.");
+  const empty = await reviewSignalsFromReviews(B, raw, TODAY, async () => null);
+  assert.equal(empty[0].severity, "strong");
+});
+
+test("tagItem: review_distress or legal_layoffs confirms; exec_departure or not relevant vetoes", async () => {
+  const raw = [rev(5, 3, "Layoffs coming, I heard.")];
+  const as = (signal_type: string | null, relevant = true) => reviewSignalsFromReviews(B, raw, TODAY, async () => ({ relevant, signal_type: signal_type ?? undefined, snippet: "Layoffs coming" }));
+  assert.equal((await as("review_distress")).length, 1);
+  assert.equal((await as("legal_layoffs")).length, 1);
+  assert.equal((await as("legal_layoffs"))[0].snippet, "Layoffs coming");
+  assert.deepEqual(await as("exec_departure"), []);
+  assert.deepEqual(await as(null), []);
+  assert.deepEqual(await as("review_distress", false), []);
+});

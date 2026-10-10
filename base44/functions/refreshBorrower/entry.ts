@@ -32,7 +32,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 // set enabled: true on its line. Scoring must already be on. P1 merges.
 const SIGNAL_FUNCTIONS = [
   { name: 'newsSignals',   owner: 'P2', enabled: true,  sources: { exec_departure: 'News', legal_layoffs: 'Legal' } },
-  { name: 'hiringSignal',  owner: 'P3', enabled: false, sources: { hiring_drop: 'Jobs' } },
+  { name: 'hiringSignal',  owner: 'P3', enabled: true,  sources: { hiring_drop: 'Jobs' } },
   { name: 'reviewSignals', owner: 'P3', enabled: false, sources: { review_distress: 'Reviews' } },
 ];
 
