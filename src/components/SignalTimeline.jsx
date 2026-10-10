@@ -5,11 +5,12 @@ import { SIGNAL_TYPES } from "@/lib/signalTypes";
 import { groupSignalsByMonth, parseSignalDate, splitByRecency, RECENT_DAYS } from "@/lib/borrowerUtils";
 
 // Evidence timeline, newest first, grouped by month. Signals from the last 90
-// days count toward status; older ones sit dimmed under "Older than 90 days".
+// days count toward status; older, future-dated and undated ones sit dimmed under
+// "Outside the last 90 days".
 // Each item: type, severity, date, title, the exact snippet as a quote, a
 // source link (new tab) and a follow-up question.
 export default function SignalTimeline({ signals, neverRefreshed, checking, newIds }) {
-  const { recent, older } = splitByRecency(signals, RECENT_DAYS);
+  const { recent, older } = splitByRecency(signals);
 
   if (recent.length === 0 && older.length === 0) {
     return <EmptyTimeline neverRefreshed={neverRefreshed} checking={checking} />;
@@ -29,7 +30,7 @@ export default function SignalTimeline({ signals, neverRefreshed, checking, newI
         <section aria-labelledby="older-heading" className="mt-8">
           <div className="mb-2 flex items-baseline justify-between border-b border-dashed border-ew-rule pb-1.5">
             <h3 id="older-heading" className="text-sm font-semibold text-ew-muted">
-              Older than {RECENT_DAYS} days
+              Outside the last {RECENT_DAYS} days
             </h3>
             <span className="text-xs text-ew-muted">Not counted in status</span>
           </div>
