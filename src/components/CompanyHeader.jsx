@@ -33,7 +33,7 @@ export default function CompanyHeader({ borrower, sourceStates, running, refresh
               Made-up company and signals, shown so the screens have something in them. It is not checked live.
             </p>
           )}
-          <div className="mt-3 flex items-start gap-3">
+          <div data-demo="status-why" className="mt-3 flex items-start gap-3">
             <StatusBadge status={borrower.status} lastRefreshed={borrower.last_refreshed} size="lg" />
             <p className="max-w-[68ch] pt-0.5 text-[15px] leading-snug text-ew-ink-soft">
               {borrower.last_refreshed

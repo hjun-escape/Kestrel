@@ -469,7 +469,7 @@ export default function ApplicantDecision({ borrower, signals }) {
           <SearchLog searched={check?.searched} />
         </div>
 
-        <div className="border-t border-gray-100 pt-5">
+        <div data-demo="documents" className="border-t border-gray-100 pt-5">
           <DocumentChecklist items={documents} onCopy={copyEmail} copied={copied} />
         </div>
 

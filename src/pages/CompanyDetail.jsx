@@ -187,7 +187,7 @@ export default function CompanyDetail() {
       {/* Evidence first: the signals behind the status, each with its source and
           what to ask. Next steps (decision, other lenders, analyst) sit beside it. */}
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_400px]">
-        <section aria-labelledby="evidence-heading" className="min-w-0">
+        <section data-demo="evidence" aria-labelledby="evidence-heading" className="min-w-0">
           <div className="mb-3 flex items-baseline justify-between gap-4">
             <h2 id="evidence-heading" className="font-heading text-xl font-bold tracking-tight text-ew-ink">
               Evidence
