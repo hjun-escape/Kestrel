@@ -2,13 +2,8 @@ import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
-import SourceStatusRow from "@/components/SourceStatusRow";
-import CheckTrace from "@/components/CheckTrace";
-import CompanyHeader from "@/components/CompanyHeader";
-import SignalTimeline from "@/components/SignalTimeline";
-import { filterRecentSignals } from "@/lib/borrowerUtils";
+import CompanyReport from "@/components/CompanyReport";
 import { scoreBorrower } from "../../base44/functions/scoreBorrower/entry.ts";
-import WarningScore from "@/components/WarningScore";
 // The same CheckRun builder newsSignals uses on the server, so this replay renders exactly what a live check saves.
 import { applyEvent, addLog, applyLinkedIn, newCheckRun } from "../../base44/functions/newsSignals/trace.ts";
 
@@ -216,29 +211,6 @@ function AddCompanyStep({ form, typing, onSubmit }) {
   );
 }
 
-function CompanyPage({ borrower, run, signals, running, startedAt, states }) {
-  const recentSignals = filterRecentSignals(signals);
-  return (
-    <>
-      <div className="border border-ew-rule bg-ew-surface">
-        <CompanyHeader borrower={borrower} sourceStates={states} running={running} refreshError={null} onRefresh={() => {}} />
-        <SourceStatusRow states={states} recentSignals={recentSignals} running={running} startedAt={startedAt} />
-        <WarningScore borrower={borrower} signals={signals} />
-        <CheckTrace run={run} refreshing={running} stale={false} />
-      </div>
-      <section aria-labelledby="demo-evidence-heading" className="mt-6">
-        <div className="mb-3 flex items-baseline justify-between gap-4">
-          <h2 id="demo-evidence-heading" className="font-heading text-xl font-bold tracking-tight text-ew-ink">
-            Evidence
-          </h2>
-          <p className="font-mono text-xs text-ew-muted">{recentSignals.length} in last 90 days</p>
-        </div>
-        <SignalTimeline signals={signals} neverRefreshed={!borrower.last_refreshed} checking={running} newIds={null} />
-      </section>
-    </>
-  );
-}
-
 export default function DevProgression() {
   const [stage, setStage] = useState("add");
   const [reached, setReached] = useState(["add"]);
@@ -317,7 +289,7 @@ export default function DevProgression() {
       ? { status: scored.status, why: scored.why, last_refreshed: run.finished_at, sources_unavailable: ["Jobs", "Reviews"] }
       : {}),
   };
-  // Jobs and Reviews are switched off in refreshBorrower today, so they answer "unavailable" right away.
+  // This example replays the News and Legal check only, so Jobs and Reviews show as not answering.
   const states = {
     News: finished ? "ok" : "checking",
     Legal: finished ? "ok" : "checking",
@@ -374,17 +346,18 @@ export default function DevProgression() {
         )}
 
         {stage === "check" && (
-          <CompanyPage borrower={borrower} run={run} signals={signals} running={playing} startedAt={startedAt} states={states} />
+          <CompanyReport borrower={borrower} signals={signals} sourceStates={states} running={playing} startedAt={startedAt} checkRun={run} />
         )}
 
         {stage === "report" && (
           <>
             <p className="mb-3 border border-ew-rule bg-ew-surface px-4 py-2.5 text-sm text-ew-ink-soft">
-              This is the saved report: the company page. It stays in the loan book, so the officer can come back to it
-              any time, and Refresh runs the same check again. Open &ldquo;How News and Legal were checked&rdquo; to see
-              every step behind it.
+              This is the saved report: the same company page the app shows. It stays in the loan book, so the officer
+              can come back to it any time, and Refresh runs the check again. Open &ldquo;How News and Legal were
+              checked&rdquo; to see every step behind it. In this example only News and Legal were replayed, and the
+              buttons in the lower sections do nothing because the company is not saved.
             </p>
-            <CompanyPage borrower={borrower} run={run} signals={signals} running={false} startedAt={null} states={states} />
+            <CompanyReport borrower={borrower} signals={signals} sourceStates={states} checkRun={run} />
           </>
         )}
       </main>
