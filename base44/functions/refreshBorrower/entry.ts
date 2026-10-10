@@ -47,6 +47,9 @@ const SCORING_ENABLED = true;
 // (about 150 s at most), so the id reaches us and the next refresh can resume.
 const SOURCE_TIMEOUT_MS = 200_000;
 
+// A company checked more recently than this is not checked again (see the cooldown below).
+const COOLDOWN_MS = 2 * 60_000;
+
 // Seed data (src/lib/seedData.js) marks every fake signal this way. A real
 // refresh deletes them so they are never scored as if they were real.
 const PLACEHOLDER_PREFIX = '[placeholder]';
@@ -100,6 +103,16 @@ export default async function(req: Request): Promise<Response> {
         { error: 'Sample company with made-up data, so it is not checked live. Screen a real company to see live checks.' },
         { status: 409 },
       );
+    }
+
+    // Cooldown: every check spends Bright Data credits and the app is open
+    // without login, so a company checked in the last two minutes is not checked
+    // again. A refresh that only resumes a still-building snapshot is allowed,
+    // and so are app admins.
+    const lastChecked = borrower.last_refreshed ? Date.parse(borrower.last_refreshed) : NaN;
+    const resuming = Object.values(borrower.pending_snapshots || {}).some((id) => typeof id === 'string' && id !== '');
+    if (Date.now() - lastChecked < COOLDOWN_MS && !resuming && caller?.role !== 'admin') {
+      return Response.json({ error: 'Checked less than two minutes ago. Try again shortly.' }, { status: 429 });
     }
 
     const enabled = SIGNAL_FUNCTIONS.filter((f) => f.enabled);

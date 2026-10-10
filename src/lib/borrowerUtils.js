@@ -222,13 +222,27 @@ export function startRefresh(borrowerId, snapshot) {
 // "ok" | "unavailable" | "checking" | "not_checked".
 // While a run is active, a source counts as answered once a new signal from it
 // arrives or its entry in sources_unavailable changes; otherwise it is checking.
+// Which signal function feeds each source (matches refreshBorrower).
+const SOURCE_FUNCTION = { News: "newsSignals", Legal: "newsSignals", Jobs: "hiringSignal", Reviews: "reviewSignals" };
+
+// Why a source has no fresh result, from what the company record already holds.
+// "collecting": Bright Data is still building a snapshot that the next refresh
+// resumes (refreshBorrower keeps its id in pending_snapshots).
+export function sourceNote(borrower, src) {
+  if (borrower?.pending_snapshots?.[SOURCE_FUNCTION[src]]) return { collecting: true };
+  if (src === "Jobs" && !borrower?.linkedin_url) return { note: "Needs the company's LinkedIn page" };
+  if (src === "Reviews" && !borrower?.glassdoor_url) return { note: "Needs the company's Glassdoor page" };
+  return null;
+}
+
 export function deriveSourceStates(borrower, signals, run) {
   const unavailableNow = new Set(borrower?.sources_unavailable || []);
   const states = {};
   SOURCES.forEach((src) => {
     if (!run) {
       if (!borrower?.last_refreshed) states[src] = "not_checked";
-      else states[src] = unavailableNow.has(src) ? "unavailable" : "ok";
+      else if (!unavailableNow.has(src)) states[src] = "ok";
+      else states[src] = sourceNote(borrower, src)?.collecting ? "collecting" : "unavailable";
       return;
     }
     const before = new Set(run.snapshot.signalIdsBefore);
