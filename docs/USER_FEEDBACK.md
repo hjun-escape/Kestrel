@@ -54,9 +54,9 @@ Has never vetted a private company for a loan, so they couldn't name specific mi
 ### What we changed
 | Tester said | Change | Status |
 |---|---|---|
-| Colors aren't defined | Status legend on the loan book and company page, plus a count line ("2 strong, 1 weak in the last 90 days → Red") | In progress |
-| AI answers vary, so it can't be fully relied on | Say it on screen: "Status is set by fixed rules, not AI. The same evidence always gives the same status. Every quote is checked word for word against its source." | In progress |
-| Wants an audit trail | Per-company audit trail (every check, signal, analysis, cash-flow review and decision, with who and when), exportable to CSV/PDF | In progress |
+| Colors aren't defined | Status legend on the loan book and company page, plus a count line ("2 strong, 1 weak in the last 90 days → Red") | **Built** |
+| AI answers vary, so it can't be fully relied on | Say it on screen: "Status is set by fixed rules, not AI. The same evidence always gives the same status. Every quote is checked word for word against its source." | **Built** |
+| Wants an audit trail | Per-company audit trail (every check, signal, analysis, cash-flow review and decision, with who and when), exportable to CSV/PDF | **Built** |
 
 ## Sense check 3: Our question (6–7 PM)
 _TBD_
