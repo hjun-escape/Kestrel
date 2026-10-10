@@ -92,6 +92,16 @@ export default async function(req: Request): Promise<Response> {
       return Response.json({ error: 'You do not have access to this company.' }, { status: 403 });
     }
 
+    // Sample companies (src/lib/seedData.js) have made-up names, profile URLs and
+    // signals on the reserved .example domain. A live check would find nothing,
+    // delete their sample signals and mark them Green, so they are never refreshed.
+    if (/\.example$/i.test(String(borrower.website_domain || '').trim())) {
+      return Response.json(
+        { error: 'Sample company with made-up data, so it is not checked live. Screen a real company to see live checks.' },
+        { status: 409 },
+      );
+    }
+
     const enabled = SIGNAL_FUNCTIONS.filter((f) => f.enabled);
     if (enabled.length === 0) {
       if (!borrower.last_refreshed) {
