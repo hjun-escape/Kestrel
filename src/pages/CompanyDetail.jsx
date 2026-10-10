@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useParams, Link, useSearchParams } from "react-router-dom";
+import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, ChevronRight, ExternalLink } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import AppHeader from "@/components/AppHeader";
@@ -11,6 +11,8 @@ import CashflowReview from "@/components/CashflowReview";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { formatTimeToFlag, timeToFirstFlag } from "@/lib/timeToFlag.ts";
 import AnalystBrief from "@/components/AnalystBrief";
+import EditCompanyDialog from "@/components/EditCompanyDialog";
+import DeleteCompanyDialog from "@/components/DeleteCompanyDialog";
 import { useAuth } from "@/lib/AuthContext";
 import { canSeeCompany, normalizeEmail } from "@/lib/ownership";
 import {
@@ -49,6 +51,10 @@ export default function CompanyDetail() {
   const [run, setRun] = useState(null);
   const [refreshError, setRefreshError] = useState(null);
   const [cashflowReview, setCashflowReview] = useState(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [notice, setNotice] = useState(null);
+  const navigate = useNavigate();
 
   async function loadData() {
     const requestedId = id;
@@ -94,6 +100,7 @@ export default function CompanyDetail() {
     setRun(null);
     setRefreshError(null);
     setCashflowReview(null);
+    setNotice(null);
     if (isLoadingAuth) return;
     (async () => {
       let data = null;
@@ -177,7 +184,14 @@ export default function CompanyDetail() {
           running={running}
           refreshError={refreshError}
           onRefresh={() => handleRefresh()}
+          onEdit={() => setEditOpen(true)}
+          onDelete={() => setDeleteOpen(true)}
         />
+        {notice && (
+          <p role="status" className="border-t border-ew-rule-soft px-5 py-2 text-xs text-ew-ink-soft">
+            {notice}
+          </p>
+        )}
         <SourceStatusRow states={sourceStates} recentSignals={recentSignals} running={running} startedAt={run?.startedAt} />
         {flagLine && (
           <p className="border-t border-ew-rule-soft px-5 py-2 text-xs text-ew-ink-soft">{flagLine}</p>
@@ -218,6 +232,24 @@ export default function CompanyDetail() {
             </Collapsible>
           )}
         </section>
+
+        <EditCompanyDialog
+          borrower={borrower}
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          onSaved={(updated, evidenceCleared) => {
+            if (updated) setBorrower(updated);
+            if (evidenceCleared) setSignals([]);
+            setNotice(evidenceCleared ? "Saved. The old evidence was cleared because the company's identity changed. Refresh to check it again." : "Saved.");
+            loadData().catch(() => {});
+          }}
+        />
+        <DeleteCompanyDialog
+          borrower={borrower}
+          open={deleteOpen}
+          onOpenChange={setDeleteOpen}
+          onDeleted={() => navigate("/", { replace: true })}
+        />
 
         <aside aria-label="Next steps" className="flex min-w-0 flex-col gap-4">
           <ApplicantDecision key={borrower.id} borrower={borrower} signals={signals} />
