@@ -44,7 +44,7 @@ export function StatusChip({ status, className = "" }) {
   );
 }
 
-const CARD = "rounded-sm border border-ew-rule bg-white p-4 text-ew-ink shadow-[0_18px_50px_rgba(0,0,0,0.35)]";
+const CARD = "rounded-sm border border-ew-rule bg-white p-4 text-ew-ink shadow-[0_10px_28px_-18px_rgba(20,32,46,0.4)]";
 
 // ------------------------------------------------------------------ Minutes, not a week
 export function RaceBars() {
@@ -58,15 +58,15 @@ export function RaceBars() {
         { label: "Kestrel", pct: kestrel, end: "2 min", fast: true },
       ].map((r) => (
         <div key={r.label} className="grid grid-cols-[130px_minmax(0,1fr)_84px] items-center gap-4">
-          <span className={`text-[14px] ${r.fast ? "font-semibold text-white" : "text-white/65"}`}>{r.label}</span>
-          <span className="h-3 overflow-hidden rounded-sm bg-white/10">
+          <span className={`text-[14px] ${r.fast ? "font-semibold text-ew-ink" : "text-ew-muted"}`}>{r.label}</span>
+          <span className="h-3 overflow-hidden rounded-sm bg-ew-rule/60">
             <span
-              className={`block h-full rounded-sm ${r.fast ? "bg-[#38bdf8]" : "bg-white/35"}`}
+              className={`block h-full rounded-sm ${r.fast ? "bg-[#0ea5e9]" : "bg-ew-muted/45"}`}
               style={{ width: `${r.pct}%`, transition: `width ${r.fast ? 600 : 900}ms ${r.fast ? "cubic-bezier(.2,.8,.2,1)" : "linear"}` }}
             />
           </span>
-          <span className={`flex items-center gap-1.5 font-mono text-[13px] ${r.fast ? "text-white" : "text-white/55"}`}>
-            {r.fast && r.pct === 100 && <Check aria-hidden="true" className="h-3.5 w-3.5 text-[#38bdf8]" />}
+          <span className={`flex items-center gap-1.5 font-mono text-[13px] ${r.fast ? "font-semibold text-ew-ink" : "text-ew-muted"}`}>
+            {r.fast && r.pct === 100 && <Check aria-hidden="true" className="h-3.5 w-3.5 text-[#0284c7]" />}
             {r.end}
           </span>
         </div>
@@ -186,26 +186,26 @@ export function LeadTimeline() {
   const fin = pos(11, 14);
   return (
     <div ref={ref} className="relative pb-2 pt-10">
-      <div className="relative h-px bg-white/30">
+      <div className="relative h-px bg-ew-ink/25">
         {AXIS.map((a) => (
-          <span key={a.label} className="absolute top-3 -translate-x-1/2 text-[12px] text-white/50" style={{ left: `${a.at}%` }}>
+          <span key={a.label} className="absolute top-3 -translate-x-1/2 text-[12px] text-ew-muted" style={{ left: `${a.at}%` }}>
             {a.label}
           </span>
         ))}
         {flags.map((f, i) => (
           <span key={f.label} className={`absolute -top-[7px] transition-all duration-500 ${step > i ? "scale-100 opacity-100" : "scale-0 opacity-0"}`} style={{ left: `${f.left}%` }}>
             <span className="block h-3.5 w-3.5 -translate-x-1/2 rounded-full bg-ew-red ring-4 ring-ew-red/25" />
-            <span className="absolute -top-8 left-0 -translate-x-1/2 whitespace-nowrap text-[12.5px] font-semibold text-white">{f.label}</span>
+            <span className="absolute -top-8 left-0 -translate-x-1/2 whitespace-nowrap text-[12.5px] font-semibold text-ew-ink">{f.label}</span>
           </span>
         ))}
-        <span className={`absolute -top-6 h-12 border-l-2 border-dashed border-white/60 transition-opacity duration-500 ${step >= 3 ? "opacity-100" : "opacity-0"}`} style={{ left: `${fin}%` }}>
-          <span className="absolute -top-6 left-0 -translate-x-1/2 whitespace-nowrap text-[12.5px] font-semibold text-white/80">Q3 financials</span>
+        <span className={`absolute -top-6 h-12 border-l-2 border-dashed border-ew-ink/50 transition-opacity duration-500 ${step >= 3 ? "opacity-100" : "opacity-0"}`} style={{ left: `${fin}%` }}>
+          <span className="absolute -top-6 left-0 -translate-x-1/2 whitespace-nowrap text-[12.5px] font-semibold text-ew-ink-soft">Q3 financials</span>
         </span>
         <span
-          className="absolute top-9 h-2 border-x-2 border-b-2 border-[#38bdf8] transition-all duration-700 ease-out"
+          className="absolute top-9 h-2 border-x-2 border-b-2 border-[#0284c7] transition-all duration-700 ease-out"
           style={{ left: `${flags[0].left}%`, width: step >= 4 ? `${fin - flags[0].left}%` : "0%" }}
         >
-          <span className={`absolute left-1/2 top-3 -translate-x-1/2 whitespace-nowrap font-heading text-[18px] font-bold text-[#38bdf8] transition-opacity duration-500 ${step >= 4 ? "opacity-100" : "opacity-0"}`}>
+          <span className={`absolute left-1/2 top-3 -translate-x-1/2 whitespace-nowrap font-heading text-[18px] font-bold text-[#0284c7] transition-opacity duration-500 ${step >= 4 ? "opacity-100" : "opacity-0"}`}>
             9 weeks earlier
           </span>
         </span>
