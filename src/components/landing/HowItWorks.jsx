@@ -1,67 +1,39 @@
 import React from "react";
-import { ChecksIllustration, DecideIllustration, ScreenIllustration } from "./StepIllustrations";
+import { CheckDemo, DecideDemo, RaceBars, ScreenDemo } from "./showScenes";
 
+// How it works, shown rather than told: a race against manual review, then three live mini-demos.
 const STEPS = [
-  {
-    title: "Screen an applicant",
-    body: "Enter the company name and website. It works for private companies with no analyst coverage and no public filings.",
-    Illustration: ScreenIllustration,
-  },
-  {
-    title: "We check the public record and their cash flow",
-    body: "News, legal records and WARN notices, hiring, and employee reviews, plus the applicant's own cash-flow statement for other lenders and late payments.",
-    Illustration: ChecksIllustration,
-  },
-  {
-    title: "You decide, with every flag sourced",
-    body: "Each flag shows the source, the date and the exact quote. Fixed rules set the status. The credit decision stays with you.",
-    Illustration: DecideIllustration,
-  },
+  { title: "Screen", caption: "Name and website. That's it.", Demo: ScreenDemo, accent: "#38bdf8" },
+  { title: "Check", caption: "Five sources, in parallel.", Demo: CheckDemo, accent: "#c084fc" },
+  { title: "Decide", caption: "Every flag sourced. You call it.", Demo: DecideDemo, accent: "#2dd4bf" },
 ];
 
-// Step accents, matching the hero pipeline's source colours (red/amber/green stay reserved for status).
-const ACCENTS = ["#38bdf8", "#c084fc", "#2dd4bf"];
-
-// Static by design: the illustrations render their final state, no scroll-in animation.
 export default function HowItWorks() {
   return (
     <section aria-labelledby="how-heading" className="border-t border-white/10 bg-ew-ink py-20 text-white sm:py-28">
       <div className="mx-auto max-w-[1200px] px-4 sm:px-8">
-        <div className="max-w-3xl">
+        <div className="grid items-end gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
           <h2
             id="how-heading"
-            className="font-heading text-[clamp(2.2rem,1.5rem+2.8vw,3.75rem)] font-bold leading-[1.02] tracking-[-0.02em] text-white [font-stretch:78%]"
+            className="font-heading text-[clamp(2.4rem,1.6rem+3.2vw,4.25rem)] font-bold leading-[0.98] tracking-[-0.02em] [font-stretch:76%]"
           >
-            A screening takes minutes, not a week of reading.
+            Minutes, not a week.
           </h2>
-          <p className="mt-4 max-w-xl text-[18px] leading-relaxed text-white/80">
-            The same checks run before the bank lends and keep running after the loan closes.
-          </p>
+          <RaceBars />
         </div>
 
-        <ol className="mt-14 grid gap-6 lg:grid-cols-3">
-          {STEPS.map(({ title, body, Illustration }, i) => (
-            <li
-              key={title}
-              className="flex flex-col rounded-sm border border-white/12 bg-white/[0.05] p-6"
-              style={{ borderTop: `3px solid ${ACCENTS[i]}` }}
-            >
-              <div className="flex items-start gap-4">
-                <span
-                  aria-hidden="true"
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-sm font-heading text-[24px] font-bold leading-none text-ew-ink tnum [font-stretch:75%]"
-                  style={{ background: ACCENTS[i] }}
-                >
-                  {i + 1}
+        <ol className="mt-16 grid gap-6 lg:grid-cols-3">
+          {STEPS.map(({ title, caption, Demo, accent }, i) => (
+            <li key={title} className="flex flex-col">
+              <div className="mb-4 flex items-baseline gap-3">
+                <span aria-hidden="true" className="font-heading text-[15px] font-bold tnum" style={{ color: accent }}>
+                  0{i + 1}
                 </span>
-                <h3 className="pt-1 text-[19px] font-semibold leading-snug text-white">
-                  <span className="sr-only">Step {i + 1}: </span>
-                  {title}
-                </h3>
+                <h3 className="font-heading text-[26px] font-bold leading-none">{title}</h3>
+                <p className="text-[14px] text-white/60">{caption}</p>
               </div>
-              <p className="mt-4 text-[15.5px] leading-relaxed text-white/80">{body}</p>
-              <div className="mt-6 flex-1" aria-hidden="true">
-                <Illustration />
+              <div className="flex-1" style={{ borderTop: `3px solid ${accent}` }}>
+                <Demo />
               </div>
             </li>
           ))}

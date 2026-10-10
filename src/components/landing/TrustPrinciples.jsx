@@ -1,42 +1,43 @@
 import React from "react";
-import { STATUS_STYLES } from "@/components/StatusBadge";
+import { DecideRulesDemo, LeadTimeline, ReadDemo } from "./showScenes";
+import { useLoop } from "./showScenes";
+import { MousePointer2 } from "lucide-react";
 
-const RULES = [
-  { key: "red", rule: "2 or more strong flags, or 1 strong and 2 weak" },
-  { key: "yellow", rule: "1 strong flag, or 2 or more weak" },
-  { key: "green", rule: "Anything less, in the last 90 days" },
-];
+// How Kestrel earns trust, shown: the AI only highlights, fixed rules set the status, a person decides.
+// Then the payoff: flags land weeks before the quarterly financials.
 
-function RuleBadge({ status }) {
-  const s = STATUS_STYLES[status];
+function ApproveDemo() {
+  const [ref, step] = useLoop(6, 700);
+  const clicked = step >= 3;
   return (
-    <span
-      className={`inline-flex w-[5.5rem] shrink-0 items-center gap-1.5 rounded-sm border px-2 py-0.5 text-[13px] font-semibold ${s.badge}`}
-    >
-      <span aria-hidden="true" className={`inline-block shrink-0 ${s.glyph}`} />
-      {s.label}
-    </span>
-  );
-}
-
-function Receipt() {
-  return (
-    <div className="rounded-[3px] border border-white/10 bg-white p-5 shadow-[0_18px_50px_rgba(0,0,0,0.4)]">
-      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[13px]">
-        <dt className="text-ew-muted">Flag</dt>
-        <dd className="font-semibold text-ew-ink">CFO departure, strong</dd>
-        <dt className="text-ew-muted">Date</dt>
-        <dd className="text-ew-ink">Sep 10, 2026</dd>
-        <dt className="text-ew-muted">Source</dt>
-        <dd className="text-ew-ink underline decoration-ew-rule underline-offset-2">Electrek</dd>
-        <dt className="text-ew-muted">Quote</dt>
-        <dd className="text-ew-ink-soft">
-          &ldquo;Chief financial officer Dana Whitlock has stepped down, effective immediately.&rdquo;
-        </dd>
-      </dl>
+    <div ref={ref} className="relative rounded-sm border border-ew-rule bg-white p-4 text-ew-ink shadow-[0_18px_50px_rgba(0,0,0,0.35)]">
+      <p className="text-[12px] font-semibold text-ew-muted">Northfield Battery Works</p>
+      <div className="mt-3 grid gap-2">
+        {["Approve", "Request documents", "Decline"].map((c) => (
+          <span
+            key={c}
+            className={`rounded-sm border px-3 py-2 text-[13px] font-semibold transition-all duration-200 ${
+              clicked && c === "Request documents" ? "border-ew-ink bg-ew-ink text-white" : "border-ew-rule"
+            }`}
+          >
+            {clicked && c === "Request documents" ? "✓ Documents requested" : c}
+          </span>
+        ))}
+      </div>
+      <MousePointer2
+        aria-hidden="true"
+        className="pointer-events-none absolute h-5 w-5 fill-white text-ew-ink transition-all duration-700 ease-out"
+        style={step >= 2 ? { left: "55%", top: "96px", transform: clicked ? "scale(0.85)" : "scale(1)" } : { left: "85%", top: "12px" }}
+      />
     </div>
   );
 }
+
+const PILLARS = [
+  { title: "AI reads.", Demo: ReadDemo, accent: "#38bdf8" },
+  { title: "Rules decide.", Demo: DecideRulesDemo, accent: "#c084fc" },
+  { title: "You approve.", Demo: ApproveDemo, accent: "#2dd4bf" },
+];
 
 export default function TrustPrinciples() {
   return (
@@ -45,45 +46,22 @@ export default function TrustPrinciples() {
         <h2 id="trust-heading" className="sr-only">
           How Kestrel earns trust
         </h2>
-        <div className="grid gap-12 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-16">
-          <article>
-            <h3 className="font-heading text-[clamp(2.6rem,1.6rem+4vw,4.8rem)] font-bold leading-[0.98] tracking-[-0.02em] text-white [font-stretch:74%]">
-              AI reads. Rules decide. You approve.
-            </h3>
-            <p className="mt-6 max-w-[36rem] text-[18px] leading-relaxed text-white/80">
-              The model only reads articles and reviews and copies the exact sentence that matters. Plain, fixed rules
-              turn flags into a status. A credit officer makes the call.
-            </p>
-            <ul className="mt-8 max-w-[36rem] divide-y divide-white/15 border-y border-white/15">
-              {RULES.map(({ key, rule }) => (
-                <li key={key} className="flex items-center gap-4 py-3.5 text-[16px] text-white/90">
-                  <RuleBadge status={key} />
-                  {rule}
-                </li>
-              ))}
-            </ul>
-          </article>
-
-          <div className="space-y-12 lg:pt-3">
-            <article>
-              <h3 className="text-[22px] font-semibold leading-snug text-white">Every flag has a receipt</h3>
-              <p className="mt-2 text-[16px] leading-relaxed text-white/80">
-                Source, date, link and the exact quote, so you can check it before you act on it.
-              </p>
-              <div className="mt-5" aria-hidden="true">
-                <Receipt />
-              </div>
-            </article>
-            <article className="border-t border-white/15 pt-8">
-              <h3 className="text-[22px] font-semibold leading-snug text-white">
-                Built for private companies with no analyst coverage
+        <ol className="grid gap-6 lg:grid-cols-3">
+          {PILLARS.map(({ title, Demo, accent }) => (
+            <li key={title}>
+              <h3 className="mb-4 font-heading text-[clamp(1.8rem,1.3rem+1.6vw,2.6rem)] font-bold leading-none" style={{ color: accent }}>
+                {title}
               </h3>
-              <p className="mt-2 text-[16px] leading-relaxed text-white/80">
-                Mid-size private borrowers report quarterly, 45 to 90 days after quarter end. Departures, layoffs,
-                lawsuits and missed payments show up in public well before that.
-              </p>
-            </article>
-          </div>
+              <Demo />
+            </li>
+          ))}
+        </ol>
+
+        <div className="mt-20 grid items-center gap-10 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)]">
+          <h3 className="font-heading text-[clamp(2rem,1.4rem+2.4vw,3.4rem)] font-bold leading-[1] tracking-[-0.02em] [font-stretch:78%]">
+            Before the quarterly financials.
+          </h3>
+          <LeadTimeline />
         </div>
       </div>
     </section>

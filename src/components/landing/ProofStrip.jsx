@@ -1,27 +1,32 @@
 import React from "react";
+import { useLoop } from "./showScenes";
 
-// The user quote that shaped the product, as a bold band between the dark sections.
+// The user quote that shaped the product. Words appear one by one when it scrolls into view.
+const QUOTE = "I wish I woulda asked the cash flow documents a lot earlier in the process.";
+
 export default function ProofStrip() {
+  const words = QUOTE.split(" ");
+  const [ref, step] = useLoop(words.length + 1, 140, { once: true });
+  const shown = Math.min(words.length, step);
   return (
     <section aria-labelledby="proof-heading" className="border-y border-white/10 bg-[#0f1a27] py-20 text-white sm:py-24">
-      <div className="mx-auto grid max-w-[1200px] gap-8 px-4 sm:px-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,9fr)] lg:gap-16">
-        <h2 id="proof-heading" className="text-[13px] font-semibold uppercase tracking-[0.16em] text-[#38bdf8] lg:pt-4">
+      <div ref={ref} className="mx-auto max-w-[1200px] px-4 sm:px-8">
+        <h2 id="proof-heading" className="text-[13px] font-semibold uppercase tracking-[0.16em] text-[#38bdf8]">
           What we heard
         </h2>
-        <figure className="border-l-4 border-[#38bdf8] pl-6 sm:pl-10">
-          <blockquote className="relative">
-            <span aria-hidden="true" className="block font-heading text-[88px] font-bold leading-[0.6] text-[#38bdf8]">
-              &ldquo;
-            </span>
-            <p className="relative mt-2 max-w-[24ch] font-heading text-[clamp(2rem,1.3rem+3vw,3.75rem)] font-semibold leading-[1.06] tracking-[-0.015em] text-white [font-stretch:85%]">
-              I wish I woulda asked the cash flow documents a lot earlier in the process.
+        <figure className="mt-6">
+          <blockquote>
+            <p className="max-w-[24ch] font-heading text-[clamp(2.2rem,1.4rem+3.4vw,4.2rem)] font-semibold leading-[1.04] tracking-[-0.015em] [font-stretch:85%]">
+              <span aria-hidden="true" className="text-[#38bdf8]">&ldquo;</span>
+              {words.map((w, i) => (
+                <span key={i} className={`transition-opacity duration-300 ${i < shown ? "opacity-100" : "opacity-15"}`}>
+                  {w}{" "}
+                </span>
+              ))}
+              <span aria-hidden="true" className="text-[#38bdf8]">&rdquo;</span>
             </p>
           </blockquote>
-          <figcaption className="mt-6 text-[15px] font-medium text-white/70">Credit officer, user interview</figcaption>
-          <p className="mt-8 max-w-xl border-t border-white/15 pt-5 text-[16px] leading-relaxed text-white/85">
-            So the cash-flow check is part of the first screening: other lenders and late payments show up next to the
-            public signals, before the term sheet.
-          </p>
+          <figcaption className="mt-6 text-[15px] font-medium text-white/65">Credit officer, user interview</figcaption>
         </figure>
       </div>
     </section>
