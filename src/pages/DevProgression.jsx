@@ -4,13 +4,20 @@ import { ArrowLeft } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
 import SourceStatusRow from "@/components/SourceStatusRow";
 import CheckTrace from "@/components/CheckTrace";
+import CompanyHeader from "@/components/CompanyHeader";
+import SignalTimeline from "@/components/SignalTimeline";
+import { filterRecentSignals } from "@/lib/borrowerUtils";
+import { scoreBorrower } from "../../base44/functions/scoreBorrower/entry.ts";
 import WarningScore from "@/components/WarningScore";
 // The same CheckRun builder newsSignals uses on the server, so this replay renders exactly what a live check saves.
 import { applyEvent, addLog, applyLinkedIn, newCheckRun } from "../../base44/functions/newsSignals/trace.ts";
 
-// /dev/progression: replays one example news check (TGI Fridays, from a real run on Oct 10)
-// through the company page's progress bar and "How News and Legal were checked" panel.
-// No data source is called and nothing is saved.
+// /dev/progression: the whole journey for one example company (TGI Fridays, from a real run on Oct 10):
+//   1. Add company   the "Screen new applicant" form is filled in and submitted
+//   2. Checking      the company page while the check runs: progress bar, steps filling in, activity log
+//   3. Report        the finished company page: status, warning score, sources, how it was checked, evidence.
+//                    This is the page a credit officer comes back to from the loan book.
+// It reuses the app's real components and the server's CheckRun builder. No data source is called, nothing is saved.
 
 const A = (title, source, date, url, query) => ({ title, source, date, url, query });
 const ARTICLES = [
@@ -89,61 +96,234 @@ function buildScript() {
 
 const SPEEDS = [1, 2, 4];
 
+const COMPANY = {
+  id: "demo-tgi",
+  name: "TGI Fridays",
+  website_domain: "tgifridays.com",
+  industry: "Restaurants",
+  hq_city: "Dallas",
+  hq_state: "TX",
+  stage: "applicant",
+  loan_amount_usd: 4500000,
+  status: "green",
+  why: "",
+  last_refreshed: null,
+  sources_unavailable: [],
+};
+
+const FIELDS = [
+  ["name", "Company name", "col-span-6"],
+  ["website_domain", "Website domain", "col-span-3"],
+  ["industry", "Industry", "col-span-3"],
+  ["hq_city", "HQ city", "col-span-4"],
+  ["hq_state", "HQ state", "col-span-2"],
+  ["loan_amount_usd", "Amount requested (USD)", "col-span-6"],
+];
+
+const STAGES = [
+  { id: "add", title: "1. Add company", sub: "Screen new applicant" },
+  { id: "check", title: "2. Checking", sub: "Sources answer one by one" },
+  { id: "report", title: "3. Report", sub: "Saved company page" },
+];
+
+// Signals as refreshBorrower stores them: newsSignals keeps the newest per type and severity,
+// so one event reported by several outlets counts once.
+function storedSignals(run) {
+  const kept = (run?.articles || []).filter((a) => a.decision === "kept");
+  return [...kept]
+    .sort((x, z) => z.date.localeCompare(x.date))
+    .filter((a, i, all) => all.findIndex((o) => o.signal_type === a.signal_type && o.severity === a.severity) === i)
+    .map((a, i) => ({
+      id: `demo-sig-${i}`,
+      borrower_id: COMPANY.id,
+      type: a.signal_type,
+      severity: a.severity,
+      date: a.date,
+      title: a.title,
+      snippet: a.snippet,
+      source_name: a.source,
+      source_url: a.url,
+    }));
+}
+
+function Stepper({ stage, reached, onGo }) {
+  return (
+    <ol className="mb-4 grid grid-cols-1 gap-px border border-ew-rule bg-ew-rule sm:grid-cols-3">
+      {STAGES.map((s, i) => {
+        const idx = STAGES.findIndex((x) => x.id === stage);
+        const state = s.id === stage ? "Current" : i < idx || reached.includes(s.id) ? "Done" : "Next";
+        const can = reached.includes(s.id);
+        return (
+          <li key={s.id} className="flex">
+            <button
+              type="button"
+              disabled={!can}
+              onClick={() => onGo(s.id)}
+              aria-current={s.id === stage ? "step" : undefined}
+              className={`flex w-full items-baseline justify-between gap-2 px-4 py-2.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-ew-focus disabled:cursor-default ${
+                s.id === stage ? "bg-ew-hover shadow-[inset_0_-2px_0_var(--ew-ink)]" : "bg-ew-surface hover:bg-ew-hover disabled:hover:bg-ew-surface"
+              }`}
+            >
+              <span>
+                <span className="block font-heading text-sm font-bold text-ew-ink">{s.title}</span>
+                <span className="block text-xs text-ew-muted">{s.sub}</span>
+              </span>
+              <span className={`text-xs font-semibold ${state === "Next" ? "text-ew-muted" : "text-ew-ink"}`}>{state}</span>
+            </button>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function AddCompanyStep({ form, typing, onSubmit }) {
+  return (
+    <div className="border border-ew-rule bg-ew-surface">
+      <div className="border-b border-ew-rule px-5 py-3">
+        <h2 className="font-heading text-lg font-bold text-ew-ink">Screen new applicant</h2>
+        <p className="text-sm text-ew-muted">The officer enters the company. Screening starts the moment it is saved.</p>
+      </div>
+      <form
+        className="grid grid-cols-6 gap-3 px-5 py-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          onSubmit();
+        }}
+      >
+        {FIELDS.map(([key, label, span]) => (
+          <label key={key} className={`flex flex-col gap-1 text-sm text-ew-ink ${span}`}>
+            {label}
+            <input
+              readOnly
+              value={form[key] ?? ""}
+              className="rounded-sm border border-ew-rule bg-ew-paper px-2.5 py-1.5 font-mono text-[13px] text-ew-ink"
+            />
+          </label>
+        ))}
+        <div className="col-span-6 flex items-center justify-between gap-3 pt-1">
+          <span className="text-xs text-ew-muted">Stage: Applicant</span>
+          <button
+            type="submit"
+            disabled={typing}
+            className="rounded-sm border border-ew-ink bg-ew-ink px-3 py-1.5 text-sm font-semibold text-ew-surface hover:opacity-90 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ew-focus"
+          >
+            {typing ? "Filling in..." : "Screen applicant"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function CompanyPage({ borrower, run, signals, running, startedAt, states }) {
+  const recentSignals = filterRecentSignals(signals);
+  return (
+    <>
+      <div className="border border-ew-rule bg-ew-surface">
+        <CompanyHeader borrower={borrower} sourceStates={states} running={running} refreshError={null} onRefresh={() => {}} />
+        <SourceStatusRow states={states} recentSignals={recentSignals} running={running} startedAt={startedAt} />
+        <WarningScore borrower={borrower} signals={signals} />
+        <CheckTrace run={run} refreshing={running} stale={false} />
+      </div>
+      <section aria-labelledby="demo-evidence-heading" className="mt-6">
+        <div className="mb-3 flex items-baseline justify-between gap-4">
+          <h2 id="demo-evidence-heading" className="font-heading text-xl font-bold tracking-tight text-ew-ink">
+            Evidence
+          </h2>
+          <p className="font-mono text-xs text-ew-muted">{recentSignals.length} in last 90 days</p>
+        </div>
+        <SignalTimeline signals={signals} neverRefreshed={!borrower.last_refreshed} checking={running} newIds={null} />
+      </section>
+    </>
+  );
+}
+
 export default function DevProgression() {
+  const [stage, setStage] = useState("add");
+  const [reached, setReached] = useState(["add"]);
+  const [form, setForm] = useState({});
+  const [typing, setTyping] = useState(false);
   const [run, setRun] = useState(null);
   const [startedAt, setStartedAt] = useState(null);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(2);
   const timers = useRef([]);
 
+  const later = (ms, fn) => timers.current.push(setTimeout(fn, ms / speed));
+
   function stop() {
     timers.current.forEach(clearTimeout);
     timers.current = [];
   }
 
-  function play() {
-    stop();
-    const r = newCheckRun("demo", new Date(), true);
+  function startCheck() {
+    const r = newCheckRun(COMPANY.id, new Date(), true);
+    setStage("check");
+    setReached(["add", "check"]);
     setRun(null);
     setStartedAt(Date.now());
     setPlaying(true);
-    // The real page only sees a run once newsSignals has saved it, about a second in.
-    timers.current.push(setTimeout(() => setRun(structuredClone(r)), 1000 / speed));
+    // The page only sees a run once newsSignals has saved it, about a second in.
+    later(1000, () => setRun(structuredClone(r)));
     for (const [at, step] of buildScript()) {
-      timers.current.push(setTimeout(() => {
+      later(at * 1000, () => {
         step(r);
         r.updated_at = new Date().toISOString();
         setRun(structuredClone(r));
-        if (r.status !== "running") setPlaying(false);
-      }, (at * 1000) / speed));
+        if (r.status !== "running") {
+          setPlaying(false);
+          setReached(["add", "check", "report"]);
+          later(1800, () => setStage("report"));
+        }
+      });
     }
   }
 
+  // Types the company in field by field, then submits, like an officer would.
+  function playAll() {
+    stop();
+    setStage("add");
+    setReached(["add"]);
+    setRun(null);
+    setPlaying(false);
+    setForm({});
+    setTyping(true);
+    let t = 300;
+    for (const [key] of FIELDS) {
+      const value = String(COMPANY[key]);
+      for (let i = 1; i <= value.length; i++) {
+        later(t, () => setForm((f) => ({ ...f, [key]: value.slice(0, i) })));
+        t += 45;
+      }
+      t += 150;
+    }
+    later(t, () => setTyping(false));
+    later(t + 900, startCheck);
+  }
+
   useEffect(() => {
-    play();
+    playAll();
     return stop;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const searchDone = (run?.searches || []).length >= 2;
-  const newsDone = run && run.status !== "running";
+  const finished = run && run.status !== "running";
+  const signals = finished ? storedSignals(run) : [];
+  const scored = finished ? scoreBorrower(signals) : null;
+  const borrower = {
+    ...COMPANY,
+    ...(finished
+      ? { status: scored.status, why: scored.why, last_refreshed: run.finished_at, sources_unavailable: ["Jobs", "Reviews"] }
+      : {}),
+  };
   // Jobs and Reviews are switched off in refreshBorrower today, so they answer "unavailable" right away.
   const states = {
-    News: newsDone ? "ok" : "checking",
-    Legal: newsDone ? "ok" : "checking",
+    News: finished ? "ok" : "checking",
+    Legal: finished ? "ok" : "checking",
     Jobs: "unavailable",
     Reviews: "unavailable",
   };
-  const kept = (run?.articles || []).filter((a) => a.decision === "kept");
-  // Signals as refreshBorrower would store them once the check finishes.
-  // newsSignals keeps the newest signal per type and severity, so one event reported by several outlets counts once.
-  const signals = newsDone
-    ? [...kept]
-      .sort((x, z) => z.date.localeCompare(x.date))
-      .filter((a, i, all) => all.findIndex((o) => o.signal_type === a.signal_type && o.severity === a.severity) === i)
-      .map((a) => ({ type: a.signal_type, severity: a.severity, date: a.date, title: a.title, source_name: a.source, source_url: a.url }))
-    : [];
-  const recentSignals = signals;
 
   return (
     <div className="min-h-screen bg-ew-paper text-ew-ink">
@@ -158,10 +338,10 @@ export default function DevProgression() {
 
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="font-heading text-2xl font-bold tracking-tight text-ew-ink">Check progression (example)</h1>
+            <h1 className="font-heading text-2xl font-bold tracking-tight text-ew-ink">From application to report (example)</h1>
             <p className="mt-1 max-w-2xl text-sm text-ew-muted">
-              A replay of one news check on TGI Fridays, shown the way the company page shows a live Refresh. No data
-              source is called and nothing is saved.
+              One applicant, TGI Fridays, from being added to the finished report, replayed from a real check on Oct 10.
+              No data source is called and nothing is saved.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -179,26 +359,34 @@ export default function DevProgression() {
             </label>
             <button
               type="button"
-              onClick={play}
+              onClick={playAll}
               className="rounded-sm border border-ew-ink bg-ew-ink px-3 py-1.5 text-sm font-semibold text-ew-surface hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ew-focus"
             >
-              {playing ? "Restart" : "Replay"}
+              Play from the start
             </button>
           </div>
         </div>
 
-        <div className="border border-ew-rule bg-ew-surface">
-          <div className="px-5 pb-1 pt-4">
-            <p className="font-heading text-lg font-bold text-ew-ink">TGI Fridays</p>
-            <p className="text-sm text-ew-muted">tgifridays.com · Dallas, TX · Restaurants</p>
-            <p className="mt-1 font-mono text-xs text-ew-ink-soft">
-              {playing ? (searchDone ? "Reading and tagging articles..." : "Searching...") : "Check finished"}
+        <Stepper stage={stage} reached={reached} onGo={setStage} />
+
+        {stage === "add" && (
+          <AddCompanyStep form={form} typing={typing} onSubmit={() => { stop(); startCheck(); }} />
+        )}
+
+        {stage === "check" && (
+          <CompanyPage borrower={borrower} run={run} signals={signals} running={playing} startedAt={startedAt} states={states} />
+        )}
+
+        {stage === "report" && (
+          <>
+            <p className="mb-3 border border-ew-rule bg-ew-surface px-4 py-2.5 text-sm text-ew-ink-soft">
+              This is the saved report: the company page. It stays in the loan book, so the officer can come back to it
+              any time, and Refresh runs the same check again. Open &ldquo;How News and Legal were checked&rdquo; to see
+              every step behind it.
             </p>
-          </div>
-          <SourceStatusRow states={states} recentSignals={recentSignals} running={playing} startedAt={startedAt} />
-          <WarningScore borrower={{ last_refreshed: newsDone ? run.finished_at : null }} signals={signals} />
-          <CheckTrace run={run} refreshing={playing} stale={false} />
-        </div>
+            <CompanyPage borrower={borrower} run={run} signals={signals} running={false} startedAt={null} states={states} />
+          </>
+        )}
       </main>
     </div>
   );
