@@ -95,7 +95,12 @@ export default async function(req: Request): Promise<Response> {
     for (const fn of SIGNAL_FUNCTIONS.filter((f) => !f.enabled)) {
       Object.values(fn.sources).forEach((s) => unavailable.add(s));
     }
-    const pending: Record<string, string> = { ...(borrower.pending_snapshots || {}) };
+    // The stored object has a key per function, null when nothing is pending; keep only real ids.
+    const pending: Record<string, string> = Object.fromEntries(
+      Object.entries(borrower.pending_snapshots || {}).filter(
+        (entry): entry is [string, string] => typeof entry[1] === 'string' && entry[1] !== '',
+      ),
+    );
     let answered = 0;
 
     // Saves run one after another so a slower write never overwrites a newer one.
