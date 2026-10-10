@@ -7,11 +7,11 @@
 // If Bright Data is still building the snapshot, the error carries snapshot_id so a later call can resume.
 //
 // Data: Bright Data Web Scraper API, LinkedIn job listings dataset, discovered by company keyword.
-// TO CONFIRM with the Bright Data MCP (PLAN.md §8): JOBS_DATASET_ID, the discovery input fields,
-// and the posted-date field name. parsePostedDate accepts ISO dates and "3 weeks ago" style text.
+// Confirmed live 2026-10-10 on Gravie: dataset, keyword discovery input, and fields (job_posted_date is an ISO
+// timestamp, job_posted_time is "1 week ago"). 34 postings in ~41 s, all Gravie's own.
 //
-// Known bias: listing sites mostly show open postings, so older postings that were filled or closed
-// are undercounted. That can overstate a drop. Mention this in the pitch if a judge asks.
+// Known limit, seen live: the dataset returns open postings only, so nearly all are under 30 days old and the
+// prior-60-day window is usually empty (no signal). Gravie: 34 recent, 0 prior. Needs a team decision (see PR).
 
 export interface Borrower {
   id?: string;
@@ -45,7 +45,7 @@ export interface Job {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const API = "https://api.brightdata.com/datasets/v3";
-export const JOBS_DATASET_ID = "gd_lpfll7v5hcqtkxl6l"; // LinkedIn job listings. TO CONFIRM.
+export const JOBS_DATASET_ID = "gd_lpfll7v5hcqtkxl6l"; // "Linkedin job listings information"
 // refreshBorrower gives each source 120 s: up to ~60 s for the sync scrape plus this budget.
 const POLL_BUDGET_MS = 50_000;
 const POLL_EVERY_MS = 10_000;
