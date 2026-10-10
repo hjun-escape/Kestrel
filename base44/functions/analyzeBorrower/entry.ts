@@ -26,6 +26,10 @@ export default async function(req: Request): Promise<Response> {
     }
 
     const base44 = createClientFromRequest(req);
+    // Signed-in users only, checked before any database, LLM or Bright Data call.
+    const user = await base44.auth.me().catch(() => null);
+    if (!user) return Response.json({ error: 'Sign in to run the analyst.' }, { status: 401 });
+
     const db = base44.asServiceRole.entities;
 
     let borrower;

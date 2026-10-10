@@ -10,11 +10,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+const TONES = {
+  light: "text-slate-900 hover:bg-slate-100 focus-visible:ring-slate-900",
+  dark: "text-white hover:bg-white/10 focus-visible:ring-white",
+};
+
 // Signed-in user chip with a Sign out action. Mount in any header:
 //   import UserMenu from "@/components/auth/UserMenu";
 //   <UserMenu />
 // Renders nothing when no one is signed in.
-export default function UserMenu({ className = "" }) {
+export default function UserMenu({ className = "", tone = "light" }) {
   const { user, displayName, email, initials, signOut } = useAuth();
   if (!user) return null;
 
@@ -22,9 +27,9 @@ export default function UserMenu({ className = "" }) {
     <DropdownMenu>
       <DropdownMenuTrigger
         aria-label={`Account menu for ${displayName}`}
-        className={`inline-flex items-center gap-2 rounded-md py-1 pl-1 pr-2 text-sm text-slate-900 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 ${className}`}
+        className={`inline-flex items-center gap-2 rounded-md py-1 pl-1 pr-2 text-sm focus-visible:outline-none focus-visible:ring-2 ${TONES[tone]} ${className}`}
       >
-        <span aria-hidden="true" className="flex h-7 w-7 items-center justify-center rounded bg-slate-900 text-xs font-semibold text-white">
+        <span aria-hidden="true" className={`flex h-7 w-7 items-center justify-center rounded text-xs font-semibold ${tone === "dark" ? "bg-white text-ew-ink" : "bg-slate-900 text-white"}`}>
           {initials}
         </span>
         <span className="hidden max-w-[11rem] truncate font-medium sm:inline">{displayName}</span>

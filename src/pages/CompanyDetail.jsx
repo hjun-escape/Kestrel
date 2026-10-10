@@ -7,6 +7,7 @@ import CompanyHeader from "@/components/CompanyHeader";
 import SourceStatusRow from "@/components/SourceStatusRow";
 import SignalTimeline from "@/components/SignalTimeline";
 import DecisionBar from "@/components/DecisionBar";
+import AnalystBrief from "@/components/AnalystBrief";
 import {
   POLL_INTERVAL_MS,
   deriveSourceStates,
@@ -160,7 +161,7 @@ export default function CompanyDetail() {
 
         <aside aria-label="Analysis and decision" className="flex min-w-0 flex-col gap-4">
           {showDecision && <DecisionBar key={borrower.id} companyName={borrower.name} />}
-          {/* ANALYST_BRIEF_SLOT */}
+          <AnalystBrief borrower={borrower} />
           <CompanyLinks borrower={borrower} />
         </aside>
       </div>

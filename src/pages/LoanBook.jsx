@@ -104,7 +104,7 @@ export default function LoanBook() {
 
   return (
     <div className="min-h-screen bg-ew-paper text-ew-ink">
-      <AppHeader />
+      <AppHeader onAskClosed={loadData} />
 
       <main className="mx-auto max-w-[1360px] px-6 pb-16 pt-6">
         <div className="mb-5 flex items-end justify-between gap-4">

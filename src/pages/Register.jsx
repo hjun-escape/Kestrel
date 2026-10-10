@@ -12,6 +12,9 @@ import SubmitButton, { linkClass } from "@/components/auth/SubmitButton";
 import { toast } from "@/components/ui/use-toast";
 import { safeReturnTo } from "@/lib/authReturnTo";
 
+// TODO: set to true once the Google provider is confirmed enabled for this Base44 app.
+const SHOW_GOOGLE = false;
+
 export default function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -167,21 +170,25 @@ export default function Register() {
         </SubmitButton>
       </form>
 
-      <div className="my-6 flex items-center gap-3 text-xs text-slate-600" role="separator" aria-label="or">
-        <span className="h-px flex-1 bg-slate-200" />
-        <span aria-hidden="true">or</span>
-        <span className="h-px flex-1 bg-slate-200" />
-      </div>
+      {SHOW_GOOGLE && (
+        <>
+        <div className="my-6 flex items-center gap-3 text-xs text-slate-600" role="separator" aria-label="or">
+          <span className="h-px flex-1 bg-slate-200" />
+          <span aria-hidden="true">or</span>
+          <span className="h-px flex-1 bg-slate-200" />
+        </div>
 
-      <Button
-        type="button"
-        variant="outline"
-        className="h-11 w-full rounded-md border-slate-400 font-medium text-slate-900 focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
-        onClick={handleGoogle}
-      >
-        <GoogleIcon className="mr-2 h-5 w-5" />
-        Continue with Google
-      </Button>
+        <Button
+          type="button"
+          variant="outline"
+          className="h-11 w-full rounded-md border-slate-400 font-medium text-slate-900 focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
+          onClick={handleGoogle}
+        >
+          <GoogleIcon className="mr-2 h-5 w-5" />
+          Continue with Google
+        </Button>
+        </>
+      )}
     </AuthLayout>
   );
 }
