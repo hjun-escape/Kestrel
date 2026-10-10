@@ -45,6 +45,7 @@ export default function CompanyReport({
       <div className="border border-ew-rule bg-ew-surface">
         <CompanyHeader
           borrower={borrower}
+          signals={signals}
           sourceStates={sourceStates}
           running={running}          refreshError={refreshError}
           onRefresh={onRefresh}

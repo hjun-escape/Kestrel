@@ -3,18 +3,24 @@ import { formatDistanceToNowStrict } from "date-fns";
 import { Pencil, RefreshCw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import StatusBadge from "@/components/StatusBadge";
+import { StatusLegendPopover } from "@/components/StatusLegend";
+import { countForRules, ruleLine } from "@/lib/statusRules.ts";
 import { SOURCES } from "@/lib/signalTypes";
 import { formatRelative, formatUsdFull, isSampleCompany, reasonText } from "@/lib/borrowerUtils";
 import { coverageText, sourceCoverage } from "@/lib/sourceCoverage";
 
 // Detail header: identity, status with the reason, key facts, the Refresh
 // control with per-source progress, and Edit / Delete.
-export default function CompanyHeader({ borrower, sourceStates, running, refreshError, onRefresh, onEdit, onDelete }) {
+export default function CompanyHeader({ borrower, signals = [], sourceStates, running, refreshError, onRefresh, onEdit, onDelete }) {
   const hq = [borrower.hq_city, borrower.hq_state].filter(Boolean).join(", ");
   const isApplicant = borrower.stage === "applicant";
   // Partial check: say how many of the four sources the status rests on.
   // Not for samples (never checked live) or while a check is running.
   const coverage = !running && !isSampleCompany(borrower) ? coverageText(sourceCoverage(borrower)) : null;
+  // The rule behind the status, counted as of the last check (same 90-day rule as scoreBorrower).
+  // Shown only when it matches the stored status (e.g. not after evidence was edited by hand).
+  const counts = !running && borrower.last_refreshed ? countForRules(signals, borrower.last_refreshed) : null;
+  const rule = counts && counts.status === borrower.status ? ruleLine(counts) : null;
   const facts = [
     { term: "Domain", value: borrower.website_domain },
     { term: "Headquarters", value: hq || "—" },
@@ -26,9 +32,9 @@ export default function CompanyHeader({ borrower, sourceStates, running, refresh
 
   return (
     <div className="px-5 pb-4 pt-5">
-      <div className="flex items-start justify-between gap-6">
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between md:gap-6">
         <div className="min-w-0">
-          <h1 className="font-heading text-[32px] font-bold leading-[1.05] tracking-tight text-ew-ink">
+          <h1 className="break-words font-heading text-[28px] font-bold leading-[1.05] tracking-tight text-ew-ink md:text-[32px]">
             {borrower.name}
           </h1>
           {isSampleCompany(borrower) && (
@@ -37,8 +43,11 @@ export default function CompanyHeader({ borrower, sourceStates, running, refresh
               Made-up company and signals, shown so the screens have something in them. It is not checked live.
             </p>
           )}
-          <div data-demo="status-why" className="mt-3 flex items-start gap-3">
-            <StatusBadge status={borrower.status} lastRefreshed={borrower.last_refreshed} size="lg" />
+          <div data-demo="status-why" className="mt-3 flex flex-col items-start gap-2 sm:flex-row sm:gap-3">
+            <div className="flex shrink-0 items-center gap-1.5">
+              <StatusBadge status={borrower.status} lastRefreshed={borrower.last_refreshed} size="lg" />
+              <StatusLegendPopover iconOnly />
+            </div>
             <p className="max-w-[68ch] pt-0.5 text-[15px] leading-snug text-ew-ink-soft">
               {borrower.last_refreshed
                 ? reasonText(borrower.why) || "No warning signs in the last 90 days."
@@ -47,11 +56,16 @@ export default function CompanyHeader({ borrower, sourceStates, running, refresh
                   : "Not checked yet. Refresh to run the first check."}
             </p>
           </div>
+          {rule && (
+            <p className="mt-1.5 text-xs font-medium tabular-nums text-ew-ink-soft">
+              Rule: {rule}
+            </p>
+          )}
           {coverage && (
             <p className="mt-1.5 text-xs text-ew-muted">{coverage}</p>
           )}
         </div>
-        <div className="flex w-[220px] shrink-0 flex-col gap-2">
+        <div className="flex w-full shrink-0 flex-col gap-2 md:w-[220px]">
           <RefreshControl sourceStates={sourceStates} running={running} error={refreshError} onRefresh={onRefresh} sample={isSampleCompany(borrower)} />
           {(onEdit || onDelete) && (
             <div className="flex justify-end gap-1">
@@ -73,7 +87,7 @@ export default function CompanyHeader({ borrower, sourceStates, running, refresh
         </div>
       </div>
 
-      <dl className="mt-5 grid grid-cols-3 gap-x-6 gap-y-3 border-t border-ew-rule-soft pt-4 xl:grid-cols-6">
+      <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-3 border-t border-ew-rule-soft pt-4 sm:grid-cols-3 xl:grid-cols-6">
         {facts.map((f) => (
           <div key={f.term} className="min-w-0">
             <dt className="text-xs text-ew-muted">{f.term}</dt>

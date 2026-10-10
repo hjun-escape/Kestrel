@@ -1,7 +1,7 @@
 // Run: node --test tests/*.test.ts   (Node 22+, runs .ts via type stripping)
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import handler, { scoreBorrower, type Signal } from "../base44/functions/scoreBorrower/entry.ts";
+import handler, { eventName, scoreBorrower, type Signal } from "../base44/functions/scoreBorrower/entry.ts";
 
 const TODAY = "2026-10-10";
 
@@ -143,4 +143,33 @@ test("why line names news events instead of quoting long headlines", () => {
     scoreBorrower([sig("strong", "2026-09-29", "Equipment lender sues Crestline Logistics over missed payments")], TODAY).why,
     "Yellow: Lender lawsuit (Sep 29).",
   );
+});
+
+test("why line names closures, shutdowns and WARN Act cases; unnamed headlines are shortened, not made generic", () => {
+  const amys = [
+    sig("strong", "2026-09-19", "$1B frozen food giant pulls plug on California manufacturing in shock retreat"),
+    sig("weak", "2026-09-26", "Amy’s Kitchen Built Its Food Empire in Santa Rosa. Now It’s Closing Its First Factory"),
+  ];
+  assert.equal(scoreBorrower(amys, TODAY).why, "Yellow: Shutdown (Sep 19) + Plant closure (Sep 26).");
+  assert.equal(
+    scoreBorrower([sig("strong", "2026-09-10", "State investigating Essendant, century-old office supply firm, for layoffs that may have violated WARN Act")], TODAY).why,
+    "Yellow: WARN Act investigation (Sep 10).",
+  );
+  const other = scoreBorrower([sig("strong", "2026-10-01", "Something entirely different happened at the company headquarters this week")], TODAY).why;
+  assert.match(other, /^Yellow: Something entirely different happened at the… \(Oct 1\)\.$/);
+});
+
+test("eventName recognizes common layoff headline phrasings without overriding closures", () => {
+  const cases = [
+    ["Sapporo’s Stone Brewing plant cutting hundreds of jobs as production moves out of San Diego County", "Layoffs"],
+    ["Mexican food manufacturer cuts 176 California workers", "Layoffs"],
+    ["Acme lays off 40 staff", "Layoffs"],
+    ["Acme is laying off 58 workers in Ohio", "Layoffs"],
+    ["Acme to close Ohio plant, cutting 200 jobs", "Plant closure"],
+    ["Acme cuts prices", "Acme cuts prices"],
+  ];
+
+  for (const [title, expected] of cases) {
+    assert.equal(eventName(sig("strong", TODAY, title)), expected);
+  }
 });

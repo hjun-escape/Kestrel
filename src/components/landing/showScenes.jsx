@@ -148,7 +148,7 @@ export function DecideDemo() {
     <div ref={ref} className={`${CARD} relative`}>
       <div className={`rounded-sm border border-ew-red-rule bg-[#fdecea]/40 p-2.5 transition-all duration-500 ${flagIn ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"}`}>
         <p className="flex justify-between text-[13px] font-semibold">
-          WARN notice, 125 jobs <span className="font-normal text-ew-muted">Nevada DETR</span>
+          WARN notice, 125 jobs <span className="font-normal text-ew-muted">State WARN notice</span>
         </p>
         <p className="mt-1 text-[12.5px] text-ew-ink-soft">&ldquo;Number of employees affected: 125.&rdquo;</p>
       </div>
