@@ -127,3 +127,19 @@ test("every entity with a borrower_id field is cleaned up on delete", async () =
     .sort();
   assert.deepEqual([...CHILD_ENTITIES].sort(), linked);
 });
+
+test("only a signed-in owner or an admin may edit or delete; signed-out visitors may not change the demo book", async () => {
+  const { canChangeCompany } = await import("../base44/functions/manageCompany/logic.ts");
+  const { canAccessCompany } = await import("../base44/functions/manageCompany/access.ts");
+  const can = (company: object, caller: object | null) => canChangeCompany(company, caller, canAccessCompany as never);
+  const mine = { owner_email: "a@x.com" };
+  const demo = {};
+  assert.equal(can(mine, { email: "A@x.com " }), true);
+  assert.equal(can(mine, { email: "b@x.com" }), false);
+  assert.equal(can(mine, null), false);
+  assert.equal(can(demo, null), false); // signed out: can view and refresh the demo book, not change it
+  assert.equal(can(demo, { email: "" }), false);
+  assert.equal(can(demo, { email: "a@x.com" }), false); // signed in: the demo book is not theirs
+  assert.equal(can(demo, { email: "boss@x.com", role: "admin" }), true);
+  assert.equal(can(mine, { email: "boss@x.com", role: "admin" }), true);
+});

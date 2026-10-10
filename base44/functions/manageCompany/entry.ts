@@ -1,13 +1,13 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { canAccessCompany } from './access.ts';
-import { deleteCompany, updateCompany, type Db } from './logic.ts';
+import { canChangeCompany, deleteCompany, updateCompany, type Db } from './logic.ts';
 
 // manageCompany({ borrower_id, action: "update", fields }) -> { borrower, evidence_cleared }
 // manageCompany({ borrower_id, action: "delete" })          -> { deleted }
 //
-// Edit and Delete on the company page. Borrower has no row-level rules, so the ownership check runs here, the
-// same as refreshBorrower: a signed-in caller may change only their own companies, a signed-out caller only the
-// shared demo book, and app admins any. Rules for what an edit may change and what a delete removes: logic.ts.
+// Edit and Delete on the company page. Borrower has no row-level rules, so the ownership check runs here: a
+// signed-in caller may change only their own companies, and app admins any. Signed-out visitors may not change
+// the shared demo book (canChangeCompany). Rules for what an edit may change and what a delete removes: logic.ts.
 export default async function (req: Request): Promise<Response> {
   try {
     let body: { borrower_id?: unknown; action?: unknown; fields?: unknown } | null = null;
@@ -28,8 +28,9 @@ export default async function (req: Request): Promise<Response> {
     if (!borrower) return Response.json({ error: 'Company not found.' }, { status: 404 });
 
     const caller = await base44.auth.me().catch(() => null);
-    if (!canAccessCompany(borrower, caller) && caller?.role !== 'admin') {
-      return Response.json({ error: 'You do not have access to this company.' }, { status: 403 });
+    if (!canChangeCompany(borrower, caller, canAccessCompany as (c: unknown, who: unknown) => boolean)) {
+      const error = caller?.email ? 'You do not have access to this company.' : 'Sign in to edit or delete companies.';
+      return Response.json({ error }, { status: 403 });
     }
 
     const result =

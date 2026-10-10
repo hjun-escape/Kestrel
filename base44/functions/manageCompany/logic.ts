@@ -27,6 +27,19 @@ export const CHILD_ENTITIES = ["Signal", "Analysis", "LenderCheck", "Decision", 
 
 type Patch = Record<string, unknown>;
 
+// Stricter than canAccessCompany: a signed-out visitor may view and refresh the shared demo book, but editing or
+// deleting it would change it for every Sense tester, so only a signed-in owner (or an app admin) may.
+export function canChangeCompany(
+  company: { owner_email?: unknown } | null | undefined,
+  caller: { email?: unknown; role?: unknown } | null | undefined,
+  canAccess: (c: unknown, who: unknown) => boolean,
+): boolean {
+  if (!company) return false;
+  if (caller?.role === "admin") return true;
+  const signedIn = typeof caller?.email === "string" && caller.email.trim() !== "";
+  return signedIn && canAccess(company, caller);
+}
+
 // "acme.com", "https://www.acme.com/about" -> "acme.com" (same rule as the add-company form)
 export function normalizeDomain(value: string): string {
   return value.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split(/[/?#]/)[0];

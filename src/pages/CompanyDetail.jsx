@@ -184,8 +184,9 @@ export default function CompanyDetail() {
           running={running}
           refreshError={refreshError}
           onRefresh={() => handleRefresh()}
-          onEdit={() => setEditOpen(true)}
-          onDelete={() => setDeleteOpen(true)}
+          // Signed-in owners only: the shared demo book is the same for every signed-out visitor (manageCompany).
+          onEdit={me ? () => setEditOpen(true) : undefined}
+          onDelete={me ? () => setDeleteOpen(true) : undefined}
         />
         {notice && (
           <p role="status" className="border-t border-ew-rule-soft px-5 py-2 text-xs text-ew-ink-soft">
