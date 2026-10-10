@@ -1,6 +1,7 @@
 import { format, parseISO } from "date-fns";
 import { base44 } from "@/api/base44Client";
 import { SIGNAL_TYPES, SOURCES } from "@/lib/signalTypes";
+import { recentSignals, WINDOW_DAYS } from "../../base44/functions/scoreBorrower/entry.ts";
 
 // Signal dates are "YYYY-MM-DD". new Date("2026-09-12") is UTC midnight, which
 // shows as Sep 11 in US time zones, so parse them as local dates instead.
@@ -51,12 +52,10 @@ export function getTopSignal(signals) {
   return weak[0] || null;
 }
 
-// Keep only signals within the last N days (default 90).
-export function filterRecentSignals(signals, days = 90) {
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - days);
-  const cutoffStr = cutoff.toISOString().split("T")[0];
-  return (signals || []).filter((s) => s.date >= cutoffStr);
+// Signals the status rules count: scoreBorrower's own 90-day window, so future-dated or
+// undated signals never show as counting toward status.
+export function filterRecentSignals(signals) {
+  return recentSignals(signals || []);
 }
 
 export function formatUsd(n) {
@@ -81,7 +80,7 @@ export function formatRelative(dateStr) {
 // ---------------------------------------------------------------------------
 
 
-export const RECENT_DAYS = 90;
+export const RECENT_DAYS = WINDOW_DAYS;
 export const POLL_INTERVAL_MS = 3000;
 
 // Status key used for display: "not_checked" until the first refresh lands.
@@ -121,8 +120,8 @@ export function sourceOfSignal(signal) {
 }
 
 // Splits signals into the last N days (count toward status) and older ones.
-export function splitByRecency(signals, days = RECENT_DAYS) {
-  const recent = filterRecentSignals(signals, days);
+export function splitByRecency(signals) {
+  const recent = filterRecentSignals(signals);
   const recentIds = new Set(recent.map((s) => s.id ?? `${s.type}-${s.date}-${s.title}`));
   const older = (signals || []).filter(
     (s) => !recentIds.has(s.id ?? `${s.type}-${s.date}-${s.title}`)

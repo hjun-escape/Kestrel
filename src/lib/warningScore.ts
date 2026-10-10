@@ -34,6 +34,16 @@ function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+// Why recentSignals left a signal out: no usable severity or date, dated after today, or too old.
+function outsideWindowNote(s: Signal, today: string): string {
+  if (s?.severity !== "strong" && s?.severity !== "weak") return "No severity";
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:$|[T ])/.exec(String(s?.date ?? "").trim());
+  const day = m ? `${m[1]}-${m[2]}-${m[3]}` : "";
+  const valid = m && new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).toISOString().slice(0, 10) === day;
+  if (!valid) return "No valid date";
+  return day > today.slice(0, 10) ? "Dated after today" : `Older than ${WINDOW_DAYS} days`;
+}
+
 const newestFirst = (a: Signal, z: Signal) => String(z.date).localeCompare(String(a.date));
 
 export function warningScore(signals: Signal[], today: string = todayIso()): WarningScore {
@@ -53,7 +63,7 @@ export function warningScore(signals: Signal[], today: string = todayIso()): War
   ];
   const notCounted: ScoreLine[] = [
     ...recent.filter((s) => !unique.includes(s)).map((s) => ({ signal: s, points: 0, note: "Same event as another signal" })),
-    ...all.filter((s) => !recent.includes(s)).sort(newestFirst).map((s) => ({ signal: s, points: 0, note: `Older than ${WINDOW_DAYS} days` })),
+    ...all.filter((s) => !recent.includes(s)).sort(newestFirst).map((s) => ({ signal: s, points: 0, note: outsideWindowNote(s, today) })),
   ];
 
   const raw = counted.reduce((n, l) => n + l.points, 0);

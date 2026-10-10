@@ -40,6 +40,12 @@ describe('warningScore', () => {
     assert.deepEqual(ws.notCounted.map((l) => l.note).sort(), ['Older than 90 days', 'Same event as another signal']);
   });
 
+  test('signals the rules skip for another reason than age say why', () => {
+    const ws = warningScore([sig('strong', 0, '2026-10-20'), sig('strong', 1, 'Sep 12'), sig('weak', 2, '2026-02-30')], today);
+    assert.equal(ws.score, 0);
+    assert.deepEqual(ws.notCounted.map((l) => l.note).sort(), ['Dated after today', 'No valid date', 'No valid date']);
+  });
+
   test('caps at 100 and no signals scores 0 (green)', () => {
     assert.equal(warningScore([0, 1, 2, 3].map((i) => sig('strong', i)), today).score, 100);
     const none = warningScore([], today);
