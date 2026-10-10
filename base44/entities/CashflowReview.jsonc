@@ -1,0 +1,74 @@
+{
+  "name": "CashflowReview",
+  "type": "object",
+  "properties": {
+    "borrower_id": { "type": "string" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "file_url": { "type": "string" },
+    "extraction_method": { "type": "string", "enum": ["csv", "extract", "llm"] },
+    "transaction_count": { "type": "number" },
+    "period_start": { "type": "string" },
+    "period_end": { "type": "string" },
+    "lender_count": { "type": "number" },
+    "lenders": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "payments": { "type": "number" },
+          "typical_amount": { "type": "number" },
+          "typical_day": { "type": "number" },
+          "cadence": { "type": "string" },
+          "late_count": { "type": "number" },
+          "missed_count": { "type": "number" },
+          "missed_months": { "type": "array", "items": { "type": "string" } },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": { "type": "string" },
+                "description": { "type": "string" },
+                "amount": { "type": "number" },
+                "days_late": { "type": "number" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "nsf_count": { "type": "number" },
+    "late_fee_count": { "type": "number" },
+    "monthly_inflows": { "type": "number" },
+    "monthly_debt_service": { "type": "number" },
+    "debt_service_ratio": { "type": "number" },
+    "negative_months": { "type": "number" },
+    "negative_month_keys": { "type": "array", "items": { "type": "string" } },
+    "lowest_balance": { "type": "number" },
+    "exceptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "date": { "type": "string" },
+          "description": { "type": "string" },
+          "amount": { "type": "number" },
+          "kind": { "type": "string", "enum": ["nsf", "late_fee"] }
+        }
+      }
+    },
+    "flags": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "severity": { "type": "string", "enum": ["strong", "weak"] },
+          "text": { "type": "string" }
+        }
+      }
+    },
+    "summary": { "type": "string" }
+  },
+  "required": ["borrower_id", "created_at", "file_url", "lender_count", "summary"]
+}
