@@ -172,66 +172,6 @@ export function DecideDemo() {
   );
 }
 
-// ------------------------------------------------------------------ AI reads / Rules decide / You approve
-export function ReadDemo() {
-  const [ref, step] = useLoop(6, 700); // 1-3 highlight sweeps, 4 quote copied
-  const sweep = Math.min(100, Math.max(0, (step - 0) * 34));
-  return (
-    <div ref={ref} className={CARD}>
-      <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-ew-muted">Electrek · Sep 10, 2026</p>
-      <p className="text-[12.5px] leading-relaxed text-ew-muted">
-        Northfield shared an update on its Reno plant on Tuesday.{" "}
-        <span className="relative text-ew-ink">
-          <span aria-hidden="true" className="absolute inset-y-0 left-0 -z-0 rounded-[2px] bg-[#38bdf8]/35 transition-[width] duration-700 ease-out" style={{ width: `${sweep}%` }} />
-          <span className="relative">Chief financial officer Dana Whitlock has stepped down, effective immediately.</span>
-        </span>{" "}
-        The company did not name a successor.
-      </p>
-      <p className={`mt-3 rounded-sm border border-ew-rule bg-ew-paper px-2.5 py-1.5 text-[12px] transition-all duration-500 ${step >= 4 ? "opacity-100" : "opacity-0"}`}>
-        <span className="font-semibold">Exact quote</span> · CFO departure · strong
-      </p>
-    </div>
-  );
-}
-
-const RULE_ROWS = [
-  { status: "red", rule: "2+ strong, or 1 strong + 2 weak" },
-  { status: "yellow", rule: "1 strong, or 2+ weak" },
-  { status: "green", rule: "Anything less, last 90 days" },
-];
-export function DecideRulesDemo() {
-  const [ref, step] = useLoop(7, 800); // 0 none, 2 one flag, 4 two flags, hold
-  const flags = step >= 4 ? 2 : step >= 2 ? 1 : 0;
-  const status = flags === 2 ? "red" : flags === 1 ? "yellow" : "green";
-  return (
-    <div ref={ref} className={CARD}>
-      <div className="flex h-8 items-center gap-2">
-        {["CFO departure", "WARN notice"].map((f, i) => (
-          <span
-            key={f}
-            className={`rounded-sm border border-ew-ink bg-ew-ink px-2 py-1 text-[11.5px] font-semibold text-white transition-all duration-500 ${
-              flags > i ? "translate-y-0 opacity-100" : "-translate-y-3 opacity-0"
-            }`}
-          >
-            {f}
-          </span>
-        ))}
-      </div>
-      <ul className="mt-3 space-y-1.5">
-        {RULE_ROWS.map((r) => (
-          <li
-            key={r.status}
-            className={`flex items-center justify-between rounded-sm px-2 py-1 text-[12.5px] transition-colors duration-500 ${r.status === status ? "bg-ew-paper font-semibold text-ew-ink" : "text-ew-muted"}`}
-          >
-            {r.rule}
-            {r.status === status ? <StatusChip status={status} /> : <span className="h-[22px]" />}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
 // ------------------------------------------------------------------ Before the quarterly financials
 // Jul 1 to Nov 30 (152 days) across the width; each month is about 20%.
 const AXIS_DAYS = 152;

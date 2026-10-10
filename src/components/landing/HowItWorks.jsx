@@ -17,9 +17,9 @@ export default function HowItWorks() {
           columns={[
             { title: "Screen", caption: "Name, website, city", accent: "#38bdf8", body: <ScreenDemo /> },
             { title: "Check", caption: "Five sources, read in parallel", accent: "#c084fc", body: <CheckDemo /> },
-            { title: "Decide", caption: "Each flag with its source and quote", accent: "#2dd4bf", body: <DecideDemo /> },
+            { title: "Decide", caption: "Fixed rules set the status. You make the call.", accent: "#2dd4bf", body: <DecideDemo /> },
           ]}
-          footer="SAMPLE RUN · Northfield Battery Works · 5 sources · 63 items read · 3 verified · Red 95 · 1m 52s"
+          footer="SAMPLE RUN · Northfield Battery Works · 63 items read · 3 verified · Red 95 · 1m 52s · AI never sets a status · every quote checked word for word"
         />
       </div>
     </section>
