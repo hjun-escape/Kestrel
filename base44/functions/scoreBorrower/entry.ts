@@ -70,7 +70,7 @@ const LEGAL_EVENTS: [RegExp, string][] = [
   [new RegExp(`\\b(supplier|vendor)s?\\b.*\\b${SUED}\\b|\\b${SUED}\\b.*\\b(supplier|vendor)s?\\b`, "i"), "Supplier lawsuit"],
   [/\bclos(e|es|ing|ure)\b.*\b(factory|plant|facility|site|mill|brewery|warehouse)s?\b|\b(factory|plant|facility|site|mill|brewery|warehouse)s?\b.*\bclos(e|es|ing|ure)\b/i, "Plant closure"],
   [/pulls? (the )?plug|shut(s|ting)? down|wind(s|ing)? down|ceases? operations/i, "Shutdown"],
-  [/layoffs?|laid off|job cuts/i, "Layoffs"],
+  [/layoffs?|laid off|\blay(s|ing)? off\b|job cuts|\bcut(s|ting)?\b.{0,40}\b(jobs|workers|employees|staff|positions)\b/i, "Layoffs"],
   [/\blien\b/i, "Lien"],
   [/wage (claim|theft)|unpaid wages/i, "Wage claim"],
   [/contract dispute|breach of contract/i, "Contract dispute"],
