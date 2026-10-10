@@ -310,6 +310,27 @@ describe('askPortfolio agent loop', () => {
     const last = buildPrompt({ messages: [{ role: 'user', content: 'hi' }], transcript: [], today: '2026-10-10', toolsAllowed: false });
     assert.match(last, /no more tools/i);
   });
+
+  test('context_company_id is passed to the prompt as a hint, and bad or unknown ids are ignored', async () => {
+    const { data } = fakeData();
+    const pinned = fakeLlm([{ action: 'final', answer: 'ok', citations: [] }]);
+    await runAgent({ messages: user('Any news?'), contextCompanyId: 'b_north', llm: pinned.llm, data, now: clock });
+    assert.match(pinned.prompts[0], /pinned/i);
+    assert.match(pinned.prompts[0], /Northfield Packaging Co\. \(id b_north\)/);
+
+    const unknown = fakeLlm([{ action: 'final', answer: 'ok', citations: [] }]);
+    await runAgent({ messages: user('Any news?'), contextCompanyId: 'b_missing', llm: unknown.llm, data, now: clock });
+    assert.doesNotMatch(unknown.prompts[0], /pinned/i);
+
+    const bad = fakeLlm([{ action: 'final', answer: 'ok', citations: [] }]);
+    const res = await runAgent({ messages: user('Any news?'), contextCompanyId: 'x"; drop', llm: bad.llm, data, now: clock });
+    assert.equal(res.status, 200);
+    assert.doesNotMatch(bad.prompts[0], /pinned/i);
+
+    const none = fakeLlm([{ action: 'final', answer: 'ok', citations: [] }]);
+    await runAgent({ messages: user('Any news?'), llm: none.llm, data, now: clock });
+    assert.doesNotMatch(none.prompts[0], /pinned/i);
+  });
 });
 
 describe('confirmAction', () => {

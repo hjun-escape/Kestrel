@@ -2,7 +2,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { runAgent } from './logic.ts';
 import type { DataLayer } from './logic.ts';
 
-// askPortfolio({ messages }). "Ask Early Warning" scoped chat agent.
+// askPortfolio({ messages, context_company_id? }). "Ask Early Warning" scoped chat agent.
 // Read-only: it never writes entities. Screen / refresh / deep-check requests
 // come back as pending_actions that the user confirms via confirmAction.
 // Response: { answer, citations, pending_actions, tool_errors } or { error }.
@@ -31,7 +31,8 @@ export default async function(req: Request): Promise<Response> {
     const llm = (prompt: string, responseSchema: object) =>
       base44.asServiceRole.integrations.Core.InvokeLLM({ prompt, response_json_schema: responseSchema });
 
-    const result = await runAgent({ messages: (body as { messages?: unknown }).messages, llm, data });
+    const { messages, context_company_id } = body as { messages?: unknown; context_company_id?: unknown };
+    const result = await runAgent({ messages, contextCompanyId: context_company_id, llm, data });
     return Response.json(result.body, { status: result.status });
   } catch (error) {
     console.error('askPortfolio failed:', (error as Error).message);

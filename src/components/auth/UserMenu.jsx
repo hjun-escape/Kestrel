@@ -1,4 +1,5 @@
 import React from "react";
+import { Link, useLocation } from "react-router-dom";
 import { LogOut } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import {
@@ -18,10 +19,23 @@ const TONES = {
 // Signed-in user chip with a Sign out action. Mount in any header:
 //   import UserMenu from "@/components/auth/UserMenu";
 //   <UserMenu />
-// Renders nothing when no one is signed in.
+// Signed-out visitors (sign-in is optional) get a "Sign in" link that returns
+// them to the current page.
 export default function UserMenu({ className = "", tone = "light" }) {
   const { user, displayName, email, initials, signOut } = useAuth();
-  if (!user) return null;
+  const location = useLocation();
+  if (!user) {
+    const returnTo = location.pathname + location.search;
+    const to = returnTo === "/" ? "/login" : `/login?returnTo=${encodeURIComponent(returnTo)}`;
+    return (
+      <Link
+        to={to}
+        className={`inline-flex h-7 items-center rounded-md px-2.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 ${TONES[tone]} ${className}`}
+      >
+        Sign in
+      </Link>
+    );
+  }
 
   return (
     <DropdownMenu>

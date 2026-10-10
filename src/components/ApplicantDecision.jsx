@@ -385,7 +385,11 @@ export default function ApplicantDecision({ borrower, signals }) {
     setSaving(true);
     setError(null);
     try {
-      const decidedBy = email || (await base44.auth.me())?.email || "";
+      const decidedBy = email || (await base44.auth.me().catch(() => null))?.email;
+      if (!decidedBy) {
+        setError("Sign in to record a decision. It is logged under your name.");
+        return false;
+      }
       const record = {
         borrower_id: borrowerId,
         decision,
