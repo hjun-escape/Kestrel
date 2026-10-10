@@ -16,11 +16,34 @@ const STEP_STATE = {
 };
 
 const TYPE_LABEL = { exec_departure: "Executive departure", legal_layoffs: "Lawsuit / layoffs" };
+// Tags always carry a text label (never color alone). Severity matches the Evidence list (filled = strong,
+// outlined = weak); red/amber/green stay reserved for status, except the Verify verdict, which uses
+// green for kept and amber for not tagged.
+const TAG = {
+  strong: "border-ew-ink bg-ew-ink text-white",
+  weak: "border-ew-rule text-ew-ink-soft",
+  yes: "border-ew-ink-soft text-ew-ink",
+  no: "border-ew-rule-soft text-ew-muted",
+  type: "border-ew-rule bg-ew-hover text-ew-ink-soft",
+  kept: "border-ew-green-rule bg-ew-green-bg text-ew-green",
+  dropped: "border-ew-rule bg-ew-none-bg text-ew-muted",
+  failed: "border-ew-amber-rule bg-ew-amber-bg text-ew-amber",
+  pending: "border-ew-rule-soft text-ew-muted",
+};
+
+function Tag({ tone, children }) {
+  return (
+    <span className={`inline-flex items-center whitespace-nowrap rounded-sm border px-1.5 py-0.5 text-[11px] font-semibold leading-none ${TAG[tone] || TAG.type}`}>
+      {children}
+    </span>
+  );
+}
+
 const DECISION = {
-  kept: { label: "Kept", className: "font-semibold text-ew-ink" },
-  dropped: { label: "Dropped", className: "text-ew-muted" },
-  failed: { label: "Not tagged", className: "text-ew-muted" },
-  pending: { label: "Waiting", className: "text-ew-muted" },
+  kept: { label: "Kept", tone: "kept" },
+  dropped: { label: "Dropped", tone: "dropped" },
+  failed: { label: "Not tagged", tone: "failed" },
+  pending: { label: "Waiting", tone: "pending" },
 };
 
 function deriveSteps(run) {
@@ -141,10 +164,16 @@ function StepDetail({ step, run }) {
               <Td className="text-ew-muted" colSpan={5}>{a.why}</Td>
             ) : (
               <>
-                <Td>{a.relevant ? "Yes" : "No"}</Td>
-                <Td>{a.same_company ? "Yes" : "No"}</Td>
-                <Td className="text-ew-ink-soft">{TYPE_LABEL[a.signal_type] || "None"}</Td>
-                <Td className="capitalize text-ew-ink-soft">{a.severity && a.severity !== "none" ? a.severity : "None"}</Td>
+                <Td><Tag tone={a.relevant ? "yes" : "no"}>{a.relevant ? "Yes" : "No"}</Tag></Td>
+                <Td><Tag tone={a.same_company ? "yes" : "no"}>{a.same_company ? "Yes" : "No"}</Tag></Td>
+                <Td>{TYPE_LABEL[a.signal_type] ? <Tag tone="type">{TYPE_LABEL[a.signal_type]}</Tag> : <span className="text-ew-muted">None</span>}</Td>
+                <Td>
+                  {a.severity === "strong" || a.severity === "weak" ? (
+                    <Tag tone={a.severity}>{a.severity === "strong" ? "Strong" : "Weak"}</Tag>
+                  ) : (
+                    <span className="text-ew-muted">None</span>
+                  )}
+                </Td>
                 <Td className="text-ew-ink-soft">{a.reason || "—"}</Td>
               </>
             )}
@@ -162,7 +191,7 @@ function StepDetail({ step, run }) {
           const d = DECISION[a.decision] || DECISION.pending;
           return (
             <tr key={a.url}>
-              <Td className={d.className}>{d.label}</Td>
+              <Td><Tag tone={d.tone}>{d.label}</Tag></Td>
               <Td className="text-ew-ink-soft">{a.decision === "kept" ? "All checks passed" : a.why || "—"}</Td>
               <Td className="text-ew-ink-soft">{a.snippet ? `"${a.snippet}"` : "—"}</Td>
               <Td><SourceLink url={a.url}>{a.title}</SourceLink></Td>
@@ -181,7 +210,7 @@ function StepDetail({ step, run }) {
       {rows.map((c) => (
         <tr key={c.exec}>
           <Td>{c.exec}</Td>
-          <Td className={c.result === "departed" ? "font-semibold text-ew-ink" : "text-ew-muted"}>{c.result}</Td>
+          <Td><Tag tone={c.result === "departed" ? "strong" : c.result === "still there" ? "yes" : "no"}>{c.result}</Tag></Td>
           <Td className="text-ew-ink-soft">{c.detail}</Td>
           <Td>{c.profile_url ? <SourceLink url={c.profile_url}>LinkedIn</SourceLink> : "—"}</Td>
         </tr>
