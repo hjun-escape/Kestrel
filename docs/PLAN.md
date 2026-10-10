@@ -134,7 +134,7 @@ Put names here: **P1** ____ · **P2** ____ · **P3** ____ · **P4** ____
 - [x] **by 2:00** `hiringSignal`. **Rule changed:** the old "last 30 days vs prior 60" never fired, because LinkedIn only lists open postings (Gravie live: 34 recent, 0 prior). Now: open postings vs employees × BLS industry openings rate; ≥75% below expected = strong, 50–75% = weak, skip if < 5 expected. Gravie live: 34 open vs ~25 expected, no signal
 - [x] **by 2:30** `reviewSignals`: strong via keyword match with exact-sentence snippet (tagItem hook behind a flag), weak via 90-day average vs prior 12 months. Gravie live: strong (layoffs review, Sep 1) + weak (3.6 → 2.2)
 - [x] **after 3** Timeouts, async snapshot handling hardened (empty/error results fail, "not ready" waited on, snapshot_id validated)
-- [ ] **open** Switch on `hiringSignal` in `refreshBorrower`. `reviewSignals` waits on a decision: Glassdoor takes ~6 min vs the 2-min refresh limit (store snapshot_id for a second Refresh, or pre-warm with `refreshAll`)
+- [x] Switch on `hiringSignal` and `reviewSignals` in `refreshBorrower`. Glassdoor takes ~6 min, so its first refresh answers 503 + snapshot_id; `refreshBorrower` saves it in `pending_snapshots` and the next Refresh collects it. **Before the demo, run `refreshAll` twice a few minutes apart.**
 
 ### P4: Research & pitch (`research/`): Sense, companies, feedback, demo, QA
 - [ ] **now** Sense check 1 results → `docs/USER_FEEDBACK.md` (in progress). Watch whether testers 2–3 also talk about pre-loan screening
