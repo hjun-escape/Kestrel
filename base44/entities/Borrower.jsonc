@@ -1,0 +1,71 @@
+{
+  "name": "Borrower",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "website_domain": {
+      "type": "string"
+    },
+    "hq_city": {
+      "type": "string"
+    },
+    "hq_state": {
+      "type": "string"
+    },
+    "industry": {
+      "type": "string"
+    },
+    "stage": {
+      "type": "string",
+      "enum": [
+        "applicant",
+        "borrower"
+      ],
+      "default": "borrower"
+    },
+    "loan_amount_usd": {
+      "type": "number"
+    },
+    "linkedin_url": {
+      "type": "string"
+    },
+    "glassdoor_url": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "green",
+        "yellow",
+        "red"
+      ]
+    },
+    "why": {
+      "type": "string"
+    },
+    "last_refreshed": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "sources_unavailable": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "News",
+          "Legal",
+          "Jobs",
+          "Reviews"
+        ]
+      }
+    }
+  },
+  "required": [
+    "name",
+    "website_domain",
+    "stage",
+    "status"
+  ]
+}

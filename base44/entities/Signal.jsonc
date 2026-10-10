@@ -1,0 +1,48 @@
+{
+  "name": "Signal",
+  "type": "object",
+  "properties": {
+    "borrower_id": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "hiring_drop",
+        "review_distress",
+        "exec_departure",
+        "legal_layoffs"
+      ]
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "strong",
+        "weak"
+      ]
+    },
+    "date": {
+      "type": "string",
+      "format": "date"
+    },
+    "title": {
+      "type": "string"
+    },
+    "snippet": {
+      "type": "string"
+    },
+    "source_name": {
+      "type": "string"
+    },
+    "source_url": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "borrower_id",
+    "type",
+    "severity",
+    "date",
+    "title"
+  ]
+}
