@@ -17,7 +17,17 @@ const white = (a) => `rgba(255,255,255,${Math.max(0, Math.min(1, a)).toFixed(3)}
 export const LANES = 5; // news, courts, jobs, reviews, linkedin
 
 // ---------------------------------------------------------------- pipeline
-export function pipelineScene({ onSignal, cell = 6, exitFrac = 0.7, top = 0 }) {
+// Lane colours, one per source (red/amber/green stay reserved for status).
+export const LANE_COLORS = [
+  [56, 189, 248], // News: sky
+  [192, 132, 252], // Court filings: purple
+  [45, 212, 191], // Job posts: teal
+  [244, 114, 182], // Reviews: pink
+  [129, 140, 248], // LinkedIn: indigo
+];
+const rgba = ([r, g, b], a) => `rgba(${r},${g},${b},${Math.max(0, Math.min(1, a)).toFixed(3)})`;
+
+export function pipelineScene({ onSignal, onMark, onDrop, cell = 6, exitFrac = 0.7, top = 0, noise = 0.1 }) {
   let cols = 0;
   let rows = 0;
   let exitCol = 0;
@@ -27,6 +37,12 @@ export function pipelineScene({ onSignal, cell = 6, exitFrac = 0.7, top = 0 }) {
   let tick = 0;
   let shifted = 0; // columns moved so far, so a cell keeps its identity as it flows
   let lastSignal = -1e9;
+  let lastMark = -1e9;
+  let lastDrop = -1e9;
+  let target = null; // where verified cells fly to (the report), in canvas px
+  let effects = []; // { kind: "pop" | "fade" | "fly" | "spawn", x, y, lane, at, ... }
+  const pendingSpawns = []; // encoded inputs waiting to enter: { lane, bits }
+  const gateAct = [0, 0, 0, 0]; // recent traffic through each gate (3 between stages + the exit)
   const BANDS = 4;
   const READ_BIRTH = 0.1; // chance an empty cell beside a fragment joins it
   const TAG_N = 5; // live neighbours needed before a cell can be marked
@@ -37,6 +53,10 @@ export function pipelineScene({ onSignal, cell = 6, exitFrac = 0.7, top = 0 }) {
   const idx = (c, r) => r * cols + c;
   const bandOf = (c) => Math.min(BANDS - 1, Math.floor((c / exitCol) * BANDS));
   const laneOf = (r) => Math.min(LANES - 1, Math.max(0, Math.floor(((r - topRow) / (rows - topRow)) * LANES)));
+  const laneRows = (lane) => {
+    const h = (rows - topRow) / LANES;
+    return [Math.ceil(topRow + lane * h), Math.floor(topRow + (lane + 1) * h) - 1];
+  };
 
   function neighbours(c, r, min) {
     let n = 0;
@@ -63,20 +83,62 @@ export function pipelineScene({ onSignal, cell = 6, exitFrac = 0.7, top = 0 }) {
     return false;
   }
 
+  const effect = (e) => {
+    effects.push(e);
+    if (effects.length > 160) effects.shift();
+  };
+
   function step(now) {
     tick++;
     if (tick % 2 === 0) {
       shifted++;
       for (let r = topRow; r < rows; r++) {
-        if (grid[idx(exitCol - 1, r)] === 2 && now - lastSignal > 3500) {
-          lastSignal = now;
-          onSignal?.({ lane: laneOf(r) });
+        // Gates between stages: whatever crosses this step gets that gate's animation.
+        for (let b = 1; b < BANDS; b++) {
+          const g = Math.floor((b * exitCol) / BANDS);
+          const crossing = grid[idx(g - 1, r)];
+          if (!crossing) continue;
+          gateAct[b - 1]++;
+          const y = (r + 0.5) * cell;
+          const x = g * cell;
+          const lane = laneOf(r);
+          if (b === 1 && Math.random() < 0.18) effect({ kind: "absorb", x, y, lane, at: now, dur: 600 });
+          if (b === 2 && Math.random() < 0.22) effect({ kind: "spark", x, y, lane, at: now, dur: 450 });
+          if (b === 3) {
+            if (crossing === 2) effect({ kind: "pass", x, y, lane, at: now, dur: 650 });
+            else if (Math.random() < 0.12) effect({ kind: "block", x, y, lane, at: now, dur: 500 });
+          }
+        }
+        if (grid[idx(exitCol - 1, r)] === 2) {
+          const lane = laneOf(r);
+          gateAct[3]++;
+          if (Math.random() < 0.5) effect({ kind: "stamp", x: exitCol * cell, y: (r + 0.5) * cell, lane, at: now, dur: 700 });
+          if (target && Math.random() < 0.35) effect({ kind: "fly", x: exitCol * cell, y: (r + 0.5) * cell, lane, at: now, dur: 900 });
+          if (now - lastSignal > 3500) {
+            lastSignal = now;
+            onSignal?.({ lane });
+          }
         }
         for (let c = exitCol - 1; c > 0; c--) grid[idx(c, r)] = grid[idx(c - 1, r)];
         grid[idx(0, r)] = 0;
       }
     }
-    for (let r = topRow; r < rows; r++) for (let c = 0; c < 2; c++) grid[idx(c, r)] = Math.random() < 0.38 ? 1 : 0;
+    // Background noise on the input edge, plus any encoded inputs waiting to enter.
+    for (let r = topRow; r < rows; r++) for (let c = 0; c < 2; c++) grid[idx(c, r)] = Math.random() < noise ? 1 : 0;
+    while (pendingSpawns.length) {
+      const { lane, bits } = pendingSpawns.shift();
+      const [r0, r1] = laneRows(lane);
+      const h = bits.length;
+      const start = r0 + Math.max(0, Math.floor(Math.random() * Math.max(1, r1 - r0 - h)));
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < bits[y].length; x++) {
+          const r = start + y;
+          if (r > r1 || x >= exitCol) continue;
+          if (bits[y][x]) grid[idx(x, r)] = 1;
+        }
+      }
+      effect({ kind: "spawn", x: 0, y: (start + h / 2) * cell, lane, at: now, dur: 700, h: h * cell });
+    }
 
     for (let r = topRow; r < rows; r++) {
       for (let c = 0; c < exitCol; c++) {
@@ -88,18 +150,32 @@ export function pipelineScene({ onSignal, cell = 6, exitFrac = 0.7, top = 0 }) {
         if (band === 0) {
           out = s ? (n === 2 || n === 3 ? 1 : 0) : n === 3 ? 1 : 0;
         } else if (band === 1) {
-          // Join beside 2-5 live cells; overcrowded cells thin out, so blobs keep holes and edges.
+          // Join beside 2-5 live cells; crowded cells thin out, so blobs keep holes and edges.
           out = s ? (n >= 2 && n <= 5 ? 1 : n >= 6 && Math.random() < 0.45 ? 1 : 0) : n >= 2 && n <= 5 && Math.random() < READ_BIRTH ? 1 : 0;
         } else if (band === 2) {
           // Marks stay as small clusters: a marked cell needs marked neighbours.
           if (s === 2) out = neighbours(c, r, 2) >= TAG_KEEP ? 2 : 0;
           else if (s === 1) out = n >= TAG_N && Math.random() < TAG_P ? 2 : n <= 1 ? 0 : n >= 3 ? 1 : 0;
           else out = n === 3 && Math.random() < 0.5 ? 1 : 0;
+          if (s === 1 && out === 2) {
+            if (Math.random() < 0.25) effect({ kind: "pop", x: (c + 0.5) * cell, y: (r + 0.5) * cell, lane: laneOf(r), at: now, dur: 650 });
+            if (now - lastMark > 1300) {
+              lastMark = now;
+              onMark?.({ lane: laneOf(r), id: r * 7919 + (c - shifted) });
+            }
+          }
         } else {
           // Only solid marked blocks pass; each step a few fail the quote check.
           if (s === 2) out = inTaggedBlock(c, r) && Math.random() < VERIFY_P ? 2 : 0;
           else if (s === 1) out = Math.random() < 0.35 ? 0 : 1;
           else out = 0;
+          if (s === 2 && out === 0) {
+            effect({ kind: "fade", x: (c + 0.5) * cell, y: (r + 0.5) * cell, lane: laneOf(r), at: now, dur: 500 });
+            if (now - lastDrop > 1700) {
+              lastDrop = now;
+              onDrop?.({ lane: laneOf(r), id: r * 7919 + (c - shifted) });
+            }
+          }
         }
         next[i] = out;
       }
@@ -109,6 +185,13 @@ export function pipelineScene({ onSignal, cell = 6, exitFrac = 0.7, top = 0 }) {
 
   return {
     layout: () => ({ cell, cols, rows, exitX: exitCol * cell, topY: topRow * cell, bandW: (exitCol * cell) / BANDS }),
+    setTarget(t) {
+      target = t;
+    },
+    /** Encoded input enters its lane on the next step: bits is rows of 0/1. */
+    inject(lane, bits) {
+      pendingSpawns.push({ lane, bits });
+    },
     probe(x, y) {
       const c0 = Math.floor(x / cell);
       const r0 = Math.floor(y / cell);
@@ -133,33 +216,163 @@ export function pipelineScene({ onSignal, cell = 6, exitFrac = 0.7, top = 0 }) {
       topRow = Math.min(rows - 4, Math.ceil(top / cell));
       grid = new Uint8Array(cols * rows);
       next = new Uint8Array(cols * rows);
+      effects = [];
+      const saved = noise;
+      noise = 0.38; // warm up with dense input so the bands open mid-flow
       for (let k = 0; k < 260; k++) step(-1e9);
+      noise = saved;
+      effects = [];
     },
     frame(ctx, now, w, h, animate) {
       if (animate) step(now);
       ctx.clearRect(0, 0, w, h);
       const bw = (exitCol * cell) / BANDS;
       const y0 = topRow * cell;
-      for (let b = 0; b < BANDS; b++) {
-        ctx.fillStyle = white(b % 2 ? 0.022 : 0.01);
-        ctx.fillRect(b * bw, y0, bw, h - y0);
-        if (b) {
-          ctx.fillStyle = white(0.14);
-          for (let y = y0; y < h; y += 6) ctx.fillRect(b * bw, y, 1, 3);
-        }
+      // Lane tints and stage dividers.
+      for (let l = 0; l < LANES; l++) {
+        const [a, b] = laneRows(l);
+        ctx.fillStyle = rgba(LANE_COLORS[l], 0.03);
+        ctx.fillRect(0, a * cell, exitCol * cell, (b - a + 1) * cell);
       }
-      ctx.fillStyle = white(0.05);
-      for (let l = 1; l < LANES; l++) ctx.fillRect(0, y0 + ((h - y0) * l) / LANES, exitCol * cell, 1);
+      // Gates: each brightens with traffic and has its own look.
+      for (let g = 0; g < 4; g++) gateAct[g] *= 0.9;
+      const gateX = [1, 2, 3].map((b) => Math.floor((b * exitCol) / BANDS) * cell).concat(exitCol * cell);
+      const glow = (g) => 0.14 + Math.min(0.45, gateAct[g] * 0.012);
+      // 1 absorb: dotted line.
+      ctx.fillStyle = white(glow(0));
+      for (let y = y0; y < h; y += 6) ctx.fillRect(gateX[0], y, 1, 3);
+      // 2 scanner: solid line with a beam sweeping up and down.
+      ctx.fillStyle = white(glow(1) * 0.7);
+      ctx.fillRect(gateX[1], y0, 1, h - y0);
+      const scanY = y0 + (h - y0) * (0.5 + 0.5 * Math.sin(now / 650));
+      const beam = ctx.createLinearGradient(0, scanY - 46, 0, scanY + 46);
+      beam.addColorStop(0, white(0));
+      beam.addColorStop(0.5, white(0.85));
+      beam.addColorStop(1, white(0));
+      ctx.fillStyle = beam;
+      ctx.fillRect(gateX[1] - 1, scanY - 46, 3, 92);
+      ctx.fillStyle = white(0.07);
+      ctx.fillRect(gateX[1] - 10, scanY - 46, 20, 92);
+      // 3 sieve: a comb of teeth.
+      ctx.fillStyle = white(glow(2));
+      ctx.fillRect(gateX[2], y0, 1, h - y0);
+      for (let y = y0 + 4; y < h; y += 10) ctx.fillRect(gateX[2] - 4, y, 8, 1);
+      // 4 exit to the report: double rule.
+      ctx.fillStyle = white(glow(3));
+      ctx.fillRect(gateX[3], y0, 1, h - y0);
+      ctx.fillRect(gateX[3] + 3, y0, 1, h - y0);
       for (let r = topRow; r < rows; r++) {
+        const col = LANE_COLORS[laneOf(r)];
         for (let c = 0; c < exitCol; c++) {
           const s = grid[idx(c, r)];
           if (!s) continue;
-          ctx.fillStyle = s === 2 ? white(0.92) : white(0.16 + 0.08 * bandOf(c));
-          ctx.fillRect(c * cell, r * cell, cell - 1, cell - 1);
+          if (s === 2) {
+            ctx.fillStyle = rgba(col, 1);
+            ctx.fillRect(c * cell, r * cell, cell - 1, cell - 1);
+            ctx.fillStyle = white(0.9);
+            ctx.fillRect(c * cell + 1.5, r * cell + 1.5, cell - 4, cell - 4);
+          } else {
+            ctx.fillStyle = rgba(col, 0.28 + 0.12 * bandOf(c));
+            ctx.fillRect(c * cell, r * cell, cell - 1, cell - 1);
+          }
         }
       }
+      // Effects: spawn flash on the input edge, pops when marked, fades when dropped, flights to the report.
+      const keep = [];
+      for (const e of effects) {
+        const t = (now - e.at) / e.dur;
+        if (t >= 1 || t < 0) continue;
+        keep.push(e);
+        const col = LANE_COLORS[e.lane];
+        if (e.kind === "absorb") {
+          ctx.fillStyle = rgba(col, 0.8 * (1 - t));
+          ctx.fillRect(e.x - 14 * t, e.y - 0.5, 28 * t + 1, 1.5);
+          ctx.fillRect(e.x - 0.5, e.y - 6 * t, 1.5, 12 * t + 1);
+          continue;
+        }
+        if (e.kind === "spark") {
+          const r = 2 + 7 * t;
+          ctx.strokeStyle = white(0.9 * (1 - t));
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          for (let k = 0; k < 4; k++) {
+            const a = (k * Math.PI) / 2 + Math.PI / 4;
+            ctx.moveTo(e.x + Math.cos(a) * 1.5, e.y + Math.sin(a) * 1.5);
+            ctx.lineTo(e.x + Math.cos(a) * r, e.y + Math.sin(a) * r);
+          }
+          ctx.stroke();
+          continue;
+        }
+        if (e.kind === "pass") {
+          ctx.strokeStyle = rgba(col, 1 - t);
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(e.x, e.y, 3 + 9 * t, 0, Math.PI * 2);
+          ctx.stroke();
+          continue;
+        }
+        if (e.kind === "block") {
+          const d = 3;
+          const bx = e.x - 6 - 6 * t; // bounced back from the sieve
+          ctx.strokeStyle = white(0.55 * (1 - t));
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(bx - d, e.y - d);
+          ctx.lineTo(bx + d, e.y + d);
+          ctx.moveTo(bx + d, e.y - d);
+          ctx.lineTo(bx - d, e.y + d);
+          ctx.stroke();
+          continue;
+        }
+        if (e.kind === "stamp") {
+          const sz = 6 + 14 * t;
+          ctx.strokeStyle = rgba(col, 1 - t);
+          ctx.lineWidth = 2 * (1 - t) + 0.5;
+          ctx.strokeRect(e.x - sz / 2, e.y - sz / 2, sz, sz);
+          ctx.fillStyle = white(0.7 * (1 - t));
+          ctx.fillRect(e.x, e.y - 22 * (1 - t), 4, 44 * (1 - t));
+          continue;
+        }
+        if (e.kind === "spawn") {
+          ctx.fillStyle = rgba(col, 0.5 * (1 - t));
+          ctx.fillRect(0, e.y - e.h / 2, 3 + 30 * t, e.h);
+        } else if (e.kind === "pop") {
+          ctx.strokeStyle = rgba(col, 0.9 * (1 - t));
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(e.x, e.y, 3 + 12 * t, 0, Math.PI * 2);
+          ctx.stroke();
+        } else if (e.kind === "fade") {
+          const s = (cell - 1) * (1 - t);
+          ctx.fillStyle = white(0.6 * (1 - t));
+          ctx.fillRect(e.x - s / 2, e.y - s / 2, s, s);
+        } else if (e.kind === "fly" && target) {
+          const ease = t * t * (3 - 2 * t);
+          const mx = (e.x + target.x) / 2;
+          const my = Math.min(e.y, target.y) - 60;
+          const x = (1 - ease) * (1 - ease) * e.x + 2 * (1 - ease) * ease * mx + ease * ease * target.x;
+          const y = (1 - ease) * (1 - ease) * e.y + 2 * (1 - ease) * ease * my + ease * ease * target.y;
+          ctx.fillStyle = rgba(col, 1 - 0.3 * t);
+          ctx.fillRect(x - 2.5, y - 2.5, 5, 5);
+          ctx.fillStyle = rgba(col, 0.25 * (1 - t));
+          ctx.fillRect(x - 6, y - 6, 12, 12);
+        }
+      }
+      effects = keep;
     },
   };
+}
+
+/** Encodes text as bits for the pipeline's input edge: 7 bits per character, laid out in rows. */
+export function encodeText(text, rowsTall = 8, maxCols = 14) {
+  const bits = [];
+  for (const ch of text) {
+    const code = ch.charCodeAt(0) & 127;
+    for (let b = 6; b >= 0; b--) bits.push((code >> b) & 1);
+  }
+  const cols = Math.min(maxCols, Math.ceil(bits.length / rowsTall));
+  const out = Array.from({ length: rowsTall }, (_, y) => Array.from({ length: cols }, (_, x) => bits[x * rowsTall + y] ?? 0));
+  return out;
 }
 
 // ---------------------------------------------------------------- waves

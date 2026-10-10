@@ -1,7 +1,8 @@
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import LandingCtas from "./LandingCtas";
 import { FLAGS, SAMPLE_COMPANY } from "./heroData";
-import { LANES, RING_EDGES, pipelineScene, sandpileScene, wavesScene } from "./caScenes";
+import { LANES, LANE_COLORS, RING_EDGES, encodeText, pipelineScene, sandpileScene, wavesScene } from "./caScenes";
+import { prefersReducedMotion } from "./motion";
 import { useCanvasScene, useFlagProgress } from "./useCanvasScene";
 
 // Three hero proposals, each a full-bleed cellular automaton that runs the product's workflow.
@@ -79,7 +80,7 @@ function Stage({ children, className = "" }) {
 function Intro({ className = "" }) {
   return (
     <div className={`pointer-events-auto rounded-sm border border-white/10 bg-ew-ink/90 p-6 shadow-[0_20px_60px_rgba(0,0,0,0.45)] backdrop-blur-sm ${className}`}>
-      <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-white/60">Early Warning</p>
+      <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-white/60">Kestrel</p>
       <h1 id="hero-heading" className="mt-2 font-heading text-[clamp(2rem,1.4rem+2vw,3rem)] font-bold leading-[0.98] tracking-[-0.02em] [font-stretch:76%]">
         See the trouble before you lend.
       </h1>
@@ -176,12 +177,144 @@ const STAGES = [
   { title: "Tag", body: "AI marks what matters" },
   { title: "Verify", body: "Same company, exact quote" },
 ];
-const EXIT = 0.68; // share of the width the pipeline runs across; the right side holds the intro and file
-const HEADER = 76; // px reserved at the top for stage titles
+const STRIP = 64; // compact intro at the top
+const GUTTER = 230; // input column: example items being encoded
+const HEADER = 62; // stage titles above the cells
+const EXIT = 0.66; // share of the canvas the pipeline runs across; the report sits to the right
+const css = ([r, g, b], a = 1) => `rgba(${r},${g},${b},${a})`;
+
+/** One example input: its text turns into blocks, then the bits spawn into the lane. */
+function EncoderCard({ job }) {
+  const [shown, setShown] = useState(0);
+  useEffect(() => {
+    if (prefersReducedMotion()) return undefined;
+    const started = performance.now();
+    let raf = 0;
+    const tick = (now) => {
+      const t = Math.min(1, (now - started) / job.encodeMs);
+      setShown(Math.round(t * job.text.length));
+      if (t < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [job]);
+  const col = LANE_COLORS[job.lane];
+  return (
+    <div
+      className={`rounded-sm border bg-ew-ink/95 px-2.5 py-1.5 transition-opacity duration-500 ${job.leaving ? "opacity-0" : "opacity-100"}`}
+      style={{ borderColor: css(col, 0.55) }}
+    >
+      <p className="text-[10.5px] font-semibold uppercase tracking-[0.12em]" style={{ color: css(col) }}>
+        Encoding
+      </p>
+      <p className="font-mono text-[11px] leading-snug text-white/85 [overflow-wrap:anywhere]">
+        {[...job.text].map((ch, i) =>
+          i < shown ? (
+            <span key={i} style={{ color: css(col) }}>
+              {(ch.charCodeAt(0) >> 3) & 1 ? "█" : "▓"}
+            </span>
+          ) : (
+            <span key={i}>{ch}</span>
+          )
+        )}
+      </p>
+    </div>
+  );
+}
 
 export function PipelineHero() {
   const progress = useFlagProgress();
-  const { canvasRef, sceneRef } = useCanvasScene(() => pipelineScene({ onSignal: progress.onSignal, exitFrac: EXIT, top: HEADER }), { fps: 14 });
+  const [log, setLog] = useState([]);
+  const [pulse, setPulse] = useState([0, 0, 0, 0]);
+  const [jobs, setJobs] = useState([]); // encoder cards, at most one per lane
+  const [landed, setLanded] = useState(null);
+  const startRef = useRef(performance.now());
+  const regionRef = useRef(null);
+  const reportRef = useRef(null);
+
+  const addLog = useCallback((lane, stage, text) => {
+    const s = Math.floor((performance.now() - startRef.current) / 1000);
+    const stamp = `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+    setLog((l) => [...l.slice(-6), { key: `${s}-${Math.random()}`, stamp, lane, stage, text }]);
+  }, []);
+  const bump = useCallback((stage) => setPulse((p) => p.map((v, i) => (i === stage ? v + 1 : v))), []);
+
+  const { canvasRef, sceneRef } = useCanvasScene(
+    () =>
+      pipelineScene({
+        exitFrac: EXIT,
+        top: HEADER,
+        onMark: ({ lane, id }) => {
+          bump(2);
+          addLog(lane, "Tag", `${SOURCES[lane].label}: ${shorten(itemFor(lane, id))} marked relevant`);
+        },
+        onDrop: ({ lane, id }) => {
+          bump(3);
+          addLog(lane, "Verify", `${SOURCES[lane].label}: quote not found, dropped ${shorten(itemFor(lane, id), 26)}`);
+        },
+        onSignal: ({ lane }) => {
+          bump(3);
+          const before = progress.step;
+          progress.onSignal();
+          const flag = FLAGS[Math.min(before, FLAGS.length - 1)];
+          if (before < FLAGS.length) {
+            setLanded(flag.id);
+            addLog(lane, "Report", `Verified: ${flag.title} added to the report`);
+          }
+        },
+      }),
+    { fps: 14 }
+  );
+
+  // Verified cells fly to the report's flag list.
+  useEffect(() => {
+    const place = () => {
+      const region = regionRef.current?.getBoundingClientRect();
+      const report = reportRef.current?.getBoundingClientRect();
+      if (region && report) sceneRef.current?.setTarget({ x: report.left - region.left + 24, y: report.top - region.top + 92 });
+    };
+    place();
+    const ro = new ResizeObserver(place);
+    if (regionRef.current) ro.observe(regionRef.current);
+    const t = setTimeout(place, 400);
+    return () => {
+      ro.disconnect();
+      clearTimeout(t);
+    };
+  }, [sceneRef]);
+
+  // Example inputs: pick a lane, show its item being encoded, then spawn the bits into that lane.
+  useEffect(() => {
+    if (prefersReducedMotion()) return undefined;
+    let n = 0;
+    const timers = [];
+    const launch = () => {
+      const lane = n % LANES;
+      const id = Math.floor(n / LANES);
+      n += 1;
+      const text = shorten(itemFor(lane, id), 44);
+      const key = `${lane}-${n}`;
+      const job = { key, lane, text, encodeMs: 1100, leaving: false };
+      setJobs((js) => [...js.filter((j) => j.lane !== lane), job]);
+      bump(0);
+      timers.push(
+        setTimeout(() => {
+          sceneRef.current?.inject(lane, encodeText(text));
+          addLog(lane, "Search", `${SOURCES[lane].label}: encoded “${shorten(text, 30)}”`);
+          setJobs((js) => js.map((j) => (j.key === key ? { ...j, leaving: true } : j)));
+          timers.push(setTimeout(() => bump(1), 1400));
+        }, 1200),
+        setTimeout(() => setJobs((js) => js.filter((j) => j.key !== key)), 1900)
+      );
+    };
+    launch();
+    const every = setInterval(launch, 1500);
+    return () => {
+      clearInterval(every);
+      timers.forEach(clearTimeout);
+    };
+  }, [sceneRef, addLog, bump]);
+
   const describe = useCallback((p) => {
     const source = SOURCES[p.lane]?.label ?? "";
     const stage = STAGES[p.stage]?.title ?? "";
@@ -194,37 +327,116 @@ export function PipelineHero() {
         ? { kicker: `Tag · ${source}`, title: item, body: "Marked relevant: a warning sign about this company." }
         : { kicker: `Tag · ${source}`, title: item, body: "Not marked: not a warning sign, will be dropped." };
     return p.state === 2
-      ? { kicker: `Verify · ${source}`, title: item, body: "Same company and the quote is word for word in the source. Heading to the file." }
+      ? { kicker: `Verify · ${source}`, title: item, body: "Same company and the quote is word for word in the source. Heading to the report." }
       : { kicker: `Verify · ${source}`, title: item, body: "Failed the check: dropped." };
   }, []);
   const { tip, handlers } = useProbe(sceneRef, describe);
 
   return (
     <Stage>
-      <canvas ref={canvasRef} aria-hidden="true" className="absolute inset-0 h-full w-full cursor-crosshair" {...handlers} />
-      {/* Stage titles above the cells. */}
-      <ol className="pointer-events-none absolute left-0 top-0 grid grid-cols-4" style={{ width: `${EXIT * 100}%`, height: HEADER }}>
-        {STAGES.map((s, i) => (
-          <li key={s.title} className="flex flex-col justify-end border-l border-white/10 px-4 pb-2 first:border-l-0">
-            <p className="text-[11px] font-semibold tracking-[0.14em] text-white/45">0{i + 1}</p>
-            <p className="font-heading text-[17px] font-bold leading-tight text-white">{s.title}</p>
-            <p className="text-[12px] text-white/55">{s.body}</p>
-          </li>
-        ))}
-      </ol>
-      {/* Input: the five sources feeding in on the left edge. */}
-      {SOURCES.map((s, i) => (
-        <Pill key={s.label} className="left-3" style={{ top: `calc(${HEADER}px + (100% - ${HEADER}px) * ${(i + 0.5) / LANES})`, transform: "translateY(-50%)" }}>
-          {s.label} →
-        </Pill>
-      ))}
-      <div className="pointer-events-none absolute inset-y-0 right-0 flex flex-col justify-center gap-5 px-6" style={{ width: `${(1 - EXIT) * 100}%` }}>
-        <Intro />
-        <LiveFile progress={progress} />
+      {/* Stage titles pulse when something happens in that stage. Self-contained keyframes. */}
+      <style>{"@keyframes kestrelPulse{0%{color:#fff;text-shadow:0 0 14px rgba(255,255,255,.9)}100%{text-shadow:0 0 0 rgba(255,255,255,0)}}"}</style>
+      {/* Compact intro across the top. */}
+      <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between gap-6 border-b border-white/10 px-6" style={{ height: STRIP }}>
+        <div className="min-w-0">
+          <h1 id="hero-heading" className="truncate font-heading text-[22px] font-bold leading-tight tracking-[-0.01em]">
+            See the trouble before you lend.
+          </h1>
+          <p className="truncate text-[12.5px] text-white/60">Kestrel screens private-company borrowers: every flag with a source.</p>
+        </div>
+        <LandingCtas tone="dark" className="shrink-0 scale-90 origin-right" />
       </div>
-      <Tooltip tip={tip} />
+
+      {/* Input column: the five sources, each showing an example item being encoded. */}
+      <div className="absolute bottom-0 left-0 border-r border-white/10" style={{ top: STRIP, width: GUTTER }}>
+        <p className="flex items-end px-3 pb-2 text-[11px] font-semibold tracking-[0.14em] text-white/45" style={{ height: HEADER }}>
+          INPUT
+        </p>
+        <div className="absolute inset-x-0 bottom-0 grid" style={{ top: HEADER, gridTemplateRows: `repeat(${LANES}, minmax(0, 1fr))` }}>
+          {SOURCES.map((s, lane) => {
+            const job = jobs.find((j) => j.lane === lane);
+            return (
+              <div key={s.label} className="flex flex-col justify-center gap-1 border-t border-white/5 px-3">
+                <p className="flex items-center gap-1.5 text-[12px] font-semibold text-white/85">
+                  <span aria-hidden="true" className="h-2 w-2 rounded-[2px]" style={{ background: css(LANE_COLORS[lane]) }} />
+                  {s.label}
+                  <span aria-hidden="true" className="ml-auto text-white/35">→</span>
+                </p>
+                {job ? <EncoderCard key={job.key} job={job} /> : <div className="h-[46px]" />}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* The automaton, its stage titles, and the report. */}
+      <div ref={regionRef} className="absolute bottom-0 right-0" style={{ top: STRIP, left: GUTTER }}>
+        <canvas ref={canvasRef} aria-hidden="true" className="absolute inset-0 h-full w-full cursor-crosshair" {...handlers} />
+        <ol className="pointer-events-none absolute left-0 top-0 grid grid-cols-4" style={{ width: `${EXIT * 100}%`, height: HEADER }}>
+          {STAGES.map((s, i) => (
+            <li key={s.title} className="flex flex-col justify-end border-l border-white/10 px-4 pb-2 first:border-l-0">
+              <p className="text-[11px] font-semibold tracking-[0.14em] text-white/45">0{i + 1}</p>
+              <p key={pulse[i]} className="font-heading text-[17px] font-bold leading-tight text-white motion-safe:animate-[kestrelPulse_700ms_ease-out]">
+                {s.title}
+              </p>
+              <p className="text-[12px] text-white/55">{s.body}</p>
+            </li>
+          ))}
+        </ol>
+
+        <div className="pointer-events-none absolute bottom-0 right-0 top-0 flex flex-col justify-center px-5" style={{ width: `${(1 - EXIT) * 100}%` }}>
+          <div ref={reportRef} className="pointer-events-auto rounded-sm border border-white/10 bg-white text-ew-ink shadow-[0_18px_50px_rgba(0,0,0,0.4)]">
+            <div className="flex items-start justify-between gap-3 border-b border-ew-rule px-4 py-3">
+              <div className="min-w-0">
+                <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-ew-muted">Report · sample</p>
+                <p className="font-heading text-[15px] font-bold leading-tight">{SAMPLE_COMPANY.name}</p>
+              </div>
+              <StatusChip status={progress.status} />
+            </div>
+            <p aria-live="polite" className="border-b border-ew-rule-soft px-4 py-2 text-[12.5px] text-ew-ink-soft">
+              {progress.why}
+            </p>
+            <ul className="min-h-[86px] px-4 py-2">
+              {progress.flags.length === 0 && <li className="py-1 text-[12.5px] text-ew-muted">Waiting for a verified signal…</li>}
+              {progress.flags.map((f) => (
+                <li
+                  key={f.id}
+                  className={`-mx-2 flex items-baseline justify-between gap-3 rounded-sm px-2 py-1 text-[13px] transition-colors duration-1000 ${
+                    landed === f.id ? "bg-sky-100" : "bg-transparent"
+                  }`}
+                  onTransitionEnd={() => setLanded((l) => (l === f.id ? null : l))}
+                >
+                  <span className="font-semibold">{f.title}</span>
+                  <span className="shrink-0 text-[12px] text-ew-muted">{f.when}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="border-t border-ew-rule bg-ew-paper px-4 py-2">
+              <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-ew-muted">Activity log</p>
+              <ol aria-live="polite" className="mt-1 space-y-0.5 font-mono text-[11px] leading-snug">
+                {log.map((e) => (
+                  <li key={e.key} className="flex gap-2">
+                    <span className="shrink-0 text-ew-muted">{e.stamp}</span>
+                    <span className="shrink-0 font-semibold" style={{ color: css(LANE_COLORS[e.lane].map((v) => Math.round(v * 0.62))) }}>
+                      {e.stage}
+                    </span>
+                    <span className="min-w-0 truncate text-ew-ink-soft">{e.text}</span>
+                  </li>
+                ))}
+                {log.length === 0 && <li className="text-ew-muted">Starting…</li>}
+              </ol>
+            </div>
+          </div>
+        </div>
+        <Tooltip tip={tip} />
+      </div>
     </Stage>
   );
+}
+
+function shorten(text, max = 40) {
+  const t = String(text).replace(/\s*·.*$/, "");
+  return t.length > max ? `${t.slice(0, max - 1)}…` : t;
 }
 
 // ------------------------------------------------------------------ 2. Waves

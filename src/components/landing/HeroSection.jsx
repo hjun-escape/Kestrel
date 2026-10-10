@@ -28,7 +28,7 @@ export function LandingNav() {
   );
 }
 
-// Hero proposals to compare: ?hero=pipeline|waves|sandpile shows one; no value shows the current hero.
+// Hero proposals to compare: ?hero=current|pipeline|waves|sandpile shows one; no value shows Pipeline.
 // While developing locally a small switcher shows all of them (never on the published site).
 const PROPOSALS = [
   { id: "current", label: "0. Current", Hero: CurrentHero },
@@ -58,7 +58,8 @@ function ProposalSwitcher({ value, onChange }) {
 
 export default function HeroSection() {
   const [params, setParams] = useSearchParams();
-  const chosen = PROPOSALS.find((p) => p.id === params.get("hero")) || PROPOSALS[0];
+  // Pipeline is the chosen direction; ?hero=current shows the previous hero for comparison.
+  const chosen = PROPOSALS.find((p) => p.id === params.get("hero")) || PROPOSALS.find((p) => p.id === "pipeline");
   const { Hero } = chosen;
   return (
     <>
