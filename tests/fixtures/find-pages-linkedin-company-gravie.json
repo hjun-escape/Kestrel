@@ -1,0 +1,18 @@
+[
+  {
+    "input": { "url": "https://www.linkedin.com/company/gravie" },
+    "url": "https://www.linkedin.com/company/gravie",
+    "name": "Gravie",
+    "website": "https://www.gravie.com/about",
+    "employees_in_linkedin": 490,
+    "industries": "Insurance"
+  },
+  {
+    "input": { "url": "https://www.linkedin.com/company/gravie-care" },
+    "url": "https://www.linkedin.com/company/gravie-care",
+    "name": "Gravie Care",
+    "website": "https://graviecare.example",
+    "employees_in_linkedin": 12,
+    "industries": "Home Health Care"
+  }
+]

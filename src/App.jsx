@@ -6,6 +6,7 @@ import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider } from '@/lib/AuthContext';
 import ScrollToTop from './components/ScrollToTop';
+import PresenterMode from '@/components/presenter/PresenterMode';
 // Add page imports here
 import LoanBook from '@/pages/LoanBook';
 import CompanyDetail from '@/pages/CompanyDetail';
@@ -50,6 +51,7 @@ function App() {
         <Router>
           <ScrollToTop />
           <AppRoutes />
+          <PresenterMode />
         </Router>
         <Toaster />
       </QueryClientProvider>

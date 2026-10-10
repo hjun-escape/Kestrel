@@ -1,0 +1,13 @@
+{
+  "general": { "search_engine": "google", "query": "\"Gravie\" Minneapolis LinkedIn" },
+  "organic": [
+    { "title": "Gravie jobs | LinkedIn", "link": "https://www.linkedin.com/company/gravie/jobs/", "description": "34 open jobs at Gravie.", "rank": 1 },
+    { "title": "Gravie | LinkedIn", "link": "https://uk.linkedin.com/company/gravie?trk=public_profile_topcard", "description": "Gravie | 7,412 followers on LinkedIn. Health benefits for small and mid-size employers. Minneapolis, MN.", "rank": 2 },
+    { "title": "Jane Doe - Gravie | LinkedIn", "link": "https://www.linkedin.com/in/janedoe", "description": "Director at Gravie.", "rank": 3 },
+    { "title": "Gravie posts", "link": "https://www.linkedin.com/company/gravie/posts/?feedView=all", "description": "Latest posts.", "rank": 4 },
+    { "title": "Gravie Health | LinkedIn showcase", "link": "https://www.linkedin.com/showcase/gravie-health/", "description": "Showcase page.", "rank": 5 },
+    { "title": "Gravie Care | LinkedIn", "link": "https://www.linkedin.com/company/gravie-care/about/", "description": "Home care in Ohio.", "rank": 6 },
+    { "title": "", "link": "javascript:alert(1)" },
+    "garbage"
+  ]
+}

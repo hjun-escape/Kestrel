@@ -73,7 +73,7 @@ test("why line puts strong before weak and caps at 2", () => {
   ];
   assert.deepEqual(scoreBorrower(s, TODAY), {
     status: "red",
-    why: "Red: WARN notice filed (Aug 1) + VP Sales departs (Oct 8).",
+    why: "Red: WARN notice (Aug 1) + VP Sales departs (Oct 8).",
   });
 });
 
@@ -84,7 +84,7 @@ test("yellow on weak only lists the two newest", () => {
 
 test("expired signals never appear in the why line", () => {
   const s = [sig("strong", "2026-01-01", "Old bankruptcy rumor"), sig("strong", "2026-10-01", "CEO resigns", "exec_departure")];
-  assert.deepEqual(scoreBorrower(s, TODAY), { status: "yellow", why: "Yellow: CEO resigns (Oct 1)." });
+  assert.deepEqual(scoreBorrower(s, TODAY), { status: "yellow", why: "Yellow: CEO departure (Oct 1)." });
 });
 
 test("invalid today throws", () => {
@@ -112,7 +112,7 @@ test("the same event reported twice counts once", () => {
   const a = { ...sig("strong", "2026-10-01", "Acme CFO steps down", "exec_departure"), source_url: "https://news.example.com/a" };
   // Same article twice (trailing slash, title case differ), and same headline on the same day from another outlet.
   const s = [a, { ...a, source_url: "https://news.example.com/a/", title: "ACME CFO steps down" }, { ...a, source_url: "https://other.example.com/b" }];
-  assert.deepEqual(scoreBorrower(s, TODAY), { status: "yellow", why: "Yellow: Acme CFO steps down (Oct 1)." });
+  assert.deepEqual(scoreBorrower(s, TODAY), { status: "yellow", why: "Yellow: CFO departure (Oct 1)." });
 });
 
 test("different events are not merged: same link with different titles, or same title on different days", () => {
@@ -128,4 +128,19 @@ test("a duplicate keeps the strongest copy", () => {
   const w = { ...sig("weak", "2026-10-01", "WARN notice filed"), source_url: "https://x.example.com/w" };
   const s = { ...w, severity: "strong" as const };
   assert.equal(scoreBorrower([w, s], TODAY).status, "yellow");
+});
+
+test("why line names news events instead of quoting long headlines", () => {
+  const s = [
+    sig("strong", "2026-09-10", "Rivian (RIVN) CFO steps down for GE Vernova amid critical R2 ramp", "exec_departure"),
+    sig("weak", "2026-10-06", "Family of man killed in loading dock incident at Rivian files wrongful death lawsuit"),
+  ];
+  assert.deepEqual(scoreBorrower(s, TODAY), {
+    status: "yellow",
+    why: "Yellow: CFO departure (Sep 10) + Wrongful-death lawsuit (Oct 6).",
+  });
+  assert.equal(
+    scoreBorrower([sig("strong", "2026-09-29", "Equipment lender sues Crestline Logistics over missed payments")], TODAY).why,
+    "Yellow: Lender lawsuit (Sep 29).",
+  );
 });

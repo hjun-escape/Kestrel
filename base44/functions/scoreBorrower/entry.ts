@@ -49,10 +49,51 @@ function shortDate(s: string): string {
   return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
 }
 
+// News headlines are long ("Rivian (RIVN) CFO steps down for GE Vernova amid ..."),
+// so for news signals the why line names the event instead of quoting the
+// headline. Titles our own code writes (hiring_drop, review_distress) are short
+// already and stay as they are.
+const ROLES: [RegExp, string][] = [
+  [/\bCEO\b|chief executive/i, "CEO"],
+  [/\bCFO\b|chief financial/i, "CFO"],
+  [/\bCOO\b|chief operating/i, "COO"],
+  [/\bpresident\b/i, "President"],
+  [/\bfounder\b/i, "Founder"],
+];
+const SUED = "(sue|sues|sued|suing|lawsuit|suit)";
+const LEGAL_EVENTS: [RegExp, string][] = [
+  [/WARN notice/i, "WARN notice"],
+  [/bankrupt|chapter (7|11)\b/i, "Bankruptcy filing"],
+  [/wrongful[- ]death/i, "Wrongful-death lawsuit"],
+  [new RegExp(`\\b(lender|bank|creditor)s?\\b.*\\b${SUED}\\b|\\b${SUED}\\b.*\\b(lender|bank|creditor)s?\\b`, "i"), "Lender lawsuit"],
+  [new RegExp(`\\b(supplier|vendor)s?\\b.*\\b${SUED}\\b|\\b${SUED}\\b.*\\b(supplier|vendor)s?\\b`, "i"), "Supplier lawsuit"],
+  [/layoffs?|laid off|job cuts/i, "Layoffs"],
+  [/\blien\b/i, "Lien"],
+  [/wage (claim|theft)|unpaid wages/i, "Wage claim"],
+  [/contract dispute|breach of contract/i, "Contract dispute"],
+  [new RegExp(`\\b${SUED}\\b`, "i"), "Lawsuit"],
+];
+const MAX_TITLE = 48;
+
+export function eventName(s: Signal): string {
+  const title = (s.title ?? "").trim();
+  if (s.type === "exec_departure") {
+    const role = ROLES.find(([re]) => re.test(title));
+    if (role) return `${role[1]} departure`;
+    return title.length <= MAX_TITLE ? title : "Executive departure";
+  }
+  if (s.type === "legal_layoffs") {
+    const event = LEGAL_EVENTS.find(([re]) => re.test(title));
+    if (event) return event[1];
+    return title.length <= MAX_TITLE ? title : "Lawsuit, layoffs or lien";
+  }
+  return title;
+}
+
 // hiring_drop is a computed fact as of the refresh, so its date adds nothing to the why line.
 function label(s: Signal): string {
-  const title = (s.title ?? "").trim();
-  return s.type === "hiring_drop" ? title : `${title} (${shortDate(s.date)})`;
+  const name = eventName(s);
+  return s.type === "hiring_drop" ? name : `${name} (${shortDate(s.date)})`;
 }
 
 // Signals with a valid date and severity, dated within the last WINDOW_DAYS days (inclusive), not in the future.

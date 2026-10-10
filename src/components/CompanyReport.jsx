@@ -54,7 +54,7 @@ export default function CompanyReport({
             {notice}
           </p>
         )}
-        <SourceStatusRow states={sourceStates} recentSignals={recentSignals} running={running} startedAt={startedAt} />
+        <SourceStatusRow borrower={borrower} states={sourceStates} recentSignals={recentSignals} running={running} startedAt={startedAt} />
         <WarningScore borrower={borrower} signals={signals} />
         <CheckTrace run={checkRun} refreshing={running} stale={checkRunStale} />
         {flagLine && (
@@ -65,7 +65,7 @@ export default function CompanyReport({
       {/* Evidence first: the signals behind the status, each with its source and
           what to ask. Next steps (decision, other lenders, analyst) sit beside it. */}
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_400px]">
-        <section aria-labelledby="evidence-heading" className="min-w-0">
+        <section data-demo="evidence" aria-labelledby="evidence-heading" className="min-w-0">
           <div className="mb-3 flex items-baseline justify-between gap-4">
             <h2 id="evidence-heading" className="font-heading text-xl font-bold tracking-tight text-ew-ink">
               Evidence
@@ -114,6 +114,11 @@ function CompanyLinks({ borrower }) {
     { label: "Glassdoor", href: borrower.glassdoor_url },
   ].filter((l) => l.href && /^https?:\/\//.test(l.href));
   if (links.length === 0) return null;
+  const lookup = borrower.profile_search || {};
+  const autoFound = [
+    lookup.linkedin === "found" && borrower.linkedin_url ? "LinkedIn" : null,
+    lookup.glassdoor === "found" && borrower.glassdoor_url ? "Glassdoor" : null,
+  ].filter(Boolean);
   return (
     <section aria-labelledby="links-heading" className="border border-ew-rule bg-ew-surface px-4 py-3">
       <h2 id="links-heading" className="text-xs font-semibold text-ew-muted">
@@ -135,6 +140,11 @@ function CompanyLinks({ borrower }) {
           </li>
         ))}
       </ul>
+      {autoFound.length > 0 && (
+        <p className="mt-2 text-xs text-ew-muted">
+          {autoFound.join(" and ")} found automatically: the LinkedIn page lists {borrower.website_domain}.
+        </p>
+      )}
     </section>
   );
 }
