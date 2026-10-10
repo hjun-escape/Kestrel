@@ -2,6 +2,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { runNewsSignals } from './logic.ts';
 import type { LLMParams, Signal } from './logic.ts';
 import { crawlLinkedIn, linkedInSignals } from './linkedin.ts';
+import { createTracker, newCheckRun } from './trace.ts';
 
 // newsSignals (P2): Google News via Bright Data -> exec_departure (News) and legal_layoffs (Legal) signals.
 //
@@ -36,31 +37,58 @@ export default async function(req: Request): Promise<Response> {
     const invokeLLM = (params: LLMParams) => base44.asServiceRole.integrations.Core.InvokeLLM(params);
     const apiKey = Deno.env.get('BRIGHTDATA_API_KEY');
     const today = typeof body?.today === 'string' ? body.today : undefined;
-    const log = (msg: string) => console.log(`newsSignals ${borrower.name}: ${msg}`);
+    const linkedinOn = LINKEDIN_ENABLED && !!apiKey;
 
-    const linkedin: Promise<Signal[]> = LINKEDIN_ENABLED && apiKey
+    // CheckRun: the step-by-step record the company page shows under Sources. Best effort only.
+    const borrowerId = typeof (borrower as { id?: unknown }).id === 'string' ? (borrower as { id: string }).id : '';
+    const db = base44.asServiceRole.entities;
+    const tracker = borrowerId
+      ? createTracker(newCheckRun(borrowerId, new Date(), linkedinOn), {
+        create: (r) => db.CheckRun.create(r),
+        update: (id, r) => db.CheckRun.update(id, r),
+        now: () => Date.now(),
+        warn: (m) => console.warn(m),
+      })
+      : null;
+    const log = (msg: string) => {
+      console.log(`newsSignals ${borrower.name}: ${msg}`);
+      tracker?.log(msg);
+    };
+
+    const linkedin: Promise<Signal[]> = linkedinOn
       ? Promise.race([
-        crawlLinkedIn(borrower as { name: string }, { fetch, apiKey, invokeLLM }, log).then((run) =>
-          linkedInSignals(borrower as { name: string }, run, today ? new Date(`${today}T12:00:00Z`) : new Date()).signals
-        ),
+        crawlLinkedIn(borrower as { name: string }, { fetch, apiKey: apiKey!, invokeLLM }, log).then((run) => {
+          const res = linkedInSignals(borrower as { name: string }, run, today ? new Date(`${today}T12:00:00Z`) : new Date());
+          tracker?.linkedin(res.checks);
+          return res.signals;
+        }),
         new Promise<Signal[]>((_, reject) => setTimeout(() => reject(new Error('timed out')), LINKEDIN_BUDGET_MS)),
       ]).catch((e) => {
         log(`LinkedIn skipped: ${(e as Error).message}`);
+        tracker?.linkedin(null);
         return [];
       })
       : Promise.resolve([]);
 
-    const signals = await runNewsSignals({
-      borrower: borrower as { name: string },
-      invokeLLM,
-      fetch: (url, init) => fetch(url, init),
-      apiKey,
-      today,
-      now: () => Date.now(),
-      log,
-    });
-    const all = [...signals, ...(await linkedin)].sort((a, z) => z.date.localeCompare(a.date));
-    return Response.json(all);
+    try {
+      const signals = await runNewsSignals({
+        borrower: borrower as { name: string },
+        invokeLLM,
+        fetch: (url, init) => fetch(url, init),
+        apiKey,
+        today,
+        now: () => Date.now(),
+        log,
+        onEvent: (e) => tracker?.event(e),
+      });
+      const all = [...signals, ...(await linkedin)].sort((a, z) => z.date.localeCompare(a.date));
+      await tracker?.finish({ ok: true, signalCount: all.length });
+      return Response.json(all);
+    } catch (error) {
+      await linkedin;
+      await tracker?.finish({ ok: false, error: (error as Error).message });
+      throw error;
+    }
   } catch (error) {
     console.error('newsSignals error:', (error as Error).message);
     return Response.json({ error: (error as Error).message }, { status: 502 });

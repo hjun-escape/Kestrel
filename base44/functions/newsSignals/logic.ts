@@ -112,7 +112,14 @@ export interface NewsDeps {
   budgetMs?: number;
   /** Optional progress log (Base44 function logs, local console). */
   log?: (msg: string) => void;
+  /** Optional structured progress, saved as a CheckRun so the company page can show each step. */
+  onEvent?: (e: NewsEvent) => void;
 }
+
+export type NewsEvent =
+  | { kind: 'search'; query_type: SignalType; query: string; ok: boolean; count: number; error?: string }
+  | { kind: 'read'; url: string; title: string; source: string; date: string; query: SignalType; read: boolean }
+  | { kind: 'tag'; url: string; tag: Tag | null; decision: 'kept' | 'dropped' | 'failed'; why: string; snippet?: string };
 
 // ---------- queries ----------
 
@@ -440,6 +447,7 @@ async function readAndTag(
     text: [serpText, pageText].filter(Boolean).join('\n'),
     query,
   };
+  deps.onEvent?.({ kind: 'read', url: item.url, title: item.title, source: item.source, date: item.date, query, read: !!pageText });
   try {
     const prompt = buildTagPrompt(deps.borrower, item);
     const raw = await withTimeout(
@@ -450,9 +458,11 @@ async function readAndTag(
     const tag = parseTag(raw);
     const { signal, reason } = judge(item, tag);
     deps.log?.(`${signal ? 'KEEP' : 'drop'} ${item.title.slice(0, 80)} -> ${reason}${tag?.reason ? ` | model: "${tag.reason}"` : ''}${pageText ? '' : ' (article not readable, used search preview)'}`);
+    deps.onEvent?.({ kind: 'tag', url: item.url, tag, decision: signal ? 'kept' : 'dropped', why: reason, ...(signal ? { snippet: signal.snippet } : {}) });
     return { query, ok: true, signal };
   } catch (error) {
     deps.log?.(`fail ${item.title.slice(0, 80)} -> tagging failed: ${errorMessage(error)}`);
+    deps.onEvent?.({ kind: 'tag', url: item.url, tag: null, decision: 'failed', why: `tagging failed: ${errorMessage(error)}` });
     return { query, ok: false, signal: null };
   }
 }
@@ -477,7 +487,10 @@ export async function runNewsSignals(deps: NewsDeps): Promise<Signal[]> {
       ),
     ),
   );
-  for (const s of searches) deps.log?.(s.ok ? `1. Search ${s.q.type}: ${s.results.length} articles in the last 180 days` : `1. Search ${s.q.type} failed: ${s.error}`);
+  for (const s of searches) {
+    deps.log?.(s.ok ? `1. Search ${s.q.type}: ${s.results.length} articles in the last 180 days` : `1. Search ${s.q.type} failed: ${s.error}`);
+    deps.onEvent?.({ kind: 'search', query_type: s.q.type, query: s.q.query, ok: s.ok, count: s.results.length, ...(s.ok ? {} : { error: s.error }) });
+  }
   const failures = searches.filter((s) => !s.ok).map((s) => `${s.q.type}: ${s.error}`);
   if (failures.length === searches.length) throw new Error(`News: both searches failed (${failures.join('; ')})`);
 
