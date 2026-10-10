@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useParams, Link, useSearchParams } from "react-router-dom";
+import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import AppHeader from "@/components/AppHeader";
 import CompanyReport from "@/components/CompanyReport";
+import EditCompanyDialog from "@/components/EditCompanyDialog";
+import DeleteCompanyDialog from "@/components/DeleteCompanyDialog";
 import { useAuth } from "@/lib/AuthContext";
 import { canSeeCompany, normalizeEmail } from "@/lib/ownership";
 import {
@@ -43,6 +45,10 @@ export default function CompanyDetail() {
   const [run, setRun] = useState(null);
   const [refreshError, setRefreshError] = useState(null);
   const [checkRun, setCheckRun] = useState(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [notice, setNotice] = useState(null);
+  const navigate = useNavigate();
 
   async function loadData() {
     const requestedId = id;
@@ -88,6 +94,7 @@ export default function CompanyDetail() {
     setSignals([]);
     setRun(null);
     setRefreshError(null);
+    setNotice(null);
     if (isLoadingAuth) return;
     (async () => {
       let data = null;
@@ -169,10 +176,31 @@ export default function CompanyDetail() {
         startedAt={run?.startedAt ?? null}
         refreshError={refreshError}
         onRefresh={() => handleRefresh()}
+        // Signed-in owners only: the shared demo book is the same for every signed-out visitor (manageCompany).
+        onEdit={me ? () => setEditOpen(true) : undefined}
+        onDelete={me ? () => setDeleteOpen(true) : undefined}
+        notice={notice}
         checkRun={checkRun}
         // A run saved before this refresh started belongs to the previous check.
         checkRunStale={!!run && !!checkRun && Date.parse(checkRun.started_at) < run.startedAt - 5000}
         newIds={newIds}
+      />
+      <EditCompanyDialog
+        borrower={borrower}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        onSaved={(updated, evidenceCleared) => {
+          if (updated) setBorrower(updated);
+          if (evidenceCleared) setSignals([]);
+          setNotice(evidenceCleared ? "Saved. The old evidence was cleared because the company's identity changed. Refresh to check it again." : "Saved.");
+          loadData().catch(() => {});
+        }}
+      />
+      <DeleteCompanyDialog
+        borrower={borrower}
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        onDeleted={() => navigate("/", { replace: true })}
       />
     </DetailShell>
   );

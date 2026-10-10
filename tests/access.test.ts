@@ -14,12 +14,13 @@ import * as refreshBorrower from '../base44/functions/refreshBorrower/access.ts'
 import * as analyzeBorrower from '../base44/functions/analyzeBorrower/access.ts';
 import * as lenderCheck from '../base44/functions/lenderCheck/access.ts';
 import * as analyzeCashflow from '../base44/functions/analyzeCashflow/access.ts';
+import * as manageCompany from '../base44/functions/manageCompany/access.ts';
 import { scopeDataLayer } from '../base44/functions/askPortfolio/scopedData.ts';
 import { runAgent } from '../base44/functions/askPortfolio/logic.ts';
 import { executeAction } from '../base44/functions/confirmAction/logic.ts';
 import type { ConfirmDeps } from '../base44/functions/confirmAction/logic.ts';
 
-const COPIES = { askPortfolio, confirmAction, refreshBorrower, analyzeBorrower, lenderCheck, analyzeCashflow };
+const COPIES = { askPortfolio, confirmAction, refreshBorrower, analyzeBorrower, lenderCheck, analyzeCashflow, manageCompany };
 const FOLDERS = Object.keys(COPIES);
 
 const A = { email: 'a@x.com' };

@@ -24,6 +24,9 @@ export default function CompanyReport({
   startedAt = null,
   refreshError = null,
   onRefresh = () => {},
+  onEdit,
+  onDelete,
+  notice = null,
   checkRun = null,
   checkRunStale = false,
   newIds = null,
@@ -43,7 +46,14 @@ export default function CompanyReport({
           running={running}
           refreshError={refreshError}
           onRefresh={onRefresh}
+          onEdit={onEdit}
+          onDelete={onDelete}
         />
+        {notice && (
+          <p role="status" className="border-t border-ew-rule-soft px-5 py-2 text-xs text-ew-ink-soft">
+            {notice}
+          </p>
+        )}
         <SourceStatusRow states={sourceStates} recentSignals={recentSignals} running={running} startedAt={startedAt} />
         <WarningScore borrower={borrower} signals={signals} />
         <CheckTrace run={checkRun} refreshing={running} stale={checkRunStale} />
