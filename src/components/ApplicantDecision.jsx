@@ -269,7 +269,7 @@ function DecisionForm({ saving, onSave }) {
   };
   return (
     <div className="space-y-3">
-      <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+      <div className="grid gap-3">
         <div className="space-y-1">
           <Label htmlFor="decision-note" className="text-xs text-gray-600">Note (optional)</Label>
           <Textarea
@@ -292,7 +292,7 @@ function DecisionForm({ saving, onSave }) {
           />
         </div>
       </div>
-      <div role="group" aria-label="Record a decision" className="flex flex-wrap gap-2">
+      <div role="group" aria-label="Record a decision" className="grid grid-cols-2 gap-2">
         {DECISIONS.map((d) => (
           <button
             key={d.value}
@@ -304,7 +304,7 @@ function DecisionForm({ saving, onSave }) {
             {d.label}
           </button>
         ))}
-        {saving && <Loader2 className="h-4 w-4 animate-spin self-center text-gray-500" aria-label="Saving decision" />}
+        {saving && <Loader2 className="col-span-2 h-4 w-4 animate-spin justify-self-center text-gray-500" aria-label="Saving decision" />}
       </div>
     </div>
   );
