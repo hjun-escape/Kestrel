@@ -14,17 +14,9 @@ import { useAssistantPage } from "./AssistantContext";
 import { AnswerText, SourcesFooter } from "./CitationParts";
 import { CompanyCards, PortfolioSummaryCard } from "./CompanyCards";
 import { ActionCard } from "./ActionCard";
-import { PART } from "./assistantData";
+import { PART, suggestedQuestions } from "./assistantData";
 
 export const COMPOSER_ID = "ew-assistant-composer";
-
-const SUGGESTIONS = [
-  { prompt: "Which borrowers need attention this week?", send: true },
-  { prompt: "What's our exposure at risk?", send: true },
-  { prompt: "Screen a new applicant: ", label: "Screen a new applicant", send: false },
-  { prompt: "Check Crestline for other lenders", send: true },
-  { prompt: "Summarise Northfield's warning signs", send: true },
-];
 
 const PART_COMPONENTS = {
   Text: AnswerText,
@@ -124,7 +116,7 @@ function Welcome() {
         </p>
       )}
       <ul className="mt-7 grid gap-1.5 sm:grid-cols-2" aria-label="Suggested questions">
-        {SUGGESTIONS.map((s) => (
+        {suggestedQuestions(companies).map((s) => (
           <li key={s.prompt}>
             <ThreadPrimitive.Suggestion
               prompt={s.prompt}
