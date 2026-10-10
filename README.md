@@ -1,9 +1,78 @@
 # Early Warning
 
-Talk to Users Hackathon, Group 17. Screens a company before a bank lends, then keeps watching it after the loan, flagging public signs of trouble before they show up in quarterly financials.
+**Catch a borrower's trouble before the quarterly financials do.** Early Warning watches the public signs that a mid-size
+private company is in trouble (executive exits, lawsuits and layoffs, hiring freezes, employee reviews about missed pay)
+and flags them for a bank's credit officer: before the bank lends, and every day after.
 
-- Plan, data contract and team rules: `CLAUDE.md` and `docs/PLAN.md`
-- Live app: https://early-warning-5bc4fabd.base44.app
+Talk to Users Hackathon, Group 17 · **Live app: https://early-warning-5bc4fabd.base44.app** (no account needed; choose
+"Explore the demo")
+
+## Why
+
+Private borrowers have no analyst coverage, and their quarterly financials arrive 45–90 days after quarter end. By
+then the CFO has already left, the layoffs have happened and the supplier has sued. Our first tester, a lender, told us
+the warning signs showed up while they were still **vetting the loan application**, and finding out late cost them a
+week: *"I wish I woulda asked the cash flow documents a lot earlier in the process."* So the product leads with
+screening an applicant, and keeps monitoring the same company after funding (see `docs/USER_FEEDBACK.md`).
+
+## What a credit officer sees
+
+- **Loan book**: every applicant and borrower, worst first, with the reason in one line
+  ("Red: CFO departure (Sep 12) + job postings down 62% in 30 days.").
+- **Screen new applicant**: type a name (the form can fill in the rest), and the checks run live. News comes back in
+  seconds; jobs and reviews fill in as Bright Data collects them, and the page keeps checking until they are in.
+- **Company page**: evidence first. Every signal quotes its source, links to it, and says what to ask the company next;
+  then the documents to request, the decision log, an "other lenders" check, a cash-flow statement check and an
+  AI analyst brief whose every claim is checked against fetched text.
+
+## Where the data comes from (Bright Data)
+
+Every signal comes from Bright Data, and every signal on screen links to its source.
+
+| Source | Bright Data product | Signal |
+|---|---|---|
+| News | SERP API (Google News) | `exec_departure` (CEO/CFO = strong), `legal_layoffs` (WARN notice, bankruptcy, lender or supplier lawsuit = strong) |
+| Jobs | Web Scraper API: LinkedIn job listings + LinkedIn company data | `hiring_drop`: open postings far below what a company of that size and industry normally has open |
+| Reviews | Web Scraper API: Glassdoor company reviews | `review_distress`: reviews about layoffs, furloughs, late or missed pay, closing; or a sharp rating drop |
+| Company pages | SERP API + LinkedIn company data | Finds the LinkedIn and Glassdoor pages when missing, kept only if the LinkedIn page lists the company's own website |
+| Other lenders | SERP API + page reads | UCC liens, lender lawsuits, new loans and late payments to other banks |
+
+## Rules that keep it trustworthy
+
+- **The LLM only tags.** It labels one article or review at a time; plain code decides the status
+  (RED = 2+ strong, or 1 strong + 2 weak; YELLOW = 1 strong, or 2+ weak; only the last 90 days count).
+- **Quotes are real.** A snippet is kept only if it appears in the source text; the model never writes evidence.
+- **Same company or nothing.** Matches are checked against the company's website domain and city; if unsure, dropped.
+- **Honest gaps.** A source that fails or is still collecting is shown as such ("Collecting", "No LinkedIn page found
+  that lists …"), never silently treated as clean. Sample companies are labeled and never checked live.
+
+## How it is built
+
+Base44 app (React + Tailwind screens, entities, Deno backend functions), synced two ways with this repo.
+
+```
+Screen / Refresh ─▶ refreshBorrower ─┬─▶ newsSignals ─▶ tagItem (LLM tags only)
+                                     ├─▶ findCompanyPages ─▶ hiringSignal
+                                     │                    └▶ reviewSignals ─▶ tagItem
+                                     └─▶ scoreBorrower (plain code) ─▶ status + why
+```
+
+- Sources run in parallel and are saved one by one, so the page fills in while the check runs. A slow Bright Data
+  snapshot is resumed on the next check instead of being paid for twice.
+- Functions: `refreshBorrower`, `refreshAll`, `newsSignals`, `tagItem`, `hiringSignal`, `reviewSignals`,
+  `scoreBorrower`, `findCompanyPages`, `suggestCompany`, `lenderCheck`, `analyzeBorrower`, `analyzeCashflow` (statements
+  parsed in a Daytona sandbox), `askPortfolio` + `confirmAction` (assistant), `manageCompany`, `loadDemo`.
+- Data contract and team rules: `CLAUDE.md`. Build plan: `docs/PLAN.md`. Tester evidence: `docs/USER_FEEDBACK.md`.
+- Sample JSON for every demo company: `data/cache/` (refresh with `node scripts/export-cache.mjs`).
+
+## Run the tests
+
+```bash
+npm ci
+npx eslint src --quiet && npx vite build && node --test tests/*.test.ts   # Node 24+
+```
+
+CI runs the same checks on every pull request to `main`.
 
 ---
 
