@@ -15,7 +15,7 @@ const CLEAR_FADE = 60;
 // Content to keep clear of: explicit markers, plus each section's direct content block.
 const CLEAR_SELECTOR = "[data-ascii-clear], #main > section > *, footer > *";
 // Sections whose background decides the ink colour.
-const SURFACE_SELECTOR = "#main > *, footer";
+const SURFACE_SELECTOR = "#main > *, footer, [data-ascii-surface]";
 
 const smooth = (t) => {
   const x = Math.min(1, Math.max(0, t));
@@ -69,7 +69,8 @@ export default function AsciiField() {
         .filter((s) => s.dark !== null);
       for (let r = 0; r < rows; r++) {
         const y = r * CELL + CELL / 2;
-        const s = surfaces.find((x) => y >= x.r.top && y < x.r.bottom);
+        // Innermost wins: later in the document means nested deeper (e.g. the white sheet inside its track).
+        const s = surfaces.findLast((x) => y >= x.r.top && y < x.r.bottom);
         rowDark[r] = s ? (s.dark ? 1 : 0) : 1;
         // In a section's faded edge the background is still mid-way between dark and light: keep the field
         // quiet there and let it come in only where the surface has mostly turned light.

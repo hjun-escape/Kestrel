@@ -481,12 +481,13 @@ export function PipelineHero() {
   const onProgress = useCallback((p) => setRun((r) => (r.cycle === p.cycle && r.done === p.done ? r : p)), []);
   return (
     // -mt-16 pt-16: the dark background and character field extend up behind the transparent nav.
-    <div className="relative -mt-16 overflow-hidden bg-ew-ink pt-16 text-white">
+    // min-h-screen: the hero fills the screen, so the white sheet below never peeks in before you scroll.
+    <div className="relative -mt-16 flex min-h-screen flex-col justify-center overflow-hidden bg-ew-ink pt-16 text-white">
       {/* Page-wide character field (fixed behind the viewport; covers every section). */}
       <AsciiField />
       {/* Stage titles pulse when something happens in that stage. Self-contained keyframes. */}
       <style>{"@keyframes kestrelPulse{0%{color:#fff;text-shadow:0 0 14px rgba(255,255,255,.9)}100%{text-shadow:0 0 0 rgba(255,255,255,0)}}"}</style>
-      <section aria-labelledby="hero-heading" className="relative mx-auto max-w-[1400px] px-4 pb-16 pt-6 sm:px-8">
+      <section aria-labelledby="hero-heading" className="relative mx-auto w-full max-w-[1400px] px-4 pb-10 pt-6 sm:px-8">
         {/* Visible heading removed by design (the nav shows Kestrel); kept for screen readers. */}
         <h1 id="hero-heading" className="sr-only">
           Kestrel, private company screener

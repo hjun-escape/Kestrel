@@ -181,8 +181,10 @@ const pos = (month, day) => (((month - 7) * 30.5 + (day - 1)) / AXIS_DAYS) * 100
 const MONTHS = ["Jul", "Aug", "Sep", "Oct", "Nov"].map((label, i) => ({ label, at: pos(7 + i, 1) }));
 const LINE_Y = 64; // px from the top of the timeline
 
-export function LeadTimeline() {
-  const [ref, p] = useScrollProgress({ start: 0.9, end: 0.4 });
+/** progress: optional 0..1 driver (the presentation passes one); otherwise driven by scroll position. */
+export function LeadTimeline({ progress } = {}) {
+  const [ref, scrollP] = useScrollProgress({ start: 0.9, end: 0.4 });
+  const p = progress ?? scrollP;
   const flags = [
     { label: "CFO departure", date: "Sep 10", left: pos(9, 10), at: 0.12 },
     { label: "WARN notice", date: "Sep 24", left: pos(9, 24), at: 0.32 },
