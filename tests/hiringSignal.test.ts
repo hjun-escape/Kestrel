@@ -2,11 +2,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import handler, {
+  employeeCount,
   fetchJobs,
-  countPostings,
-  hiringSignalFromJobs,
+  hiringGap,
+  hiringSignal,
+  hiringSignalFromData,
+  industryRate,
   isSameCompany,
-  parsePostedDate,
+  openPostings,
   type Borrower,
   type Job,
 } from "../base44/functions/hiringSignal/entry.ts";
@@ -15,71 +18,90 @@ const TODAY = "2026-10-10";
 const B: Borrower = { id: "b1", name: "Acme Widgets, Inc.", linkedin_url: "https://www.linkedin.com/company/acme-widgets/" };
 
 let n = 0;
-// A job posted `daysAgo` days before TODAY at Acme.
-function job(daysAgo: number, extra: Partial<Job> = {}): Job {
-  const d = new Date(Date.UTC(2026, 9, 10) - daysAgo * 86400000).toISOString().slice(0, 10);
-  return { company_name: "Acme Widgets", company_url: "https://www.linkedin.com/company/acme-widgets", job_posted_date: d, url: `u${n++}`, ...extra };
+// An open posting at Acme.
+function job(_unused = 0, extra: Partial<Job> = {}): Job {
+  return { company_name: "Acme Widgets", company_url: "https://www.linkedin.com/company/acme-widgets", url: `https://www.linkedin.com/jobs/view/${n++}`, ...extra };
 }
-const many = (count: number, daysAgo: number) => Array.from({ length: count }, () => job(daysAgo));
+const many = (count: number) => Array.from({ length: count }, () => job());
+// 400 employees in manufacturing (3.5%) -> 14 expected openings.
+const MFG = { employees_in_linkedin: 400, industries: "Machinery Manufacturing" };
 
-test("parsePostedDate handles ISO and relative text", () => {
-  const day = (s: string) => new Date(parsePostedDate(s, TODAY)!).toISOString().slice(0, 10);
-  assert.equal(day("2026-09-14"), "2026-09-14");
-  assert.equal(day("2026-09-14T22:10:00.000Z"), "2026-09-14");
-  assert.equal(day("3 weeks ago"), "2026-09-19");
-  assert.equal(day("1 month ago"), "2026-09-10");
-  assert.equal(day("30+ days ago"), "2026-09-10");
-  assert.equal(day("5 hours ago"), TODAY);
-  assert.equal(parsePostedDate("whenever", TODAY), null);
-  assert.equal(parsePostedDate(undefined, TODAY), null);
+test("industryRate maps LinkedIn industries to BLS sectors, first match wins", () => {
+  assert.deepEqual(industryRate("Insurance"), { sector: "Financial activities", rate: 5.1 });
+  assert.deepEqual(industryRate("Food and Beverage Manufacturing"), { sector: "Manufacturing", rate: 3.5 });
+  assert.deepEqual(industryRate("Restaurants"), { sector: "Accommodation and food services", rate: 5.5 });
+  assert.deepEqual(industryRate("Hospitals and Health Care"), { sector: "Health care and social assistance", rate: 5.4 });
+  assert.deepEqual(industryRate("IT Services and IT Consulting"), { sector: "Professional and business services", rate: 4.2 });
+  assert.deepEqual(industryRate("Software Development"), { sector: "Information", rate: 2.8 });
+  assert.deepEqual(industryRate("Truck Transportation"), { sector: "Transportation, warehousing, and utilities", rate: 4.0 });
+  assert.deepEqual(industryRate("Underwater Basket Weaving"), { sector: "All industries", rate: 4.1 });
+  assert.deepEqual(industryRate(undefined), { sector: "All industries", rate: 4.1 });
 });
 
-test("countPostings splits 0-29 / 30-89 days and dedupes by url", () => {
-  const jobs = [...many(3, 0), ...many(2, 29), ...many(4, 30), ...many(6, 89), ...many(5, 90), job(-1), job(5, { url: "dup" }), job(5, { url: "dup" })];
-  assert.deepEqual(countPostings(jobs, TODAY), { recent: 6, prior60: 10, priorPer30: 5, dropPct: -20 });
+test("employeeCount prefers employees_in_linkedin, else the middle of the size band", () => {
+  assert.equal(employeeCount({ employees_in_linkedin: 490, company_size: "201-500 employees" }), 490);
+  assert.equal(employeeCount({ employees_in_linkedin: 0, company_size: "201-500 employees" }), 351);
+  assert.equal(employeeCount({ company_size: "1,001-5,000 employees" }), 3001);
+  assert.equal(employeeCount({ company_size: "10,001+ employees" }), 10001);
+  assert.equal(employeeCount({}), null);
 });
 
-test("drop >= 50% is strong, with the computed snippet", () => {
-  // prior 60 days: 74 postings = 37/month. last 30: 14. drop = 62%.
-  const s = hiringSignalFromJobs(B, [...many(14, 10), ...many(74, 45)], TODAY);
-  assert.deepEqual(s, [
+test("openPostings keeps the borrower's own postings, each once", () => {
+  const other = job(0, { company_name: "Acme Widgets", company_url: "https://www.linkedin.com/company/acme-widgets-uk" });
+  const dup = job(0, { url: "https://www.linkedin.com/jobs/view/42?trk=a" });
+  const dup2 = job(0, { url: "https://www.linkedin.com/jobs/view/42?trk=b" });
+  assert.equal(openPostings([job(), job(), other, dup, dup2], B), 3);
+});
+
+test("hiringGap: expected = employees x industry rate", () => {
+  assert.deepEqual(hiringGap(2, 400, "Machinery Manufacturing"), {
+    open: 2, employees: 400, sector: "Manufacturing", rate: 3.5, expected: 14, gapPct: 86,
+  });
+  assert.equal(hiringGap(20, 400, "Machinery Manufacturing").gapPct, -43); // more than normal
+});
+
+test(">= 75% below expected is strong, with the computed snippet", () => {
+  assert.deepEqual(hiringSignalFromData(B, many(2), MFG, TODAY), [
     {
       borrower_id: "b1",
       type: "hiring_drop",
       severity: "strong",
       date: TODAY,
-      title: "Job postings down 62% in 30 days",
-      snippet: "14 postings in last 30 days vs 37/month before",
+      title: "Job postings 86% below normal for company size",
+      snippet: "2 open postings vs ~14 expected for 400 employees (Manufacturing: 3.5% openings rate, BLS)",
       source_name: "LinkedIn Jobs",
       source_url: "https://www.linkedin.com/company/acme-widgets/jobs/",
     },
   ]);
 });
 
-test("exactly 50% is strong, exactly 25% is weak, under 25% is nothing", () => {
-  assert.equal(hiringSignalFromJobs(B, [...many(5, 1), ...many(20, 60)], TODAY)[0].severity, "strong");
-  assert.equal(hiringSignalFromJobs(B, [...many(15, 1), ...many(40, 60)], TODAY)[0].severity, "weak");
-  assert.deepEqual(hiringSignalFromJobs(B, [...many(16, 1), ...many(40, 60)], TODAY), []);
+test("50-75% below is weak; under 50% below or above normal is nothing", () => {
+  // expected 14: 3 open = 79% below (strong), 4 = 71% (weak), 7 = exactly 50% (weak), 8 = 43% (none)
+  assert.equal(hiringSignalFromData(B, many(3), MFG, TODAY)[0].severity, "strong");
+  assert.equal(hiringSignalFromData(B, many(4), MFG, TODAY)[0].severity, "weak");
+  assert.equal(hiringSignalFromData(B, many(7), MFG, TODAY)[0].severity, "weak");
+  assert.deepEqual(hiringSignalFromData(B, many(8), MFG, TODAY), []);
+  assert.deepEqual(hiringSignalFromData(B, many(30), MFG, TODAY), []);
 });
 
-test("no prior postings means no signal", () => {
-  assert.deepEqual(hiringSignalFromJobs(B, [], TODAY), []);
-  assert.deepEqual(hiringSignalFromJobs(B, many(3, 1), TODAY), []);
+test("too small to judge: fewer than 5 expected openings gives no signal", () => {
+  // 100 employees x 4.1% = 4.1 expected
+  assert.deepEqual(hiringSignalFromData(B, [job(0, { company_url: "https://www.linkedin.com/company/someone-else" })], { employees_in_linkedin: 100 }, TODAY), []);
 });
 
-test("fractional monthly rate is shown with one decimal", () => {
-  const s = hiringSignalFromJobs(B, [...many(2, 1), ...many(9, 50)], TODAY);
-  assert.equal(s[0].snippet, "2 postings in last 30 days vs 4.5/month before");
+test("search results with none of the borrower's postings count as 0 open", () => {
+  const others = Array.from({ length: 5 }, () => job(0, { company_url: "https://www.linkedin.com/company/acme-widgets-uk" }));
+  assert.equal(hiringSignalFromData(B, others, MFG, TODAY)[0].title, "Job postings 100% below normal for company size");
+});
+
+test("no employee count is a failure, not 'no signal'", () => {
+  assert.throws(() => hiringSignalFromData(B, many(3), { industries: "Insurance" }, TODAY), /^Error: Jobs: LinkedIn company page has no employee count/);
 });
 
 test("other companies from keyword discovery are ignored", () => {
-  const other = { company_name: "Acme Widgets", company_url: "https://www.linkedin.com/company/acme-widgets-uk" };
-  assert.equal(isSameCompany(job(1, other), B), false);
-  assert.equal(isSameCompany(job(1, { company_url: undefined, company_name: "ACME WIDGETS LLC" }), B), true);
-  assert.equal(isSameCompany(job(1, { company_url: undefined, company_name: "Acme Widget Supply" }), B), false);
-  // 40 prior postings all belong to a different company -> no signal for Acme.
-  const jobs = Array.from({ length: 40 }, () => job(60, other));
-  assert.deepEqual(hiringSignalFromJobs(B, jobs, TODAY), []);
+  assert.equal(isSameCompany(job(0, { company_url: "https://www.linkedin.com/company/acme-widgets-uk" }), B), false);
+  assert.equal(isSameCompany(job(0, { company_url: undefined, company_name: "ACME WIDGETS LLC" }), B), true);
+  assert.equal(isSameCompany(job(0, { company_url: undefined, company_name: "Acme Widget Supply" }), B), false);
 });
 
 test("Base44 handler: missing borrower is 400, missing key fails as Jobs", async () => {
@@ -90,16 +112,6 @@ test("Base44 handler: missing borrower is 400, missing key fails as Jobs", async
   assert.equal(res.status, 502);
   assert.match((await res.json()).error, /^Jobs: BRIGHTDATA_API_KEY/);
   delete (globalThis as any).Deno;
-});
-
-test("minimum sample: 1 or 5 prior postings then none is not a drop; 6 is", () => {
-  assert.deepEqual(hiringSignalFromJobs(B, many(1, 45), TODAY), []);
-  assert.deepEqual(hiringSignalFromJobs(B, many(5, 45), TODAY), []);
-  assert.equal(hiringSignalFromJobs(B, many(6, 45), TODAY)[0].severity, "strong");
-});
-
-test("records with no readable date at all are a failure, not 'no signal'", () => {
-  assert.throws(() => hiringSignalFromJobs(B, [{ company_name: "Acme Widgets", posted: "yesterday-ish" }], TODAY), /^Error: Jobs: no posting/);
 });
 
 // ---------- Bright Data replies (fetch is faked) ----------
@@ -156,4 +168,31 @@ test("crafted snapshot_id is refused before any request is made", async () => {
   }
   assert.equal(calls.length, 0);
   globalThis.fetch = realFetch;
+});
+
+
+test("hiringSignal fetches jobs and the company page in parallel and scores them", async () => {
+  fakeFetch({
+    gd_lpfll7v5hcqtkxl6l: [[200, many(2)]],
+    gd_l1vikfnt1wgvvqz95w: [[200, [MFG]]],
+  });
+  try {
+    const s = await hiringSignal(B, "k", TODAY);
+    assert.equal(s[0].severity, "strong");
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test("a company page that fails makes Jobs unavailable", async () => {
+  fakeFetch({
+    gd_lpfll7v5hcqtkxl6l: [[200, many(2)]],
+    gd_l1vikfnt1wgvvqz95w: [[200, [{ error: "dead_page" }]]],
+  });
+  try {
+    await assert.rejects(hiringSignal(B, "k", TODAY), /Jobs: Bright Data returned no records: dead_page/);
+    await assert.rejects(hiringSignal({ ...B, linkedin_url: "https://example.com/acme" }, "k", TODAY), /Jobs: borrower needs a linkedin.com\/company\/ URL/);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
 });

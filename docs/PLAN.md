@@ -47,7 +47,7 @@ Unchanged: the 4 signal rules, the status rules, tagging-only LLM, snippet guard
 **Demo story (P4 owns the script):**
 1. A credit officer gets a new loan application. They click **Screen new applicant** and type the company name, domain and city.
 2. Within seconds, news signals appear. Job postings and reviews fill in a moment later. Status turns **Red**:
-   *"Red: CFO departure (Sep 12) + job postings down 62% in 30 days."* They click a source link to the real article.
+   *"Red: CFO departure (Sep 12) + Job postings 84% below normal for company size."* They click a source link to the real article.
 3. The officer asks for cash-flow documents **before** spending a week on the deal (Tester 1's exact wish).
 4. Switch to **Borrowers**: the same checks keep running on companies already lent to; one has turned Yellow since funding.
 
@@ -70,7 +70,7 @@ for applicants, outstanding for borrowers), `linkedin_url`, `glassdoor_url`, `st
 |---|---|---|---|
 | `newsSignals` | P2 | Borrower → Signal[] (exec_departure + legal_layoffs) | SERP, `tagItem` |
 | `tagItem` | P2 | (item text + url, Borrower) → `{relevant, same_company, signal_type, severity, snippet}` | LLM (Base44's built-in LLM integration if available, else an API key secret) |
-| `hiringSignal` | P3 | Borrower → Signal[] (0 or 1 hiring_drop) | Web Scraper API (LinkedIn jobs or Indeed) |
+| `hiringSignal` | P3 | Borrower → Signal[] (0 or 1 hiring_drop) | Web Scraper API (LinkedIn job listings + LinkedIn company page) |
 | `reviewSignals` | P3 | Borrower → Signal[] (review_distress) | Web Scraper API (Glassdoor), `tagItem` for the strong case |
 | `scoreBorrower` | P3 | Signal[] + today → `{status, why}` | none (pure code) |
 | `refreshBorrower` | P1 | borrower_id → updated Borrower + Signals. **Saves after each source finishes**, so the screen fills in progressively | all of the above |
@@ -97,7 +97,7 @@ On failure it throws, with the source name in the message (`News`, `Legal`, `Job
 | Source | API | Flow |
 |---|---|---|
 | News (P2) | **SERP via zone `mcp_unlocker`** (verified working 12:44) | `POST https://api.brightdata.com/request`, `Authorization: Bearer <key>`, body `{"zone":"mcp_unlocker","url":"https://www.google.com/search?q=<query>&tbm=nws&tbs=qdr:m6&hl=en&gl=us&brd_json=1","format":"raw"}`. This returns **parsed JSON** (`search_type: "news"`, results under `news`). `tbs=qdr:m6` = last 6 months |
-| Jobs (P3) | **Web Scraper API**, LinkedIn job listings or Indeed dataset | trigger (company URL) → poll progress → download snapshot → count postings by posted date |
+| Jobs (P3) | **Web Scraper API**: LinkedIn job listings (discover by company keyword) + LinkedIn company information (by URL), in parallel | sync `/scrape` → count the company's open postings; company page gives employees + industry → compare with employees × BLS openings rate |
 | Reviews (P3) | **Web Scraper API**, Glassdoor reviews dataset | trigger (glassdoor_url) → poll → download → reviews with date, rating, text |
 
 - **P2:** confirm the field names inside `news[]` (title, link, source, date) on the first real call, and put them in §8.
@@ -129,11 +129,12 @@ Put names here: **P1** ____ · **P2** ____ · **P3** ____ · **P4** ____
 - [ ] **after 3** Timeouts/retry, cache tags by `source_url` so refresh doesn't re-tag
 
 ### P3: Jobs & reviews (`jobs/`): Web Scraper API + scoring
-- [ ] **now** `scoreBorrower` + why line first. It's pure code and testable without any API, so write the test cases from §2 first
-- [ ] **now** Use the MCP to pick the dataset (LinkedIn jobs vs Indeed) and Glassdoor reviews dataset IDs, run one manual trigger → snapshot, and **time it** (decides sync vs two-step)
-- [ ] **by 2:00** `hiringSignal`: last 30 days vs prior 60 ÷ 2, ≥50% drop = strong, 25–50% = weak, skip if the prior 60 had 0
-- [ ] **by 2:30** `reviewSignals`: strong via `tagItem` (layoffs, furloughs, late/missed pay, closing), weak via 90-day average vs prior 12 months
-- [ ] **after 3** Timeouts/retry, async snapshot handling hardened
+- [x] **now** `scoreBorrower` + why line first. It's pure code and testable without any API, so write the test cases from §2 first
+- [x] **now** Use the MCP to pick the dataset (LinkedIn jobs vs Indeed) and Glassdoor reviews dataset IDs, run one manual trigger → snapshot, and **time it** (decides sync vs two-step). IDs and times in §8
+- [x] **by 2:00** `hiringSignal`. **Rule changed:** the old "last 30 days vs prior 60" never fired, because LinkedIn only lists open postings (Gravie live: 34 recent, 0 prior). Now: open postings vs employees × BLS industry openings rate; ≥75% below expected = strong, 50–75% = weak, skip if < 5 expected. Gravie live: 34 open vs ~25 expected, no signal
+- [x] **by 2:30** `reviewSignals`: strong via keyword match with exact-sentence snippet (tagItem hook behind a flag), weak via 90-day average vs prior 12 months. Gravie live: strong (layoffs review, Sep 1) + weak (3.6 → 2.2)
+- [x] **after 3** Timeouts, async snapshot handling hardened (empty/error results fail, "not ready" waited on, snapshot_id validated)
+- [ ] **open** Switch on `hiringSignal` in `refreshBorrower`. `reviewSignals` waits on a decision: Glassdoor takes ~6 min vs the 2-min refresh limit (store snapshot_id for a second Refresh, or pre-warm with `refreshAll`)
 
 ### P4: Research & pitch (`research/`): Sense, companies, feedback, demo, QA
 - [ ] **now** Sense check 1 results → `docs/USER_FEEDBACK.md` (in progress). Watch whether testers 2–3 also talk about pre-loan screening
@@ -212,9 +213,10 @@ Every person runs **one Claude Code session in this repo**. That's the harness. 
 |---|---|---|
 | SERP zone | **`mcp_unlocker`**: Google News with `tbm=nws&brd_json=1` returns parsed JSON (verified 12:44) | P4 |
 | `news[]` field names | | P2 |
-| LinkedIn jobs dataset ID | | P3 |
-| Indeed jobs dataset ID | | P3 |
-| Glassdoor reviews dataset ID | | P3 |
-| Snapshot time (trigger → ready) | | P3 |
+| LinkedIn jobs dataset ID | `gd_lpfll7v5hcqtkxl6l` ("Linkedin job listings information"); input `{keyword, company, location, time_range}` with `type=discover_new&discover_by=keyword`; fields `company_name`, `company_url`, `job_posted_date`, `url` | P3 |
+| LinkedIn company dataset ID | `gd_l1vikfnt1wgvvqz95w` ("LinkedIn company information"); input `{url}`; fields `employees_in_linkedin`, `company_size`, `industries` | P3 |
+| Indeed jobs dataset ID | not used | P3 |
+| Glassdoor reviews dataset ID | `gd_l7j1po0921hbu0ri1z` ("Glassdoor companies reviews"); input `{url, days}` (`days` required); fields `rating_date`, `rating_overall`, `summary`, `review_pros`, `review_cons`, `review_id`, `overview_id` (`review_url` is null) | P3 |
+| Snapshot time (trigger → ready) | Gravie, 2026-10-10: LinkedIn jobs ~40 s (sync), company page ~3 s (sync), Glassdoor reviews ~5.7 min (async snapshot) | P3 |
 | Base44 app | "Early Warning", app id `6aca96c9744d6ba75bc4fabd` (not yet synced to GitHub: `git_remote_source: s3`) | P1 |
 | Base44 layout | entities `base44/entities/*.jsonc` · functions `base44/functions/<name>/entry.ts` (Deno, `npm:@base44/sdk`) · pages `src/pages/` (LoanBook, CompanyDetail) | P4 (checked 1:05) |
