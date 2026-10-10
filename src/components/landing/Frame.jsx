@@ -1,7 +1,8 @@
 import React from "react";
 
-// Below the hero every section sits on one soft matte off-white. It eases in under the dark hero and back out
-// into the dark footer over FADE px along a smooth S-curve (many stops), so it melts instead of banding.
+// Below the hero every section sits on one soft matte off-white. It eases in under the dark hero over FADE px
+// along a smooth S-curve (many stops), so it melts instead of banding. (At the bottom, the lead-time section
+// closes back into the dark footer with a growing dark panel.)
 export const SURFACE_A = "#14202e"; // the hero's ink (--ew-ink)
 export const MATTE = "#eceeea";
 export const FADE = 320;
@@ -16,7 +17,6 @@ const fadeFrom = (dir) => {
 };
 export const matte = { backgroundColor: MATTE };
 export const matteFromDark = { backgroundColor: MATTE, backgroundImage: fadeFrom("bottom"), paddingTop: FADE };
-export const matteIntoDark = { backgroundColor: MATTE, backgroundImage: fadeFrom("top"), paddingBottom: FADE };
 
 // The hero's framed-panel language, in light: a thin-bordered white frame split into
 // columns, each with a stage-style header (small number, bold title, muted caption), and an optional mono

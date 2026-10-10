@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Check, Loader2, MousePointer2 } from "lucide-react";
 import { prefersReducedMotion } from "./motion";
+import { useScrollProgress } from "./reveal";
 
 // Small looping demos for the landing sections: show the product working instead of describing it.
 // Each loops only while on screen; visitors who ask for reduced motion see the final frame.
@@ -173,43 +174,72 @@ export function DecideDemo() {
 }
 
 // ------------------------------------------------------------------ Before the quarterly financials
-// Jul 1 to Nov 30 (152 days) across the width; each month is about 20%.
+// Jul 1 to Nov 30 (152 days) across the width. Scroll-driven: as the panel scrolls up, the CFO departure lands,
+// then the WARN notice, then the Q3 financials marker, then the lead-time bracket draws across.
 const AXIS_DAYS = 152;
 const pos = (month, day) => (((month - 7) * 30.5 + (day - 1)) / AXIS_DAYS) * 100;
-const AXIS = ["Jul", "Aug", "Sep", "Oct", "Nov"].map((label, i) => ({ label, at: pos(7 + i, 1) }));
+const MONTHS = ["Jul", "Aug", "Sep", "Oct", "Nov"].map((label, i) => ({ label, at: pos(7 + i, 1) }));
+const LINE_Y = 64; // px from the top of the timeline
+
 export function LeadTimeline() {
-  const [ref, step] = useLoop(7, 700); // 1 first flag, 2 second, 3 financials marker, 4 bracket
+  const [ref, p] = useScrollProgress({ start: 0.9, end: 0.4 });
   const flags = [
-    { label: "CFO departure", left: pos(9, 10) },
-    { label: "WARN notice", left: pos(9, 24) },
+    { label: "CFO departure", date: "Sep 10", left: pos(9, 10), at: 0.12 },
+    { label: "WARN notice", date: "Sep 24", left: pos(9, 24), at: 0.32 },
   ];
   const fin = pos(11, 14);
+  const showFin = p >= 0.52;
+  const bracket = Math.min(1, Math.max(0, (p - 0.66) / 0.3));
   return (
-    <div ref={ref} className="relative pb-2 pt-10">
-      <div className="relative h-px bg-ew-ink/25">
-        {AXIS.map((a) => (
-          <span key={a.label} className="absolute top-3 -translate-x-1/2 text-[12px] text-ew-muted" style={{ left: `${a.at}%` }}>
-            {a.label}
-          </span>
-        ))}
-        {flags.map((f, i) => (
-          <span key={f.label} className={`absolute -top-[7px] transition-all duration-500 ${step > i ? "scale-100 opacity-100" : "scale-0 opacity-0"}`} style={{ left: `${f.left}%` }}>
-            <span className="block h-3.5 w-3.5 -translate-x-1/2 rounded-full bg-ew-red ring-4 ring-ew-red/25" />
-            <span className="absolute -top-8 left-0 -translate-x-1/2 whitespace-nowrap text-[12.5px] font-semibold text-ew-ink">{f.label}</span>
-          </span>
-        ))}
-        <span className={`absolute -top-6 h-12 border-l-2 border-dashed border-ew-ink/50 transition-opacity duration-500 ${step >= 3 ? "opacity-100" : "opacity-0"}`} style={{ left: `${fin}%` }}>
-          <span className="absolute -top-6 left-0 -translate-x-1/2 whitespace-nowrap text-[12.5px] font-semibold text-ew-ink-soft">Q3 financials</span>
-        </span>
-        <span
-          className="absolute top-9 h-2 border-x-2 border-b-2 border-[#0284c7] transition-all duration-700 ease-out"
-          style={{ left: `${flags[0].left}%`, width: step >= 4 ? `${fin - flags[0].left}%` : "0%" }}
-        >
-          <span className={`absolute left-1/2 top-3 -translate-x-1/2 whitespace-nowrap font-heading text-[18px] font-bold text-[#0284c7] transition-opacity duration-500 ${step >= 4 ? "opacity-100" : "opacity-0"}`}>
-            9 weeks earlier
-          </span>
-        </span>
+    <div ref={ref} className="relative h-[176px]">
+      {/* Axis with month ticks and labels. */}
+      <div className="absolute inset-x-0 h-[2px] rounded bg-ew-ink/25" style={{ top: LINE_Y }} />
+      {MONTHS.map((m) => (
+        <div key={m.label} className="absolute" style={{ left: `${m.at}%`, top: LINE_Y - 4 }}>
+          <span className="block h-[10px] w-px bg-ew-ink/35" />
+          <span className="absolute left-0 top-4 -translate-x-1/2 text-[12px] text-ew-muted">{m.label}</span>
+        </div>
+      ))}
+
+      {/* Flags land on the line. */}
+      {flags.map((f) => {
+        const on = p >= f.at;
+        return (
+          <div
+            key={f.label}
+            className="absolute -translate-x-1/2 text-center transition-all duration-500 ease-out"
+            style={{ left: `${f.left}%`, top: LINE_Y - 46, opacity: on ? 1 : 0, transform: `translate(-50%, ${on ? 0 : -14}px)` }}
+          >
+            <p className="whitespace-nowrap text-[12.5px] font-semibold text-ew-ink">{f.label}</p>
+            <p className="whitespace-nowrap text-[11px] text-ew-muted">{f.date}</p>
+            <span
+              className="mx-auto mt-1 block h-3.5 w-3.5 rounded-full bg-ew-red"
+              style={{ boxShadow: "0 0 0 4px rgba(185, 28, 28, 0.18)" }}
+            />
+          </div>
+        );
+      })}
+
+      {/* Quarterly financials marker. */}
+      <div
+        className="absolute transition-opacity duration-500"
+        style={{ left: `${fin}%`, top: LINE_Y - 46, opacity: showFin ? 1 : 0 }}
+      >
+        <p className="-translate-x-1/2 whitespace-nowrap text-[12.5px] font-semibold text-ew-ink-soft">Q3 financials</p>
+        <p className="-translate-x-1/2 whitespace-nowrap text-[11px] text-ew-muted">Nov 14</p>
+        <span className="mt-1 block h-[34px] w-0 border-l-2 border-dashed border-ew-ink/45" />
       </div>
+
+      {/* Lead-time bracket, drawn across as you scroll. */}
+      <div className="absolute" style={{ left: `${flags[0].left}%`, width: `${(fin - flags[0].left) * bracket}%`, top: LINE_Y + 36 }}>
+        <span className="block h-2.5 rounded-b-sm border-x-2 border-b-2 border-[#0284c7]" style={{ opacity: bracket > 0 ? 1 : 0 }} />
+      </div>
+      <p
+        className="absolute -translate-x-1/2 whitespace-nowrap font-heading text-[17px] font-bold text-[#0284c7] transition-opacity duration-300"
+        style={{ left: `${(flags[0].left + fin) / 2}%`, top: LINE_Y + 54, opacity: bracket >= 1 ? 1 : 0 }}
+      >
+        9 weeks earlier
+      </p>
     </div>
   );
 }
