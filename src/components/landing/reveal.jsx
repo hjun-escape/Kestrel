@@ -83,3 +83,25 @@ export function useScrollProgress({ start = 0.85, end = 0.35 } = {}) {
   }, [start, end]);
   return [ref, p];
 }
+
+/**
+ * A band where one colour grows in from the centre over another as it scrolls into view: `grow` fills `base`.
+ * Used to open the white sections out of the dark hero, and to close them back into the dark footer.
+ * `edge`: which edge the growing shape is anchored to ("bottom" grows upward into the content below,
+ * "top" grows down from the content above).
+ */
+export function GrowBand({ base, grow, height = 150, edge = "bottom", start = 1, end = 0.55 }) {
+  const [ref, p] = useScrollProgress({ start, end });
+  const side = 46 * (1 - p);
+  const lift = 60 * (1 - p); // % of the band left uncovered on the far side
+  const r = 36 * (1 - p);
+  const clip =
+    edge === "bottom"
+      ? `inset(${lift}% ${side}% 0 ${side}% round ${r}px ${r}px 0 0)`
+      : `inset(0 ${side}% ${lift}% ${side}% round 0 0 ${r}px ${r}px)`;
+  return (
+    <div ref={ref} aria-hidden="true" className="relative" style={{ height, background: base }}>
+      <div className="absolute inset-0" style={{ background: grow, clipPath: clip }} />
+    </div>
+  );
+}

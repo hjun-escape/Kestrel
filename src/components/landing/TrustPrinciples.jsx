@@ -1,29 +1,15 @@
 import React from "react";
-import { FADE, SURFACE_A, SectionHeader, matte } from "./Frame";
+import { BAND, MATTE, SURFACE_A, SectionHeader, matte } from "./Frame";
 import { LeadTimeline } from "./showScenes";
-import { Reveal, useScrollProgress } from "./reveal";
+import { GrowBand, Reveal } from "./reveal";
 
 // Lead time: flags land weeks before the quarterly financials (the timeline is scroll-driven).
 // Then the page closes back into the dark footer: a dark panel grows in from both sides as you scroll down.
 
-function ClosingPanel() {
-  const [ref, p] = useScrollProgress({ start: 1, end: 0.5 });
-  const side = 46 * (1 - p); // % inset from each side
-  const radius = 32 * (1 - p);
-  return (
-    <div ref={ref} aria-hidden="true" className="relative" style={{ height: FADE }}>
-      <div
-        className="absolute inset-0"
-        style={{ background: SURFACE_A, clipPath: `inset(${18 * (1 - p)}% ${side}% 0 ${side}% round ${radius}px ${radius}px 0 0)` }}
-      />
-    </div>
-  );
-}
-
 export default function TrustPrinciples() {
   return (
-    <section aria-labelledby="lead-heading" data-ascii-fade-bottom={FADE} className="pt-4 text-ew-ink" style={matte}>
-      <div className="mx-auto max-w-[1200px] px-4 pb-16 sm:px-8">
+    <section aria-labelledby="lead-heading" data-ascii-fade-bottom={BAND} className="pt-4 text-ew-ink" style={matte}>
+      <div className="mx-auto max-w-[1200px] px-4 pb-10 sm:px-8">
         <Reveal>
           <SectionHeader kicker="Lead time" title="Flags land before the quarterly financials." id="lead-heading" />
         </Reveal>
@@ -40,7 +26,8 @@ export default function TrustPrinciples() {
           </p>
         </Reveal>
       </div>
-      <ClosingPanel />
+      {/* Closes back into the dark footer: the dark grows in from the centre as you scroll down. */}
+      <GrowBand base={MATTE} grow={SURFACE_A} height={BAND} edge="bottom" start={1} end={0.6} />
     </section>
   );
 }

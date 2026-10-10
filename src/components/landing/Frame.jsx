@@ -1,22 +1,11 @@
 import React from "react";
 
-// Below the hero every section sits on one soft matte off-white. It eases in under the dark hero over FADE px
-// along a smooth S-curve (many stops), so it melts instead of banding. (At the bottom, the lead-time section
-// closes back into the dark footer with a growing dark panel.)
+// Below the hero every section sits on one soft matte off-white. It opens out of the dark hero with a white
+// shape growing from the centre, and closes back into the dark footer the same way (GrowBand in reveal.jsx).
 export const SURFACE_A = "#14202e"; // the hero's ink (--ew-ink)
 export const MATTE = "#eceeea";
-export const FADE = 320;
-const ease = (t) => t * t * t * (t * (t * 6 - 15) + 10); // smootherstep
-const fadeFrom = (dir) => {
-  const stops = [];
-  for (let i = 0; i <= 12; i++) {
-    const t = i / 12;
-    stops.push(`rgba(20,32,46,${(1 - ease(t)).toFixed(3)}) ${Math.round(t * FADE)}px`);
-  }
-  return `linear-gradient(to ${dir}, ${stops.join(", ")})`;
-};
+export const BAND = 150; // height of the opening and closing bands
 export const matte = { backgroundColor: MATTE };
-export const matteFromDark = { backgroundColor: MATTE, backgroundImage: fadeFrom("bottom"), paddingTop: FADE };
 
 // The hero's framed-panel language, in light: a thin-bordered white frame split into
 // columns, each with a stage-style header (small number, bold title, muted caption), and an optional mono

@@ -1,14 +1,16 @@
 import React from "react";
-import { FADE, Frame, SectionHeader, matteFromDark } from "./Frame";
+import { BAND, Frame, MATTE, SURFACE_A, SectionHeader, matte } from "./Frame";
 import { CheckDemo, DecideDemo, RaceBars, ScreenDemo } from "./showScenes";
-import { Reveal } from "./reveal";
+import { GrowBand, Reveal } from "./reveal";
 
 // How a check runs, in the hero's framed style: the race against reading by hand, then one sample
 // applicant through Screen, Check and Decide, with a run summary along the bottom.
 export default function HowItWorks() {
   return (
-    <section aria-labelledby="how-heading" data-ascii-fade-top={FADE} className="pb-20 text-ew-ink" style={matteFromDark}>
-      <div className="mx-auto max-w-[1200px] px-4 sm:px-8">
+    <section aria-labelledby="how-heading" data-ascii-fade-top={BAND} className="pb-20 text-ew-ink" style={matte}>
+      {/* The white opens out of the dark hero: it grows from the centre as you scroll in. */}
+      <GrowBand base={SURFACE_A} grow={MATTE} height={BAND} edge="bottom" start={1} end={0.6} />
+      <div className="mx-auto max-w-[1200px] px-4 pt-6 sm:px-8">
         <Reveal>
           <SectionHeader kicker="How a check runs" title="One applicant, end to end." id="how-heading" />
         </Reveal>
