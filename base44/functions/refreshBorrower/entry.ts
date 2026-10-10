@@ -1,6 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { canAccessCompany } from './access.ts';
-import { COOLDOWN_MS, cooldownLeft } from './cooldown.ts';
+import { cooldownLeft } from './cooldown.ts';
 
 // refreshBorrower(borrower_id). Owner: P1. See docs/PLAN.md §2 and CLAUDE.md "Refresh flow".
 //
