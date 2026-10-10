@@ -31,10 +31,10 @@ const SIGNAL_FUNCTIONS = [
   { name: 'reviewSignals', owner: 'P3', enabled: false, sources: { review_distress: 'Reviews' } },
 ];
 
-// TODO (P3): set to true once scoreBorrower is deployed. It takes
-// { signals, today: 'YYYY-MM-DD' } and returns { status, why }, counting only
-// the last 90 days. Until then status and why stay unchanged.
-const SCORING_ENABLED = false;
+// scoreBorrower (P3) takes { signals, today: 'YYYY-MM-DD' } and returns
+// { status, why }, counting only the last 90 days. Ships in the same merge as
+// base44/functions/scoreBorrower.
+const SCORING_ENABLED = true;
 
 // A source that takes longer than this counts as unavailable.
 const SOURCE_TIMEOUT_MS = 120_000;
