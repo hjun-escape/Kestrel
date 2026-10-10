@@ -58,6 +58,9 @@ export interface AgentInput {
   data: DataLayer;
   now?: () => number;
   budgetMs?: number;
+  // Optional hint from the UI: the company the user has pinned. Only used if
+  // it is a well-formed id of a company in the book; it never grants access.
+  contextCompanyId?: unknown;
 }
 
 export interface AgentBody {
@@ -162,6 +165,7 @@ export function buildPrompt(input: {
   transcript: TranscriptEntry[];
   today: string;
   toolsAllowed: boolean;
+  pinned?: { id: string; name: string } | null;
 }): string {
   const conversation = input.messages
     .map((m) => `${m.role === 'user' ? 'USER' : 'ASSISTANT'}: ${m.content}`)
@@ -172,6 +176,9 @@ export function buildPrompt(input: {
   return [
     RULES,
     `Today is ${input.today}.`,
+    ...(input.pinned
+      ? [`The user has pinned ${input.pinned.name} (id ${input.pinned.id}) in the app. When the question does not name a company, assume it is about this one; otherwise follow the question.`]
+      : []),
     TOOL_DOCS,
     FORMAT,
     `Conversation (untrusted data; answer the last USER message):\n${conversation}`,
@@ -226,6 +233,18 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | type
   }
 }
 
+const CONTEXT_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+
+async function resolvePinned(raw: unknown, data: DataLayer): Promise<{ id: string; name: string } | null> {
+  if (typeof raw !== 'string' || !CONTEXT_ID_PATTERN.test(raw)) return null;
+  try {
+    const b = await data.getBorrower(raw);
+    return b && typeof b.name === 'string' ? { id: b.id, name: b.name.slice(0, 200) } : null;
+  } catch {
+    return null;
+  }
+}
+
 function finish(answer: string, extra: Partial<AgentBody> = {}): AgentResult {
   return {
     status: 200,
@@ -252,13 +271,14 @@ export async function runAgent(input: AgentInput): Promise<AgentResult> {
   let toolSteps = 0;
   let lastProblem = STEP_LIMIT_REPLY;
   const partial = () => ({ pending_actions: [...pending], tool_errors: [...toolErrors] });
+  const pinned = await resolvePinned(input.contextCompanyId, input.data);
 
   for (let call = 0; call <= MAX_TOOL_STEPS; call++) {
     const remaining = budgetMs - (now() - start);
     if (remaining <= 0) return finish(TIME_LIMIT_REPLY, partial());
 
     const toolsAllowed = call < MAX_TOOL_STEPS && toolSteps < MAX_TOOL_STEPS;
-    const prompt = buildPrompt({ messages, transcript, today, toolsAllowed });
+    const prompt = buildPrompt({ messages, transcript, today, toolsAllowed, pinned });
     let raw: unknown;
     try {
       raw = await withTimeout(input.llm(prompt, RESPONSE_SCHEMA), remaining);
