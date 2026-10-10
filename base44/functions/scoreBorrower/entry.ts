@@ -62,11 +62,14 @@ const ROLES: [RegExp, string][] = [
 ];
 const SUED = "(sue|sues|sued|suing|lawsuit|suit)";
 const LEGAL_EVENTS: [RegExp, string][] = [
-  [/WARN notice/i, "WARN notice"],
+  [/WARN Act.*investigat|investigat.*WARN Act/i, "WARN Act investigation"],
+  [/WARN (notice|Act)/i, "WARN notice"],
   [/bankrupt|chapter (7|11)\b/i, "Bankruptcy filing"],
   [/wrongful[- ]death/i, "Wrongful-death lawsuit"],
   [new RegExp(`\\b(lender|bank|creditor)s?\\b.*\\b${SUED}\\b|\\b${SUED}\\b.*\\b(lender|bank|creditor)s?\\b`, "i"), "Lender lawsuit"],
   [new RegExp(`\\b(supplier|vendor)s?\\b.*\\b${SUED}\\b|\\b${SUED}\\b.*\\b(supplier|vendor)s?\\b`, "i"), "Supplier lawsuit"],
+  [/\bclos(e|es|ing|ure)\b.*\b(factory|plant|facility|site|mill|brewery|warehouse)s?\b|\b(factory|plant|facility|site|mill|brewery|warehouse)s?\b.*\bclos(e|es|ing|ure)\b/i, "Plant closure"],
+  [/pulls? (the )?plug|shut(s|ting)? down|wind(s|ing)? down|ceases? operations/i, "Shutdown"],
   [/layoffs?|laid off|job cuts/i, "Layoffs"],
   [/\blien\b/i, "Lien"],
   [/wage (claim|theft)|unpaid wages/i, "Wage claim"],
@@ -75,17 +78,26 @@ const LEGAL_EVENTS: [RegExp, string][] = [
 ];
 const MAX_TITLE = 48;
 
+// A headline no rule names: keep its first words (at a word boundary) rather than a generic label, so two
+// different events never read the same.
+function shortTitle(title: string): string {
+  if (title.length <= MAX_TITLE) return title;
+  const cut = title.slice(0, MAX_TITLE + 1);
+  const words = cut.slice(0, Math.max(cut.lastIndexOf(" "), 20)).replace(/[\s,;:.-]+$/, "");
+  return `${words}…`;
+}
+
 export function eventName(s: Signal): string {
   const title = (s.title ?? "").trim();
   if (s.type === "exec_departure") {
     const role = ROLES.find(([re]) => re.test(title));
     if (role) return `${role[1]} departure`;
-    return title.length <= MAX_TITLE ? title : "Executive departure";
+    return shortTitle(title);
   }
   if (s.type === "legal_layoffs") {
     const event = LEGAL_EVENTS.find(([re]) => re.test(title));
     if (event) return event[1];
-    return title.length <= MAX_TITLE ? title : "Lawsuit, layoffs or lien";
+    return shortTitle(title);
   }
   return title;
 }

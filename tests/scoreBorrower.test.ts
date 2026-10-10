@@ -144,3 +144,17 @@ test("why line names news events instead of quoting long headlines", () => {
     "Yellow: Lender lawsuit (Sep 29).",
   );
 });
+
+test("why line names closures, shutdowns and WARN Act cases; unnamed headlines are shortened, not made generic", () => {
+  const amys = [
+    sig("strong", "2026-09-19", "$1B frozen food giant pulls plug on California manufacturing in shock retreat"),
+    sig("weak", "2026-09-26", "Amy’s Kitchen Built Its Food Empire in Santa Rosa. Now It’s Closing Its First Factory"),
+  ];
+  assert.equal(scoreBorrower(amys, TODAY).why, "Yellow: Shutdown (Sep 19) + Plant closure (Sep 26).");
+  assert.equal(
+    scoreBorrower([sig("strong", "2026-09-10", "State investigating Essendant, century-old office supply firm, for layoffs that may have violated WARN Act")], TODAY).why,
+    "Yellow: WARN Act investigation (Sep 10).",
+  );
+  const other = scoreBorrower([sig("strong", "2026-10-01", "Something entirely different happened at the company headquarters this week")], TODAY).why;
+  assert.match(other, /^Yellow: Something entirely different happened at the… \(Oct 1\)\.$/);
+});

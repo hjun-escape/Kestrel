@@ -34,12 +34,13 @@ export default function LandingCtas({ tone = "dark", className = "" }) {
 
   return (
     <div className={`flex flex-col gap-3 sm:flex-row sm:items-center ${className}`}>
-      <Link to={SIGN_IN_PATH} className={`${BASE} ${styles.primary}`}>
-        Sign in
-      </Link>
-      <a href={DEMO_LOAD_PATH} onClick={handleExplore} className={`${BASE} ${styles.secondary}`}>
+      {/* Most visitors (testers, judges) have no account: the demo is the main way in. */}
+      <a href={DEMO_LOAD_PATH} onClick={handleExplore} className={`${BASE} ${styles.primary}`}>
         Explore the demo
       </a>
+      <Link to={SIGN_IN_PATH} className={`${BASE} ${styles.secondary}`}>
+        Sign in
+      </Link>
     </div>
   );
 }
