@@ -183,40 +183,27 @@ const HEADER = 72; // stage titles (and the applicant input) above the cells
 const EXIT = 0.66; // share of the canvas the pipeline runs across; the report sits to the right
 const css = ([r, g, b], a = 1) => `rgba(${r},${g},${b},${a})`;
 
-/** One example input: its text turns into blocks, then the bits spawn into the lane. */
-function EncoderCard({ job }) {
-  const [shown, setShown] = useState(0);
+/** One example input: slides right and disappears through the edge into its lane; its cells appear there. */
+function InputChip({ job }) {
+  const [go, setGo] = useState(false);
   useEffect(() => {
     if (prefersReducedMotion()) return undefined;
-    const started = performance.now();
-    let raf = 0;
-    const tick = (now) => {
-      const t = Math.min(1, (now - started) / job.encodeMs);
-      setShown(Math.round(t * job.text.length));
-      if (t < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
+    const raf = requestAnimationFrame(() => setGo(true));
     return () => cancelAnimationFrame(raf);
-  }, [job]);
+  }, []);
   const col = LANE_COLORS[job.lane];
   return (
-    <div
-      className={`rounded-sm border bg-ew-ink/95 px-2.5 py-1.5 transition-opacity duration-500 ${job.leaving ? "opacity-0" : "opacity-100"}`}
-      style={{ borderColor: css(col, 0.55) }}
-    >
-      <p className="text-[10.5px] font-semibold uppercase tracking-[0.12em]" style={{ color: css(col) }}>
-        Encoding
-      </p>
-      <p className="font-mono text-[11px] leading-snug text-white/85 [overflow-wrap:anywhere]">
-        {[...job.text].map((ch, i) =>
-          i < shown ? (
-            <span key={i} style={{ color: css(col) }}>
-              {(ch.charCodeAt(0) >> 3) & 1 ? "█" : "▓"}
-            </span>
-          ) : (
-            <span key={i}>{ch}</span>
-          )
-        )}
+    <div className="relative h-[30px] overflow-hidden">
+      <p
+        className="absolute inset-y-0 left-0 flex w-full items-center truncate rounded-sm border px-2 text-[11.5px] text-white/90 ease-in"
+        style={{
+          borderColor: css(col, 0.6),
+          background: css(col, 0.14),
+          transform: go ? "translateX(105%)" : "translateX(0)",
+          transition: `transform ${job.encodeMs}ms cubic-bezier(.55,0,.75,.4)`,
+        }}
+      >
+        <span className="truncate">{job.text}</span>
       </p>
     </div>
   );
@@ -361,7 +348,7 @@ export function PipelineHero() {
                       {s.label}
                       <span aria-hidden="true" className="ml-auto text-white/35">→</span>
                     </p>
-                    {job ? <EncoderCard key={job.key} job={job} /> : <div className="h-[46px]" />}
+                    {job ? <InputChip key={job.key} job={job} /> : <div className="h-[30px]" />}
                   </div>
                 );
               })}
