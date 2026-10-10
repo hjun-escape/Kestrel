@@ -1,4 +1,10 @@
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
+
+// Signal dates are "YYYY-MM-DD". new Date("2026-09-12") is UTC midnight, which
+// shows as Sep 11 in US time zones, so parse them as local dates instead.
+export function parseSignalDate(dateStr) {
+  return parseISO(dateStr);
+}
 
 // Sort order for the loan book: Red, Yellow, Green, then Not checked.
 // Within each group, larger loan first.
@@ -50,7 +56,7 @@ export function formatUsd(n) {
 export function formatRelative(dateStr) {
   if (!dateStr) return null;
   try {
-    return format(new Date(dateStr), "MMM d, yyyy 'at' HH:mm 'UTC'");
+    return format(new Date(dateStr), "MMM d, yyyy 'at' h:mm a O");
   } catch {
     return null;
   }
