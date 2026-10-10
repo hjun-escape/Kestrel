@@ -45,6 +45,7 @@ export default function AsciiField() {
     let level = new Float32Array(0);
     let open = new Float32Array(0);
     let rowDark = new Uint8Array(0); // 1 = dark surface under this row
+    let rowFade = new Float32Array(0); // 0..1, quiets the field inside a section's faded edge
     let hits = [];
     let lastHit = 0;
     let raf = 0;
@@ -59,12 +60,25 @@ export default function AsciiField() {
         .map((el) => el.getBoundingClientRect())
         .filter((r) => r.width > 2 && r.height > 2 && r.bottom > -CLEAR_FADE && r.top < h + CLEAR_FADE);
       const surfaces = [...document.querySelectorAll(SURFACE_SELECTOR)]
-        .map((el) => ({ r: el.getBoundingClientRect(), dark: isDark(el) }))
+        .map((el) => ({
+          r: el.getBoundingClientRect(),
+          dark: isDark(el),
+          fadeTop: Number(el.dataset.asciiFadeTop) || 0,
+          fadeBottom: Number(el.dataset.asciiFadeBottom) || 0,
+        }))
         .filter((s) => s.dark !== null);
       for (let r = 0; r < rows; r++) {
         const y = r * CELL + CELL / 2;
         const s = surfaces.find((x) => y >= x.r.top && y < x.r.bottom);
         rowDark[r] = s ? (s.dark ? 1 : 0) : 1;
+        // In a section's faded edge the background is still mid-way between dark and light: keep the field
+        // quiet there and let it come in only where the surface has mostly turned light.
+        let fadeK = 1;
+        if (s && !s.dark) {
+          if (s.fadeTop) fadeK = Math.min(fadeK, Math.max(0, (y - s.r.top - s.fadeTop * 0.7) / (s.fadeTop * 0.3)));
+          if (s.fadeBottom) fadeK = Math.min(fadeK, Math.max(0, (s.r.bottom - y - s.fadeBottom * 0.7) / (s.fadeBottom * 0.3)));
+        }
+        rowFade[r] = Math.min(1, fadeK);
         for (let c = 0; c < cols; c++) {
           const x = c * CELL + CELL / 2;
           let d = Infinity;
@@ -88,7 +102,8 @@ export default function AsciiField() {
         const dark = rowDark[r];
         // White on dark surfaces; faint ink on light ones.
         const base = dark ? "255,255,255" : "20,32,46";
-        const k = dark ? 1 : 0.7;
+        const k = (dark ? 1 : 0.6) * rowFade[r];
+        if (k < 0.02) continue;
         for (let c = 0; c < cols; c++) {
           const i = r * cols + c;
           if (open[i] < 0.02) continue;
@@ -126,6 +141,7 @@ export default function AsciiField() {
       level = new Float32Array(n);
       open = new Float32Array(n);
       rowDark = new Uint8Array(rows);
+      rowFade = new Float32Array(rows).fill(1);
       for (let i = 0; i < n; i++) {
         glyph[i] = (Math.random() * GLYPHS.length) | 0;
         level[i] = Math.random();

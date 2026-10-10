@@ -1,12 +1,12 @@
 import React from "react";
-import { Frame, SectionHeader, matteFromDark } from "./Frame";
+import { FADE, Frame, SectionHeader, matteFromDark } from "./Frame";
 import { CheckDemo, DecideDemo, RaceBars, ScreenDemo } from "./showScenes";
 
 // How a check runs, in the hero's framed style: the race against reading by hand, then one sample
 // applicant through Screen, Check and Decide, with a run summary along the bottom.
 export default function HowItWorks() {
   return (
-    <section aria-labelledby="how-heading" className="pb-20 text-ew-ink" style={matteFromDark}>
+    <section aria-labelledby="how-heading" data-ascii-fade-top={FADE} className="pb-20 text-ew-ink" style={matteFromDark}>
       <div className="mx-auto max-w-[1200px] px-4 sm:px-8">
         <SectionHeader kicker="How a check runs" title="One applicant, end to end." id="how-heading" />
         <div className="mt-8 rounded-sm border border-ew-rule bg-white px-5 py-6 shadow-[0_14px_40px_-30px_rgba(20,32,46,0.45)]">

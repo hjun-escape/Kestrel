@@ -1,12 +1,12 @@
 import React from "react";
-import { SectionHeader, matteIntoDark } from "./Frame";
+import { FADE, SectionHeader, matteIntoDark } from "./Frame";
 import { LeadTimeline } from "./showScenes";
 
 // Lead time: the one thing the earlier sections don't show. Flags land weeks before the quarterly financials.
 // (How Kestrel decides is covered by the hero pipeline and "How a check runs", so it is not repeated here.)
 export default function TrustPrinciples() {
   return (
-    <section aria-labelledby="lead-heading" className="pt-4 text-ew-ink" style={matteIntoDark}>
+    <section aria-labelledby="lead-heading" data-ascii-fade-bottom={FADE} className="pt-4 text-ew-ink" style={matteIntoDark}>
       <div className="mx-auto max-w-[1200px] px-4 sm:px-8">
         <SectionHeader kicker="Lead time" title="Flags land before the quarterly financials." id="lead-heading" />
         <div className="mt-8 rounded-sm border border-ew-rule bg-white shadow-[0_14px_40px_-30px_rgba(20,32,46,0.45)]">

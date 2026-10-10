@@ -1,12 +1,19 @@
 import React from "react";
 
-// Below the hero every section sits on one soft matte white. It eases in under the dark hero and back out
-// into the dark footer, over FADE px with several stops so the blend is smooth.
+// Below the hero every section sits on one soft matte off-white. It eases in under the dark hero and back out
+// into the dark footer over FADE px along a smooth S-curve (many stops), so it melts instead of banding.
 export const SURFACE_A = "#14202e"; // the hero's ink (--ew-ink)
-export const MATTE = "#f6f7f5";
-const FADE = 180;
-const fadeFrom = (dir) =>
-  `linear-gradient(to ${dir}, ${SURFACE_A} 0, rgba(20,32,46,0.78) ${FADE * 0.2}px, rgba(20,32,46,0.45) ${FADE * 0.45}px, rgba(20,32,46,0.16) ${FADE * 0.72}px, rgba(20,32,46,0) ${FADE}px)`;
+export const MATTE = "#eceeea";
+export const FADE = 320;
+const ease = (t) => t * t * t * (t * (t * 6 - 15) + 10); // smootherstep
+const fadeFrom = (dir) => {
+  const stops = [];
+  for (let i = 0; i <= 12; i++) {
+    const t = i / 12;
+    stops.push(`rgba(20,32,46,${(1 - ease(t)).toFixed(3)}) ${Math.round(t * FADE)}px`);
+  }
+  return `linear-gradient(to ${dir}, ${stops.join(", ")})`;
+};
 export const matte = { backgroundColor: MATTE };
 export const matteFromDark = { backgroundColor: MATTE, backgroundImage: fadeFrom("bottom"), paddingTop: FADE };
 export const matteIntoDark = { backgroundColor: MATTE, backgroundImage: fadeFrom("top"), paddingBottom: FADE };
