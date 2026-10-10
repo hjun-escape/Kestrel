@@ -375,7 +375,9 @@ export async function fetchReviews(b: Borrower, apiKey: string, snapshotId?: unk
 }
 
 // Base44 backend function. Reads the BRIGHTDATA_API_KEY secret.
-// A snapshot that is still building returns 503 with its snapshot_id, so a later call can pass it back.
+// A snapshot that is still building returns 503 with its snapshot_id. refreshBorrower saves it in
+// Borrower.pending_snapshots and passes it back on the next refresh. Glassdoor takes ~6 min, so the first
+// refresh of a company shows Reviews as unavailable and a refresh a few minutes later collects the result.
 declare const Deno: { env: { get(k: string): string | undefined } };
 
 export default async function (req: Request): Promise<Response> {
@@ -389,11 +391,13 @@ export default async function (req: Request): Promise<Response> {
 
     let tag: Tagger | undefined;
     if (TAG_ITEM_ENABLED) {
-      // Loaded only when tagging is on, so the tests (Node) never import the Deno-only SDK URL.
-      const { createClientFromRequest } = await import("npm:@base44/sdk@0.8.52");
-      const base44 = createClientFromRequest(req);
       // tagItem input: { text, borrower, kind }. Without kind it would read the review as a news article.
-      tag = async (text) => (await base44.asServiceRole.functions.invoke("tagItem", { text, borrower, kind: "employee review" }))?.data ?? null;
+      // The SDK loads only when a review needs tagging (and Node tests, which cannot load npm: URLs, fall back).
+      tag = async (text) => {
+        const { createClientFromRequest } = await import("npm:@base44/sdk@0.8.52");
+        const base44 = createClientFromRequest(req);
+        return (await base44.asServiceRole.functions.invoke("tagItem", { text, borrower, kind: "employee review" }))?.data ?? null;
+      };
     }
 
     const raw = await fetchReviews(borrower, apiKey, body.snapshot_id);

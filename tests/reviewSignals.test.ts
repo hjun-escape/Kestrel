@@ -254,3 +254,36 @@ test("tagItem: review_distress or legal_layoffs confirms; exec_departure or not 
   assert.deepEqual(await as(null), []);
   assert.deepEqual(await as("review_distress", false), []);
 });
+
+test("refreshBorrower contract: still-building Glassdoor answers 503 + snapshot_id, and a resume collects it", async () => {
+  const realFetch = globalThis.fetch;
+  const realSetTimeout = globalThis.setTimeout;
+  const realNow = Date.now;
+  let clock = realNow();
+  Date.now = () => (clock += 5_000); // every look at the clock moves 5 s, so the poll budget runs out fast
+  (globalThis as any).setTimeout = ((f: () => void) => (f(), 0)) as any;
+  (globalThis as any).Deno = { env: { get: (k: string) => (k === "BRIGHTDATA_API_KEY" ? "k" : undefined) } };
+  const call = async (body: unknown) => {
+    const res = await handler(new Request("http://x", { method: "POST", body: JSON.stringify(body) }));
+    return { status: res.status, body: await res.json() };
+  };
+  try {
+    // First refresh: Bright Data hands back a snapshot that never finishes in time.
+    fakeFetch({ "/scrape": [[202, { snapshot_id: "sd_glass123" }]], "/progress/": [[200, { status: "running" }]] });
+    const first = await call({ borrower: B, today: TODAY });
+    assert.equal(first.status, 503); // refreshBorrower stores pending_snapshots.reviewSignals
+    assert.equal(first.body.snapshot_id, "sd_glass123");
+
+    // Next refresh passes it back: no new scrape, the ready snapshot is scored.
+    const calls = fakeFetch({ "/progress/": [[200, { status: "ready" }]], "/snapshot/": [[200, [rev(5, 1, "Layoffs again.")]]] });
+    const second = await call({ borrower: B, today: TODAY, snapshot_id: "sd_glass123" });
+    assert.equal(second.status, 200);
+    assert.equal(second.body[0].title, "Employee review mentions layoffs");
+    assert.ok(calls.every((u) => !u.includes("/scrape")));
+  } finally {
+    globalThis.fetch = realFetch;
+    globalThis.setTimeout = realSetTimeout;
+    Date.now = realNow;
+    delete (globalThis as any).Deno;
+  }
+});
