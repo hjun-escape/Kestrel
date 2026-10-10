@@ -1,32 +1,35 @@
 import React from "react";
 import { useLoop } from "./showScenes";
 
-// The user quote that shaped the product. Words appear one by one when it scrolls into view.
+// The user quote that shaped the product, framed like the hero's panels. Words appear once, one by one.
 const QUOTE = "I wish I woulda asked the cash flow documents a lot earlier in the process.";
 
 export default function ProofStrip() {
   const words = QUOTE.split(" ");
   const [ref, step] = useLoop(words.length + 1, 140, { once: true });
-  const shown = Math.min(words.length, step);
   return (
-    <section aria-labelledby="proof-heading" className="border-y border-white/10 bg-[#0f1a27] py-20 text-white sm:py-24">
+    <section aria-labelledby="proof-heading" className="bg-ew-ink py-4 text-white">
       <div ref={ref} className="mx-auto max-w-[1200px] px-4 sm:px-8">
-        <h2 id="proof-heading" className="text-[13px] font-semibold uppercase tracking-[0.16em] text-[#38bdf8]">
-          What we heard
-        </h2>
-        <figure className="mt-6">
+        <figure className="grid gap-6 rounded-sm border border-white/10 bg-black/15 px-6 py-8 lg:grid-cols-[220px_minmax(0,1fr)] lg:px-8" style={{ boxShadow: "inset 2px 0 0 #38bdf8" }}>
+          <div>
+            <h2 id="proof-heading" className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#38bdf8]">
+              What we heard
+            </h2>
+            <figcaption className="mt-2 text-[13px] text-white/55">Credit officer, user interview</figcaption>
+          </div>
           <blockquote>
-            <p className="max-w-[24ch] font-heading text-[clamp(2.2rem,1.4rem+3.4vw,4.2rem)] font-semibold leading-[1.04] tracking-[-0.015em] [font-stretch:85%]">
-              <span aria-hidden="true" className="text-[#38bdf8]">&ldquo;</span>
+            <p className="font-heading text-[clamp(1.4rem,1.1rem+1.2vw,2rem)] font-semibold leading-snug">
+              &ldquo;
               {words.map((w, i) => (
-                <span key={i} className={`transition-opacity duration-300 ${i < shown ? "opacity-100" : "opacity-15"}`}>
-                  {w}{" "}
+                <span key={i} className={`transition-opacity duration-300 ${i < step ? "opacity-100" : "opacity-20"}`}>
+                  {w}
+                  {i < words.length - 1 ? " " : ""}
                 </span>
               ))}
-              <span aria-hidden="true" className="text-[#38bdf8]">&rdquo;</span>
+              &rdquo;
             </p>
+            <p className="mt-3 font-mono text-[11.5px] text-white/55">→ The cash-flow check is now part of the first screening.</p>
           </blockquote>
-          <figcaption className="mt-6 text-[15px] font-medium text-white/65">Credit officer, user interview</figcaption>
         </figure>
       </div>
     </section>

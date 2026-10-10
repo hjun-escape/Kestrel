@@ -104,11 +104,11 @@ export function ScreenDemo() {
 }
 
 const CHECKS = [
-  { label: "News", result: "1 flag" },
-  { label: "Court filings", result: "1 flag" },
-  { label: "Hiring", result: "Clear" },
-  { label: "Reviews", result: "Clear" },
-  { label: "Cash flow", result: "1 flag" },
+  { label: "News", detail: "12 articles read", result: "1 flag" },
+  { label: "Court filings", detail: "3 records", result: "1 flag" },
+  { label: "Job posts", detail: "14 vs 37/month", result: "Clear" },
+  { label: "Reviews", detail: "48 reviews", result: "Clear" },
+  { label: "Cash flow", detail: "2 other lenders", result: "1 flag" },
 ];
 export function CheckDemo() {
   const [ref, step] = useLoop(CHECKS.length + 4, 550);
@@ -119,8 +119,11 @@ export function CheckDemo() {
           const done = step > i;
           const flag = c.result !== "Clear";
           return (
-            <li key={c.label} className="flex items-center justify-between py-2 text-[13.5px]">
-              <span className="font-medium">{c.label}</span>
+            <li key={c.label} className="flex items-center justify-between gap-3 py-2 text-[13.5px]">
+              <span className="min-w-0">
+                <span className="font-medium">{c.label}</span>
+                <span className={`ml-2 font-mono text-[11.5px] text-ew-muted transition-opacity duration-300 ${done ? "opacity-100" : "opacity-0"}`}>{c.detail}</span>
+              </span>
               {done ? (
                 <span className={`rounded-sm px-1.5 py-0.5 text-[12px] font-semibold ${flag ? "bg-ew-red-bg text-ew-red" : "text-ew-muted"}`}>{c.result}</span>
               ) : (
@@ -175,6 +178,7 @@ export function ReadDemo() {
   const sweep = Math.min(100, Math.max(0, (step - 0) * 34));
   return (
     <div ref={ref} className={CARD}>
+      <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-ew-muted">Electrek · Sep 10, 2026</p>
       <p className="text-[12.5px] leading-relaxed text-ew-muted">
         Northfield shared an update on its Reno plant on Tuesday.{" "}
         <span className="relative text-ew-ink">
@@ -191,9 +195,9 @@ export function ReadDemo() {
 }
 
 const RULE_ROWS = [
-  { status: "red", rule: "2 strong flags" },
-  { status: "yellow", rule: "1 strong flag" },
-  { status: "green", rule: "Less" },
+  { status: "red", rule: "2+ strong, or 1 strong + 2 weak" },
+  { status: "yellow", rule: "1 strong, or 2+ weak" },
+  { status: "green", rule: "Anything less, last 90 days" },
 ];
 export function DecideRulesDemo() {
   const [ref, step] = useLoop(7, 800); // 0 none, 2 one flag, 4 two flags, hold

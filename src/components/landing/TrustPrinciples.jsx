@@ -1,17 +1,19 @@
 import React from "react";
-import { DecideRulesDemo, LeadTimeline, ReadDemo } from "./showScenes";
-import { useLoop } from "./showScenes";
 import { MousePointer2 } from "lucide-react";
+import { Frame, SectionHeader } from "./Frame";
+import { DecideRulesDemo, LeadTimeline, ReadDemo, useLoop } from "./showScenes";
 
-// How Kestrel earns trust, shown: the AI only highlights, fixed rules set the status, a person decides.
-// Then the payoff: flags land weeks before the quarterly financials.
+// How Kestrel earns trust, in the hero's framed style: the AI only highlights, fixed rules set the status,
+// a person decides. Then the lead time over the quarterly financials, with real dates.
 
 function ApproveDemo() {
   const [ref, step] = useLoop(6, 700);
   const clicked = step >= 3;
   return (
     <div ref={ref} className="relative rounded-sm border border-ew-rule bg-white p-4 text-ew-ink shadow-[0_18px_50px_rgba(0,0,0,0.35)]">
-      <p className="text-[12px] font-semibold text-ew-muted">Northfield Battery Works</p>
+      <p className="flex justify-between text-[12px] font-semibold text-ew-muted">
+        Northfield Battery Works <span className="text-ew-red">Red 95</span>
+      </p>
       <div className="mt-3 grid gap-2">
         {["Approve", "Request documents", "Decline"].map((c) => (
           <span
@@ -24,6 +26,9 @@ function ApproveDemo() {
           </span>
         ))}
       </div>
+      <p className={`mt-3 font-mono text-[11px] text-ew-muted transition-opacity duration-300 ${clicked ? "opacity-100" : "opacity-0"}`}>
+        Decision recorded with 3 sourced flags
+      </p>
       <MousePointer2
         aria-hidden="true"
         className="pointer-events-none absolute h-5 w-5 fill-white text-ew-ink transition-all duration-700 ease-out"
@@ -33,35 +38,30 @@ function ApproveDemo() {
   );
 }
 
-const PILLARS = [
-  { title: "AI reads.", Demo: ReadDemo, accent: "#38bdf8" },
-  { title: "Rules decide.", Demo: DecideRulesDemo, accent: "#c084fc" },
-  { title: "You approve.", Demo: ApproveDemo, accent: "#2dd4bf" },
-];
-
 export default function TrustPrinciples() {
   return (
-    <section aria-labelledby="trust-heading" className="bg-ew-ink py-20 text-white sm:py-28">
+    <section aria-labelledby="trust-heading" className="bg-ew-ink py-20 text-white sm:py-24">
       <div className="mx-auto max-w-[1200px] px-4 sm:px-8">
-        <h2 id="trust-heading" className="sr-only">
-          How Kestrel earns trust
-        </h2>
-        <ol className="grid gap-6 lg:grid-cols-3">
-          {PILLARS.map(({ title, Demo, accent }) => (
-            <li key={title}>
-              <h3 className="mb-4 font-heading text-[clamp(1.8rem,1.3rem+1.6vw,2.6rem)] font-bold leading-none" style={{ color: accent }}>
-                {title}
-              </h3>
-              <Demo />
-            </li>
-          ))}
-        </ol>
+        <SectionHeader kicker="How Kestrel earns trust" title="AI reads. Rules decide. You approve." id="trust-heading" />
+        <Frame
+          className="mt-8"
+          columns={[
+            { title: "AI reads", caption: "Copies the exact sentence, nothing more", accent: "#38bdf8", body: <ReadDemo /> },
+            { title: "Rules decide", caption: "Fixed thresholds, last 90 days", accent: "#c084fc", body: <DecideRulesDemo /> },
+            { title: "You approve", caption: "The decision stays with you", accent: "#2dd4bf", body: <ApproveDemo /> },
+          ]}
+          footer="AI never sets a status · every flag links to its source · quotes are checked word for word"
+        />
 
-        <div className="mt-20 grid items-center gap-10 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)]">
-          <h3 className="font-heading text-[clamp(2rem,1.4rem+2.4vw,3.4rem)] font-bold leading-[1] tracking-[-0.02em] [font-stretch:78%]">
-            Before the quarterly financials.
-          </h3>
-          <LeadTimeline />
+        <div className="mt-6 rounded-sm border border-white/10 bg-black/15">
+          <div className="border-b border-white/10 px-5 pb-3 pt-4">
+            <p className="text-[11px] font-semibold tracking-[0.14em] text-white/45">LEAD TIME</p>
+            <h3 className="font-heading text-[17px] font-bold leading-tight">Before the quarterly financials</h3>
+            <p className="text-[12.5px] text-white/55">Northfield Battery Works, sample</p>
+          </div>
+          <div className="px-8 pb-10 pt-6">
+            <LeadTimeline />
+          </div>
         </div>
       </div>
     </section>

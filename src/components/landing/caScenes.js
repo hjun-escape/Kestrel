@@ -137,6 +137,9 @@ export function pipelineScene({ onSignal, onMark, onDrop, cell = 6, exitFrac = 0
       for (let k = spawning.length - 1; k >= 0; k--) if (spawning[k].col >= spawning[k].bits[0].length) spawning.splice(k, 1);
     }
 
+    // Verify sits on a knife edge (a slightly longer band lets nothing through). If no verified signal has reached
+    // the report for a while, loosen it until one does. A clean company (low verifyPass) never adapts.
+    const verifyNow = VERIFY_P >= 0.99 && now - lastSignal > 6000 ? 0.9995 : VERIFY_P;
     for (let r = topRow; r < rows; r++) {
       for (let c = 0; c < exitCol; c++) {
         const i = idx(c, r);
@@ -163,7 +166,7 @@ export function pipelineScene({ onSignal, onMark, onDrop, cell = 6, exitFrac = 0
           }
         } else {
           // Only solid marked blocks pass; each step a few fail the quote check.
-          if (s === 2) out = inTaggedBlock(c, r) && Math.random() < VERIFY_P ? 2 : 0;
+          if (s === 2) out = inTaggedBlock(c, r) && Math.random() < verifyNow ? 2 : 0;
           else if (s === 1) out = Math.random() < 0.35 ? 0 : 1;
           else out = 0;
           if (s === 2 && out === 0) {

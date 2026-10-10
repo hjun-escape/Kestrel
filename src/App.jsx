@@ -16,7 +16,7 @@ const Assistant = lazy(() => import('@/pages/Assistant'));
 const DevProgression = lazy(() => import('@/pages/DevProgression'));
 // The welcome page pulls in animejs; load it only when visited.
 const Landing = lazy(() => import('@/pages/Landing'));
-// About reuses the welcome page's sections (animejs); load it only when visited.
+// About: a plain page; load it only when visited.
 const About = lazy(() => import('@/pages/About'));
 import WelcomeGate from '@/components/landing/WelcomeGate';
 import Login from '@/pages/Login';
