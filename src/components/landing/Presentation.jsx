@@ -7,6 +7,7 @@ import HowItWorks from "./HowItWorks";
 import ProofStrip from "./ProofStrip";
 import TrustPrinciples from "./TrustPrinciples";
 import WhiteSheet from "./WhiteSheet";
+import SenseCredit from "./SenseCredit";
 
 // Below the hero, as a presentation. A white sheet rises out of the dark hero and widens to fill the screen,
 // then stays pinned while scrolling steps through slides: each step moves the current slide's pieces out to the
@@ -130,6 +131,9 @@ function SlideQuote() {
               Credit officer, user interview · <span className="text-ew-ink-soft">so cash flow is now part of the first screening.</span>
             </figcaption>
           </Piece>
+          <Piece i={4}>
+            <SenseCredit className="mt-3" />
+          </Piece>
         </div>
       </figure>
     </div>
@@ -246,12 +250,6 @@ export default function Presentation() {
               </div>
             </SlideState.Provider>
           ))}
-          {/* Progress dots. */}
-          <ol aria-hidden="true" className="absolute bottom-6 left-1/2 flex -translate-x-1/2 gap-2">
-            {SLIDES.map((_, i) => (
-              <li key={i} className={`h-1.5 rounded-full transition-all duration-300 ${i === index ? "w-6 bg-ew-ink" : "w-1.5 bg-[#14202e]/25"}`} />
-            ))}
-          </ol>
         </section>
       </div>
     </div>

@@ -2,6 +2,7 @@ import React from "react";
 import { UserRound } from "lucide-react";
 import { matte } from "./Frame";
 import { Reveal } from "./reveal";
+import SenseCredit from "./SenseCredit";
 
 // The user quote that shaped the product: a person, their words, and what we changed. Plain and small.
 // The pieces slide in from different sides as it scrolls into view.
@@ -30,6 +31,9 @@ export default function ProofStrip() {
               <figcaption className="mt-2 text-[13px] text-ew-muted">
                 Credit officer, user interview · <span className="text-ew-ink-soft">so cash flow is now part of the first screening.</span>
               </figcaption>
+            </Reveal>
+            <Reveal from="up" delay={560}>
+              <SenseCredit className="mt-3" />
             </Reveal>
           </div>
         </figure>
