@@ -14,8 +14,8 @@
 // the LLM only tags; the snippet guard still applies). Glassdoor pages belong to one company, so
 // same-company matching is not needed here.
 //
-// TO CONFIRM with the Bright Data MCP or scripts/brightdata-datasets.mjs (PLAN.md §8):
-// GLASSDOOR_REVIEWS_DATASET_ID and the field names. normalizeReview accepts several likely spellings.
+// Dataset and fields confirmed 2026-10-10 with scripts/brightdata-datasets.mjs: date is rating_date,
+// rating is rating_overall, text is summary/pros/cons/review_advice. Other spellings are kept as fallbacks.
 
 export interface Borrower {
   id?: string;
@@ -45,7 +45,7 @@ export interface Review {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const API = "https://api.brightdata.com/datasets/v3";
-export const GLASSDOOR_REVIEWS_DATASET_ID = "gd_l7j1po0921hbu0ri1z"; // Glassdoor company reviews. TO CONFIRM.
+export const GLASSDOOR_REVIEWS_DATASET_ID = "gd_l7j1po0921hbu0ri1z"; // "Glassdoor companies reviews"
 // refreshBorrower gives each source 120 s: up to ~60 s for the sync scrape plus this budget.
 const POLL_BUDGET_MS = 50_000;
 const POLL_EVERY_MS = 10_000;
@@ -79,11 +79,11 @@ function firstOf(raw: Record<string, unknown>, keys: string[]): unknown {
 
 // Maps a scraped record to a Review, or null if it has no usable date.
 export function normalizeReview(raw: Record<string, unknown>): Review | null {
-  const dateRaw = firstOf(raw, ["review_date", "date", "date_of_review", "review_date_time", "reviewDateTime", "date_posted"]);
+  const dateRaw = firstOf(raw, ["rating_date", "review_date", "date", "date_of_review", "review_date_time", "reviewDateTime", "date_posted"]);
   const t = parseDay(dateRaw) ?? parseMonthDay(dateRaw);
   if (t === null) return null;
   const r = Number(firstOf(raw, ["rating", "overall_rating", "rating_overall", "review_rating", "ratingOverall"]));
-  const texts = ["review_title", "title", "summary", "pros", "cons", "review_pros", "review_cons", "advice", "advice_to_management"]
+  const texts = ["review_title", "title", "summary", "pros", "cons", "review_pros", "review_cons", "advice", "review_advice", "advice_to_management"]
     .map((k) => raw[k])
     .filter((v): v is string => typeof v === "string" && v.trim() !== "");
   const url = firstOf(raw, ["review_url", "url"]);
@@ -266,10 +266,11 @@ export async function fetchReviews(b: Borrower, apiKey: string, snapshotId?: str
   if (snapshotId) return waitForSnapshot(apiKey, snapshotId);
   if (!b.glassdoor_url) throw new Error("Reviews: borrower has no glassdoor_url");
   const qs = new URLSearchParams({ dataset_id: GLASSDOOR_REVIEWS_DATASET_ID, format: "json", include_errors: "true" });
-  const body = JSON.stringify({ input: [{ url: b.glassdoor_url }], limit_per_input: 300 });
+  const body = JSON.stringify({ input: [{ url: b.glassdoor_url, days: 455 }], limit_per_input: 300 });
   const res = await bd(apiKey, `/scrape?${qs}`, { method: "POST", body });
   const data = await res.json();
   if (res.status === 202) return waitForSnapshot(apiKey, data.snapshot_id);
+  // days is required by the dataset: 455 covers the 90-day window plus the prior 12 months.
   // Error records from include_errors have no review date and are dropped by normalizeReview.
   return Array.isArray(data) ? data : [];
 }
