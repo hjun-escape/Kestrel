@@ -7,12 +7,12 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AppHeader from "@/components/AppHeader";
 import AddCompanyDialog from "@/components/AddCompanyDialog";
 import SummaryStrip from "@/components/SummaryStrip";
-import { StatusLegendPopover } from "@/components/StatusLegend";
+import ColourKey from "@/components/loanbook/ColourKey";
 import LoanBookTable from "@/components/LoanBookTable";
 import LoanBookCards from "@/components/LoanBookCards";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { STATUS_STYLES } from "@/components/StatusBadge";
-import { getTopSignal, filterRecentSignals, sortRows, statusKey } from "@/lib/borrowerUtils";
+import { sortRows, statusKey } from "@/lib/borrowerUtils";
 import { ensureSeedData } from "@/lib/seed";
 import { useAuth } from "@/lib/AuthContext";
 import { normalizeEmail, visibleCompanies } from "@/lib/ownership";
@@ -31,15 +31,7 @@ const TABS = [
 const DEFAULT_SORT = { key: "status", dir: "asc" };
 
 // First direction when a sort key is picked: biggest / newest first for numbers and dates.
-const defaultDir = (key) => (key === "amount" || key === "signal" || key === "checked" ? "desc" : "asc");
-
-function groupSignals(items) {
-  const map = {};
-  items.forEach((s) => {
-    map[s.borrower_id] = [...(map[s.borrower_id] || []), s];
-  });
-  return map;
-}
+const defaultDir = (key) => (key === "amount" || key === "checked" ? "desc" : "asc");
 
 export default function LoanBook() {
   const navigate = useNavigate();
@@ -47,7 +39,6 @@ export default function LoanBook() {
   const { email, isAuthenticated, isLoadingAuth, navigateToLogin } = useAuth();
   const me = isAuthenticated ? normalizeEmail(email) : "";
   const [borrowers, setBorrowers] = useState(null);
-  const [signalsByBorrower, setSignalsByBorrower] = useState({});
   const [tab, setTab] = useState("all");
   const [statusFilter, setStatusFilter] = useState(null);
   const [sort, setSort] = useState(DEFAULT_SORT);
@@ -66,12 +57,8 @@ export default function LoanBook() {
     setLoadError(null);
     try {
       const query = me ? { owner_email: me } : {};
-      const [items, signalItems] = await Promise.all([
-        base44.entities.Borrower.filter(query, "-created_date", 500),
-        base44.entities.Signal.filter({}, "-date", 500),
-      ]);
+      const items = await base44.entities.Borrower.filter(query, "-created_date", 500);
       setBorrowers(visibleCompanies(items, me));
-      setSignalsByBorrower(groupSignals(signalItems));
     } catch {
       setBorrowers([]);
       setLoadError("Could not load the loan book. Check your connection and reload.");
@@ -133,12 +120,8 @@ export default function LoanBook() {
 
   const rows = useMemo(() => {
     const visible = statusFilter ? inTab.filter((b) => statusKey(b) === statusFilter) : inTab;
-    const withSignals = visible.map((b) => ({
-      borrower: b,
-      topSignal: getTopSignal(filterRecentSignals(signalsByBorrower[b.id] || [])),
-    }));
-    return sortRows(withSignals, sort.key, sort.dir);
-  }, [inTab, statusFilter, signalsByBorrower, sort]);
+    return sortRows(visible.map((b) => ({ borrower: b })), sort.key, sort.dir);
+  }, [inTab, statusFilter, sort]);
 
   function handleSort(key) {
     setSort((s) =>
@@ -168,7 +151,7 @@ export default function LoanBook() {
               {me
                 ? "Public warning signs for the applicants and borrowers you added, worst first."
                 : "Shared demo book: public warning signs for every applicant and borrower, worst first."}{" "}
-              Status counts only the last 90 days.
+              Status looks at the last 90 days.
             </p>
             {!me && !isLoadingAuth && (
               <p className="mt-1 text-xs text-ew-muted">
@@ -181,14 +164,7 @@ export default function LoanBook() {
                 </button>
               </p>
             )}
-            <div data-demo="status-legend" className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
-              <p className="hidden text-xs text-ew-muted xl:block">
-                <span className="font-semibold text-ew-red">Red</span> 2+ strong signs, or 1 strong + 2 weak ·{" "}
-                <span className="font-semibold text-ew-amber">Yellow</span> 1 strong, or 2+ weak ·{" "}
-                <span className="font-semibold text-ew-green">Green</span> none that count · set by fixed rules, not AI
-              </p>
-              <StatusLegendPopover align="start" />
-            </div>
+            <ColourKey />
           </div>
           <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:justify-end">
             <LoadDemoButton signedIn={!!me} running={demo.running} onClick={demo.start} />

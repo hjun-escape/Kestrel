@@ -1,79 +1,72 @@
 import React from "react";
 import { STATUS_STYLES } from "@/components/StatusBadge";
+import { STATUS_MEANING } from "@/components/loanbook/ColourKey";
 import { formatUsd, summarizeBook } from "@/lib/borrowerUtils";
 
-const ORDER = ["red", "yellow", "green", "not_checked"];
+const TILE_ORDER = ["red", "yellow", "green"];
 
-// Counts per status (each doubles as a filter) and exposure at risk, with a
-// bar showing how the dollars in view split across statuses.
+// Three status tiles (count + one-line meaning, each also filters the table), a plain
+// "Amount in Red or Yellow" figure, and a neutral not-checked count.
 export default function SummaryStrip({ borrowers, statusFilter, onStatusFilter, loading }) {
-  const { counts, exposure, total, atRisk } = summarizeBook(borrowers);
+  const { counts, total, atRisk } = summarizeBook(borrowers);
   const share = total > 0 ? Math.round((atRisk / total) * 100) : 0;
+  const notChecked = counts.not_checked;
+  const notCheckedActive = statusFilter === "not_checked";
 
   return (
-    <section
-      aria-label="Loan book summary"
-      className="grid grid-cols-1 items-stretch border border-ew-rule bg-ew-surface md:grid-cols-[minmax(0,1fr)_auto]"
-    >
-      <div className="flex min-w-0 flex-col">
-        <div className="grid min-w-0 flex-1 grid-cols-2 gap-px bg-ew-rule-soft md:flex md:gap-0 md:divide-x md:divide-ew-rule-soft md:bg-transparent">
-          {ORDER.map((key) => {
-            const style = STATUS_STYLES[key];
-            const active = statusFilter === key;
-            return (
-              <button
-                key={key}
-                type="button"
-                aria-pressed={active}
-                onClick={() => onStatusFilter(active ? null : key)}
-                className={`group flex min-w-0 flex-1 items-center justify-between gap-3 px-3 py-3 text-left transition-colors focus-visible:-outline-offset-2 md:px-4 md:py-4 ${
-                  active ? "bg-ew-paper" : "bg-ew-surface hover:bg-ew-hover"
-                }`}
-              >
-                <span className="flex min-w-0 flex-wrap items-center gap-x-2 text-[11px] font-medium uppercase tracking-[0.06em] text-ew-ink-soft">
-                  <span aria-hidden="true" className={`inline-block ${style.glyph}`} />
+    <section aria-label="Loan book summary" className="border border-ew-rule bg-ew-surface">
+      <div className="grid grid-cols-1 divide-y divide-ew-rule-soft sm:grid-cols-3 sm:divide-x sm:divide-y-0 lg:grid-cols-[1fr_1fr_1fr_1.2fr]">
+        {TILE_ORDER.map((key) => {
+          const style = STATUS_STYLES[key];
+          const active = statusFilter === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              aria-pressed={active}
+              onClick={() => onStatusFilter(active ? null : key)}
+              className={`relative flex items-center justify-between gap-3 px-4 py-3 text-left transition-colors focus-visible:-outline-offset-2 sm:block ${
+                active ? "bg-ew-paper" : "hover:bg-ew-hover"
+              }`}
+            >
+              <span aria-hidden="true" className={`absolute inset-x-0 top-0 hidden h-[3px] sm:block ${style.rail}`} />
+              <span className="min-w-0">
+                <span className="flex items-center gap-2 text-sm font-semibold text-ew-ink">
+                  <span aria-hidden="true" className={`inline-block shrink-0 ${style.glyph}`} />
                   {style.label}
-                  {active && <span className="font-normal normal-case text-ew-muted">(filter on)</span>}
+                  {active && <span className="text-xs font-normal text-ew-muted">(showing only these)</span>}
                 </span>
-                <span className="font-mono text-2xl font-medium leading-none text-ew-ink">
-                  {loading ? "–" : counts[key]}
-                </span>
-              </button>
-            );
-          })}
+                <span className="mt-0.5 block text-xs text-ew-muted">{STATUS_MEANING[key]}</span>
+              </span>
+              <span className="font-mono text-3xl font-medium leading-none text-ew-ink sm:mt-2 sm:block">
+                {loading ? "–" : counts[key]}
+              </span>
+            </button>
+          );
+        })}
+        <div className="flex flex-col justify-center bg-ew-hover px-4 py-3 sm:col-span-3 lg:col-span-1">
+          <span className="text-sm font-semibold text-ew-ink">Amount in Red or Yellow</span>
+          <span className="font-mono text-[26px] font-semibold leading-tight text-ew-ink">
+            {loading ? "–" : formatUsd(atRisk)}
+          </span>
+          <span className="text-xs text-ew-muted">
+            {loading ? " " : `${share}% of the ${formatUsd(total)} shown`}
+          </span>
         </div>
-        <ExposureBar exposure={exposure} total={total} />
       </div>
-
-      <div className="flex flex-col justify-center border-t border-ew-rule bg-ew-hover px-4 py-3 md:min-w-[220px] md:border-l md:border-t-0 md:px-5">
-        <span className="text-[11px] font-medium uppercase tracking-[0.06em] text-ew-muted">Exposure at risk</span>
-        <span className="font-mono text-[28px] font-semibold leading-tight text-ew-ink">
-          {loading ? "–" : formatUsd(atRisk)}
-        </span>
-        <span className="text-xs text-ew-muted">
-          {loading ? " " : `${share}% of ${formatUsd(total)} in view, red and yellow`}
-        </span>
-      </div>
+      {!loading && notChecked > 0 && (
+        <div className="border-t border-ew-rule-soft px-4 py-2 text-xs text-ew-muted">
+          <button
+            type="button"
+            aria-pressed={notCheckedActive}
+            onClick={() => onStatusFilter(notCheckedActive ? null : "not_checked")}
+            className="rounded-sm underline-offset-2 hover:text-ew-ink hover:underline"
+          >
+            {notChecked} {notChecked === 1 ? "company has" : "companies have"} not been checked yet
+            {notCheckedActive && " (showing only these)"}
+          </button>
+        </div>
+      )}
     </section>
-  );
-}
-
-function ExposureBar({ exposure, total }) {
-  if (total <= 0) return <div className="h-1.5 bg-ew-rule-soft" aria-hidden="true" />;
-  const parts = ORDER.filter((k) => exposure[k] > 0);
-  const label = parts
-    .map((k) => `${STATUS_STYLES[k].label} ${formatUsd(exposure[k])}`)
-    .join(", ");
-  return (
-    <div className="flex h-1.5 w-full gap-px bg-ew-surface" role="img" aria-label={`Exposure by status: ${label}`}>
-      {parts.map((k) => (
-        <div
-          key={k}
-          className={STATUS_STYLES[k].rail}
-          style={{ flexGrow: exposure[k], flexBasis: 0 }}
-          title={`${STATUS_STYLES[k].label}: ${formatUsd(exposure[k])}`}
-        />
-      ))}
-    </div>
   );
 }

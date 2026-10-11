@@ -1,19 +1,16 @@
 import React, { useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { format } from "date-fns";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import StatusBadge, { STATUS_STYLES } from "@/components/StatusBadge";
-import { SIGNAL_TYPES } from "@/lib/signalTypes";
-import { formatAgoShort, formatRelative, formatUsd, isSampleCompany, parseSignalDate, reasonText, statusKey } from "@/lib/borrowerUtils";
+import SourcesNote from "@/components/loanbook/SourcesNote";
+import { formatAgoShort, formatRelative, formatUsd, isSampleCompany, reasonText, statusKey } from "@/lib/borrowerUtils";
 
 const COLUMNS = [
-  { key: "status", label: "Status", className: "w-[120px]" },
-  { key: "company", label: "Company", className: "w-[21%]" },
-  { key: "stage", label: "Stage", className: "w-[92px]" },
+  { key: "company", label: "Company", className: "w-[22%]" },
+  { key: "status", label: "Status", className: "w-[150px]" },
   { key: null, label: "Why", className: "" },
-  { key: "signal", label: "Top signal", className: "w-[18%]" },
-  { key: "amount", label: "Amount", className: "w-[96px]", align: "right" },
-  { key: "checked", label: "Last checked", className: "w-[132px]" },
+  { key: "amount", label: "Amount", className: "w-[104px]", align: "right" },
+  { key: "checked", label: "Last checked", className: "w-[128px]" },
 ];
 
 const SKELETON_ROWS = 6;
@@ -51,11 +48,10 @@ export default function LoanBookTable({ rows, sort, onSort, loading }) {
           {loading &&
             Array.from({ length: SKELETON_ROWS }).map((_, i) => <SkeletonRow key={i} />)}
           {!loading &&
-            rows.map(({ borrower: b, topSignal }) => (
+            rows.map(({ borrower: b }) => (
               <BookRow
                 key={b.id}
                 borrower={b}
-                topSignal={topSignal}
                 onOpen={() => navigate(`/borrower/${b.id}`)}
               />
             ))}
@@ -93,7 +89,7 @@ function HeaderCell({ col, sort, onSort }) {
   );
 }
 
-function BookRow({ borrower: b, topSignal, onOpen }) {
+function BookRow({ borrower: b, onOpen }) {
   const key = statusKey(b);
   return (
     <tr
@@ -101,14 +97,8 @@ function BookRow({ borrower: b, topSignal, onOpen }) {
       onClick={onOpen}
       className="group cursor-pointer border-b border-ew-rule-soft align-top last:border-0 hover:bg-ew-hover focus-within:bg-ew-hover"
     >
-      <td className="relative px-3 py-2.5">
-        <span
-          aria-hidden="true"
-          className={`absolute inset-y-0 left-0 w-[3px] ${STATUS_STYLES[key].rail}`}
-        />
-        <StatusBadge status={b.status} lastRefreshed={b.last_refreshed} />
-      </td>
-      <td className="px-3 py-2.5">
+      <td className="relative px-3 py-3">
+        <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-[3px] ${STATUS_STYLES[key].rail}`} />
         <Link
           to={`/borrower/${b.id}`}
           data-row-link
@@ -122,50 +112,18 @@ function BookRow({ borrower: b, topSignal, onOpen }) {
           <span className="truncate text-xs text-ew-muted">{b.website_domain}</span>
         </div>
       </td>
-      <td className="px-3 py-2.5 capitalize text-ew-ink-soft">{b.stage}</td>
-      <td className="px-3 py-2.5 text-ew-ink-soft">
-        <span className="line-clamp-2">
-          {reasonText(b.why) || <span className="text-ew-muted">{b.last_refreshed ? "No reason recorded" : "Awaiting first check"}</span>}
-        </span>
+      <td className="px-3 py-3">
+        <StatusBadge status={b.status} lastRefreshed={b.last_refreshed} />
+        <SourcesNote borrower={b} />
       </td>
-      <td className="px-3 py-2.5">
-        <TopSignalSummary topSignal={topSignal} />
+      <td className="px-3 py-3 text-sm leading-snug text-ew-ink-soft">
+        {reasonText(b.why) || <span className="text-ew-muted">{b.last_refreshed ? "No reason recorded" : "Awaiting first check"}</span>}
       </td>
-      <td className="px-3 py-2.5 text-right font-mono font-medium text-ew-ink">
-        {formatUsd(b.loan_amount_usd)}
-      </td>
-      <td className="px-3 py-2.5 font-mono text-xs text-ew-muted">
+      <td className="px-3 py-3 text-right font-mono font-medium text-ew-ink">{formatUsd(b.loan_amount_usd)}</td>
+      <td className="px-3 py-3 font-mono text-xs text-ew-muted">
         <LastChecked value={b.last_refreshed} />
       </td>
     </tr>
-  );
-}
-
-// Top signal: type label, then the Strong / Weak tag and its date. Shared with the phone cards.
-export function TopSignalSummary({ topSignal }) {
-  if (!topSignal) return <span className="text-ew-muted">None in 90 days</span>;
-  const typeLabel = SIGNAL_TYPES[topSignal.type]?.label || topSignal.type;
-  return (
-    <div className="min-w-0">
-      <div className="truncate font-medium text-ew-ink">{typeLabel}</div>
-      <div className="mt-0.5 flex items-center gap-1.5 text-xs text-ew-muted">
-        <span
-          className={`rounded-sm border px-1 text-[11px] font-semibold leading-4 ${
-            topSignal.severity === "strong" ? "border-ew-ink bg-ew-ink text-white" : "border-ew-rule text-ew-ink-soft"
-          }`}
-        >
-          {topSignal.severity === "strong" ? "Strong" : "Weak"}
-        </span>
-        <time
-          dateTime={topSignal.date}
-          title={topSignal.date_approx ? "Approximate date" : undefined}
-          className="font-mono text-xs"
-        >
-          {topSignal.date_approx && "~"}
-          {format(parseSignalDate(topSignal.date), "d MMM yyyy")}
-        </time>
-      </div>
-    </div>
   );
 }
 

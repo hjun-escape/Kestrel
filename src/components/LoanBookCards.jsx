@@ -1,15 +1,14 @@
 import React, { useId } from "react";
 import { Link } from "react-router-dom";
 import StatusBadge, { STATUS_STYLES } from "@/components/StatusBadge";
-import { LastChecked, SampleTag, TopSignalSummary } from "@/components/LoanBookTable";
+import SourcesNote from "@/components/loanbook/SourcesNote";
+import { LastChecked, SampleTag } from "@/components/LoanBookTable";
 import { formatUsd, isSampleCompany, reasonText, statusKey } from "@/lib/borrowerUtils";
 
 // The sort keys the table's column headers offer, for the phone sort picker.
 export const SORT_OPTIONS = [
   { key: "status", label: "Status" },
   { key: "company", label: "Company" },
-  { key: "stage", label: "Stage" },
-  { key: "signal", label: "Top signal" },
   { key: "amount", label: "Amount" },
   { key: "checked", label: "Last checked" },
 ];
@@ -41,13 +40,13 @@ export default function LoanBookCards({ rows, sort, onSortSet, loading }) {
         {loading &&
           Array.from({ length: SKELETON_CARDS }).map((_, i) => <SkeletonCard key={i} />)}
         {!loading &&
-          rows.map(({ borrower, topSignal }) => <BookCard key={borrower.id} borrower={borrower} topSignal={topSignal} />)}
+          rows.map(({ borrower }) => <BookCard key={borrower.id} borrower={borrower} />)}
       </ul>
     </div>
   );
 }
 
-function BookCard({ borrower: b, topSignal }) {
+function BookCard({ borrower: b }) {
   const key = statusKey(b);
   return (
     <li data-demo={`row-${b.id}`} className="border-b border-ew-rule-soft last:border-0">
@@ -61,30 +60,25 @@ function BookCard({ borrower: b, topSignal }) {
             <p className="truncate font-semibold text-ew-ink">{b.name}</p>
             <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-ew-muted">
               {isSampleCompany(b) && <SampleTag />}
-              <span className="shrink-0 capitalize">{b.stage}</span>
-              <span className="truncate">{b.website_domain}</span>
+                            <span className="truncate">{b.website_domain}</span>
             </div>
           </div>
           <div className="shrink-0">
             <StatusBadge status={b.status} lastRefreshed={b.last_refreshed} />
+            <SourcesNote borrower={b} />
           </div>
         </div>
 
-        <p className="mt-2 line-clamp-3 text-sm leading-snug text-ew-ink-soft">
+        <p className="mt-2 text-sm leading-snug text-ew-ink-soft">
           {reasonText(b.why) || (
             <span className="text-ew-muted">{b.last_refreshed ? "No reason recorded" : "Awaiting first check"}</span>
           )}
         </p>
 
         <div className="mt-2.5 flex items-end justify-between gap-3 text-[13px]">
-          <div className="min-w-0">
-            <TopSignalSummary topSignal={topSignal} />
-          </div>
-          <div className="shrink-0 text-right">
-            <div className="font-mono font-medium text-ew-ink">{formatUsd(b.loan_amount_usd)}</div>
-            <div className="mt-0.5 font-mono text-xs text-ew-muted">
-              <LastChecked value={b.last_refreshed} />
-            </div>
+          <div className="font-mono font-medium text-ew-ink">{formatUsd(b.loan_amount_usd)}</div>
+          <div className="font-mono text-xs text-ew-muted">
+            Checked <LastChecked value={b.last_refreshed} />
           </div>
         </div>
       </Link>
