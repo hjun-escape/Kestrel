@@ -123,6 +123,7 @@ export default function PresenterMode() {
   const [picks, setPicks] = useState(null);
   const [rect, setRect] = useState(null);
   const [lookup, setLookup] = useState("searching"); // searching | found | missing
+  const [covered, setCovered] = useState(false); // a dialog or popover is open
   const pathRef = useRef(location.pathname);
   const barRef = useRef(null);
   const atBook = location.pathname === "/";
@@ -247,6 +248,15 @@ export default function PresenterMode() {
 
     function track() {
       if (step.route && window.location.pathname !== step.route) return;
+      // A dialog or popover the presenter opened: drop the dimming and let the
+      // dialog sit above the bar (its buttons can reach the bottom of the
+      // screen) until it closes.
+      const dialog = dialogIsOpen();
+      setCovered(dialog);
+      if (dialog) {
+        setRect(null);
+        return;
+      }
       if (!pressed) {
         const tab = byDemoId(step.press);
         if (tab) {
@@ -326,7 +336,7 @@ export default function PresenterMode() {
         ref={barRef}
         role="region"
         aria-label="Presenter mode"
-        className="fixed inset-x-0 bottom-0 z-[60] border-t border-ew-ink-soft bg-ew-ink text-white"
+        className={`fixed inset-x-0 bottom-0 ${covered ? "z-40" : "z-[60]"} border-t border-ew-ink-soft bg-ew-ink text-white`}
       >
         {/* One segment per step: filled up to the current one. Click to jump. */}
         <ol aria-label="Steps" className="flex gap-1 px-1">
