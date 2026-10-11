@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowRight, Check, Loader2, Play, ShieldCheck } from 'lucide-react';
 import { Button as SharedButton } from '@/components/ui/button';
+import DevinReviewPanel from '@/components/devin/DevinReviewPanel';
 
 // The shared JS forwardRef button does not declare its props for checkJs.
 const Button = /** @type {React.ComponentType<any>} */ (SharedButton);
@@ -27,7 +28,7 @@ const SAMPLE_RESULTS = [
   { verdict: 'Unresolved', claim: 'Northstar announces planned layoffs', reason: 'The example source describes a proposal subject to consultation, not completed layoffs. The recorded date is also outside the 90-day scoring window.', evidence: 'The company proposed a restructuring plan subject to consultation.' },
 ];
 
-export default function AuditWorkflow({ preview = false, companyName, onReview, mode = 'audit' }) {
+export default function AuditWorkflow({ preview = false, companyName, onReview, mode = 'audit', borrowerId = '', connected = false, signedOut = false }) {
   const [phase, setPhase] = useState(-1);
   const [logs, setLogs] = useState([]);
   const [running, setRunning] = useState(false);
@@ -47,6 +48,7 @@ export default function AuditWorkflow({ preview = false, companyName, onReview, 
   const finished = phase === STAGES.length;
   if (mode === 'report') return <section className="mt-6 border border-ew-rule bg-ew-surface p-5" aria-labelledby="original-report-heading"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs text-ew-muted">Kestrel report · Example</p><h2 id="original-report-heading" className="mt-1 font-heading text-xl font-bold">{companyName}</h2></div><span className="border border-ew-red-rule bg-ew-red-bg px-2 py-1 text-xs font-semibold text-ew-red">Red · 2 strong signals</span></div><p className="mt-4 max-w-2xl text-sm leading-relaxed">The report flags a CFO departure and a supplier lawsuit as strong signals. It also retains an older planned-layoff announcement.</p><div className="mt-5 divide-y divide-ew-rule-soft border-y border-ew-rule-soft">{SAMPLE_RESULTS.map((r, i) => <details key={r.claim} className="py-4"><summary className="cursor-pointer text-sm font-medium">{i + 1}. {r.claim}<span className="ml-2 text-xs font-normal text-ew-muted">{i === 2 ? 'Historical · Weak' : 'Strong'}</span></summary><blockquote className="mt-3 border-l-2 border-ew-rule pl-3 text-sm text-ew-ink-soft">“{r.evidence}”</blockquote><p className="mt-2 text-xs text-ew-muted">Fictional source evidence for this preview.</p></details>)}</div><p className="mt-4 text-xs text-ew-muted">Producer: Kestrel analysis. Open Audit to see the independent reviewer’s findings.</p><Button className="mt-4" onClick={onReview}>Open independent audit<ArrowRight className="ml-2 h-4 w-4" /></Button></section>;
   if (mode !== 'audit') return null;
+  if (borrowerId && (connected || signedOut)) return <DevinReviewPanel borrowerId={borrowerId} companyName={companyName} signedOut={signedOut} />;
   return <section className="mt-6 border border-ew-rule bg-ew-surface" aria-labelledby="independent-heading">
     <header className="flex flex-wrap items-start justify-between gap-4 border-b border-ew-rule px-5 py-5">
       <div><p className="text-xs text-ew-muted">{preview ? 'Reviewer · Example' : 'Independent reviewer · Not connected'}</p><h2 id="independent-heading" className="mt-1 font-heading text-xl font-bold">Independent audit</h2><p className="mt-1 text-sm text-ew-muted">Verifies the Kestrel report’s claims against their evidence.</p></div>

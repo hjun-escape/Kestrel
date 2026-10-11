@@ -49,6 +49,7 @@ export default function ReportAudit({ borrower, currentSignals = [], refreshing 
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState('');
+  const [reviewer, setReviewer] = useState(null);
   const selected = runs.find(r => r.id === selectedId) || runs[0];
   const payload = selected?.payload;
   const signals = payload?.snapshot.signals || currentSignals;
@@ -68,11 +69,11 @@ export default function ReportAudit({ borrower, currentSignals = [], refreshing 
     setLoading(true);
     setPhase(-1); setActivity([]); setFailed(false);
     execution.current += 1; setBusy(''); setProgressTests([]); setRevealed(0);
-    setRuns([]); setConsiderations([]); setDecisions([]); setError(''); setDismissed([]);
+    setRuns([]); setReviewer(null); setConsiderations([]); setDecisions([]); setError(''); setDismissed([]);
     if (!allowed) { setLoading(false); return; }
     request({ action: 'list', borrower_id: borrower.id }).then(data => {
       if (!active) return;
-      setRuns(data.runs || []); setSuggestions(data.suggestions || []);
+      setRuns(data.runs || []); setSuggestions(data.suggestions || []); setReviewer(data.independent_reviewer || null);
       setSelectedId(data.runs?.[0]?.id || '');
       setDecisions(data.runs?.[0]?.payload.decisions || []);
     }).catch(e => { if (active) setError(errorText(e)); }).finally(() => { if (active) setLoading(false); });
@@ -133,7 +134,10 @@ export default function ReportAudit({ borrower, currentSignals = [], refreshing 
   }
   const canRun = allowed && !busy && !loading && !refreshing && !historical;
   const summaryReport = <><AuditReportSummary run={selected} companyName={borrower.name} preview={preview} />{!!runs.length && <details className="mt-6 border-t border-ew-rule-soft pt-4"><summary className="cursor-pointer text-sm font-medium">Review history ({runs.length} versions)</summary><div className="mt-3 space-y-2">{runs.map((r, i) => <button type="button" key={r.id} onClick={() => setSelectedId(r.id)} className={`flex w-full items-center justify-between gap-3 rounded-sm border px-3 py-2 text-left text-xs ${selected?.id === r.id ? 'border-ew-ink bg-ew-paper' : 'border-ew-rule-soft hover:bg-ew-hover'}`}><span>{stamp(r.created_at)} · {r.reviewed_by}{i === 0 ? ' · Latest' : ''}</span><span className="capitalize">{r.payload.result.status.replace('_', ' ')}</span></button>)}</div></details>}</>;
-  return <>{preview && <AuditWorkflow preview={preview} companyName={borrower.name} mode={view || 'audit'} onReview={() => { if (onViewChange) onViewChange(view === 'report' ? 'audit' : 'considerations'); else setTab('checks'); }} />}<div hidden={view === 'report'}><Dialog open={view === 'considerations' && !preview} onOpenChange={open => { if (!open) onViewChange?.('summary'); }}><AuditContainer className={`border border-ew-rule bg-ew-surface ${view === 'considerations' && !preview ? 'max-h-[85vh] overflow-y-auto p-0 text-ew-ink sm:max-w-2xl sm:rounded-sm' : 'mt-6'}`} aria-labelledby="audit-heading">
+  const showDevin = !preview && !['report', 'considerations', 'history'].includes(view || '');
+  const devinProps = { borrowerId: borrower.id, connected: reviewer?.status === 'connected', signedOut: !isAuthenticated };
+  const toConsiderations = () => { if (onViewChange) onViewChange(view === 'report' ? 'audit' : 'considerations'); else setTab('checks'); };
+  return <>{preview && <AuditWorkflow preview={preview} companyName={borrower.name} mode={view || 'audit'} onReview={toConsiderations} {...devinProps} signedOut={false} />}{showDevin && (!loading || devinProps.signedOut) && <AuditWorkflow companyName={borrower.name} mode="audit" onReview={toConsiderations} {...devinProps} />}<div hidden={view === 'report'}><Dialog open={view === 'considerations' && !preview} onOpenChange={open => { if (!open) onViewChange?.('summary'); }}><AuditContainer className={`border border-ew-rule bg-ew-surface ${view === 'considerations' && !preview ? 'max-h-[85vh] overflow-y-auto p-0 text-ew-ink sm:max-w-2xl sm:rounded-sm' : 'mt-6'}`} aria-labelledby="audit-heading">
     {view === 'considerations' && !preview && <><DialogTitle className="sr-only">Rerun with considerations</DialogTitle><DialogDescription className="sr-only">Edit the instructions for the next audit run.</DialogDescription></>}
     {view === 'audit' && preview && <summary className="cursor-pointer px-5 py-4 text-sm font-medium">Evidence checks & reviewer assessments <span className="ml-2 text-xs font-normal text-ew-muted">{payload?.tests.length || 0} checks</span></summary>}
     <header className="flex flex-wrap items-start justify-between gap-4 border-b border-ew-rule px-5 py-5">
