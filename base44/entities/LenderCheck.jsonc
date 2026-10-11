@@ -105,5 +105,6 @@
     "created_at",
     "lender_count",
     "summary"
-  ]
+  ],
+  "rls": { "create": false, "read": false, "update": false, "delete": false }
 }

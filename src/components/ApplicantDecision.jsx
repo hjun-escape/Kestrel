@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { format, formatDistanceToNow } from "date-fns";
 import { Check, ChevronDown, Copy, ExternalLink, Landmark, Loader2 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
+import { listRecords } from "@/api/data";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -304,9 +305,9 @@ function useApplicantRecords(borrowerId) {
     setDecisions([]);
     const q = { borrower_id: borrowerId };
     Promise.allSettled([
-      base44.entities.LenderCheck.filter(q, "-created_at", 1),
-      base44.entities.Analysis.filter(q, "-created_at", 1),
-      base44.entities.Decision.filter(q, "-created_at", 50),
+      listRecords("LenderCheck", q, "-created_at", 1),
+      listRecords("Analysis", q, "-created_at", 1),
+      listRecords("Decision", q, "-created_at", 50),
     ]).then(([c, a, d]) => {
       if (!active) return;
       setCheck(c.status === "fulfilled" ? asList(c.value)[0] || null : null);

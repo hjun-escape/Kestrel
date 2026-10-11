@@ -2,6 +2,7 @@ import React, { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
+import { getRecord, listRecords } from "@/api/data";
 import StatusBadge from "@/components/StatusBadge";
 import { deriveSourceStates } from "@/lib/borrowerUtils";
 import { useAssistantPage } from "./AssistantContext";
@@ -52,8 +53,8 @@ function formatParam(key, value) {
 async function snapshotFor(id) {
   try {
     const [borrower, sigRes] = await Promise.all([
-      base44.entities.Borrower.get(id),
-      base44.entities.Signal.filter({ borrower_id: id }, { limit: 200, sort: "-date" }),
+      getRecord("Borrower", id),
+      listRecords("Signal", { borrower_id: id }, "-date", 200),
     ]);
     return {
       unavailableBefore: borrower?.sources_unavailable || [],

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { base44 } from "@/api/base44Client";
+import { listRecords } from "@/api/data";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AppHeader from "@/components/AppHeader";
@@ -13,7 +14,6 @@ import LoanBookCards from "@/components/LoanBookCards";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { STATUS_STYLES } from "@/components/StatusBadge";
 import { sortRows, statusKey } from "@/lib/borrowerUtils";
-import { ensureSeedData } from "@/lib/seed";
 import { useAuth } from "@/lib/AuthContext";
 import { normalizeEmail, visibleCompanies } from "@/lib/ownership";
 import LoadDemoButton from "@/components/demo/LoadDemoButton";
@@ -62,8 +62,7 @@ export default function LoanBook() {
     if (!quiet) setLoading(true);
     setLoadError(null);
     try {
-      const query = me ? { owner_email: me } : {};
-      const items = await base44.entities.Borrower.filter(query, "-created_date", 500);
+      const items = await listRecords("Borrower", {}, "-created_date", 500);
       setBorrowers(visibleCompanies(items, me));
     } catch {
       setBorrowers([]);
@@ -95,11 +94,6 @@ export default function LoanBook() {
   useEffect(() => {
     if (isLoadingAuth) return;
     (async () => {
-      try {
-        await ensureSeedData();
-      } catch {
-        // seeding failed: still load whatever is in the database
-      }
       await loadData();
     })();
   }, [isLoadingAuth, me]);

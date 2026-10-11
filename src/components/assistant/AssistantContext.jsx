@@ -1,10 +1,9 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { base44 } from "@/api/base44Client";
+import { listRecords } from "@/api/data";
 import { sortBorrowers } from "@/lib/borrowerUtils";
 import { useAuth } from "@/lib/AuthContext";
 import { normalizeEmail, visibleCompanies } from "@/lib/ownership";
-import { asList } from "./assistantData";
 
 // Page-level state shared by the three Assistant columns: the portfolio list,
 // the pinned company (kept in the URL as ?company=) and the company the last
@@ -25,9 +24,8 @@ export function AssistantPageProvider({ children }) {
   const reloadCompanies = useCallback(async () => {
     if (isLoadingAuth) return;
     try {
-      const query = me ? { owner_email: me } : {};
-      const res = await base44.entities.Borrower.filter(query, { limit: 500, sort: "-created_date" });
-      setCompanies(sortBorrowers(visibleCompanies(asList(res), me)));
+      const res = await listRecords("Borrower", {}, "-created_date", 500);
+      setCompanies(sortBorrowers(visibleCompanies(res, me)));
       setLoadError(null);
     } catch {
       setCompanies((prev) => prev || []);

@@ -78,5 +78,6 @@
     "created_at",
     "summary",
     "recommended_action"
-  ]
+  ],
+  "rls": { "create": false, "read": false, "update": false, "delete": false }
 }

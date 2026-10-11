@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronRight, Download, ExternalLink, Printer } from "lucide-react";
-import { base44 } from "@/api/base44Client";
+import { listRecords } from "@/api/data";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { auditFileName, auditTrailCsv, buildAuditTrail, collapseRepeatedChecks, formatTrailDate } from "@/lib/auditTrail.ts";
@@ -34,11 +34,11 @@ const KIND_LABEL = {
 const asList = (res) => (Array.isArray(res) ? res : res?.items || []);
 
 const SOURCES = [
-  { key: "checkRuns", label: "source checks", load: (q) => base44.entities.CheckRun.filter(q, "-started_at", 100) },
-  { key: "analyses", label: "AI news summaries", load: (q) => base44.entities.Analysis.filter(q, "-created_at", 100) },
-  { key: "lenderChecks", label: "lender checks", load: (q) => base44.entities.LenderCheck.filter(q, "-created_at", 100) },
-  { key: "cashflowReviews", label: "cash-flow reviews", load: (q) => base44.entities.CashflowReview.filter(q, "-created_at", 100) },
-  { key: "decisions", label: "decisions", load: (q) => base44.entities.Decision.filter(q, "-created_at", 200) },
+  { key: "checkRuns", label: "source checks", load: (q) => listRecords("CheckRun", q, "-started_at", 100) },
+  { key: "analyses", label: "AI news summaries", load: (q) => listRecords("Analysis", q, "-created_at", 100) },
+  { key: "lenderChecks", label: "lender checks", load: (q) => listRecords("LenderCheck", q, "-created_at", 100) },
+  { key: "cashflowReviews", label: "cash-flow reviews", load: (q) => listRecords("CashflowReview", q, "-created_at", 100) },
+  { key: "decisions", label: "decisions", load: (q) => listRecords("Decision", q, "-created_at", 200) },
 ];
 
 function useAuditRecords(borrowerId, enabled, reloadKey) {

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { base44 } from "@/api/base44Client";
+import { listRecords } from "@/api/data";
 import { startRefresh } from "@/lib/borrowerUtils";
 import { DEMO_COMPANIES } from "@/lib/demoCompanies";
 import { CHECK_CONCURRENCY, companiesToCheck, runPool, summarizeChecks } from "@/lib/demoLoad";
@@ -16,8 +17,7 @@ function statusOf(e) {
 
 // The demo companies as they now stand in this book (shared when signed out, the user's own when signed in).
 async function demoRowsInBook(me) {
-  const res = await base44.entities.Borrower.filter(me ? { owner_email: me } : {}, { limit: 500, sort: "-created_date" });
-  const items = Array.isArray(res) ? res : res?.items || [];
+  const items = await listRecords("Borrower", {}, "-created_date", 500);
   return items.filter(
     (b) => DEMO_DOMAINS.has(String(b.website_domain || "").trim().toLowerCase()) && (me ? true : !b.owner_email)
   );

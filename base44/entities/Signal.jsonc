@@ -48,5 +48,6 @@
     "severity",
     "date",
     "title"
-  ]
+  ],
+  "rls": { "create": false, "read": false, "update": false, "delete": false }
 }
