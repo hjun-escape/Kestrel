@@ -27,7 +27,8 @@
 
 <p align="center">
   <img src="public/brand/talk-to-users-hackathon.jpg" alt="Talk to Users Hackathon poster, SF Tech Week" width="320"><br>
-  <sub>Built at the <b>Talk to Users Hackathon</b> · SF Tech Week · Group 17</sub>
+  <sub>Built at the <b>Talk to Users Hackathon</b> · SF Tech Week · Group 17</sub><br>
+  <img alt="Semifinalist" src="https://img.shields.io/badge/%F0%9F%8F%86%20semifinalist-out%20of%20~80%20participants-b8860b?style=flat-square">
 </p>
 
 <h3 align="center">Contributors</h3>
