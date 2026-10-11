@@ -21,6 +21,15 @@ export default async function(req: Request): Promise<Response> {
     },
     now: () => new Date().toISOString(),
     save: (record: any) => db.AuditRun.create(record),
+    // Documents the bank accepted in the document exchange (documentExchange), for this company.
+    accepted: async (id: string) => items(await db.DocumentExchange.filter({ borrower_id: id, kind: 'document', status: 'accepted' }, '-created_at', 50)).map((d: any) => ({ id: d.id, name: d.name || d.title, title: d.title, text: d.text || '', signal_id: d.signal_id || '', finding: d.finding || 'no_bearing', reviewed_by: d.reviewed_by || '', review_note: d.review_note || '' })),
+    extractText: async (file_url: string) => {
+      const res: any = await base44.asServiceRole.integrations.Core.ExtractDataFromUploadedFile({
+        file_url,
+        json_schema: { type: 'object', properties: { text: { type: 'string', description: 'The full text of the document, word for word.' } } },
+      });
+      return res?.status === 'success' ? res.output?.text || '' : '';
+    },
   });
   return Response.json(result.data, { status: result.status });
 }

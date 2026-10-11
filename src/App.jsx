@@ -19,6 +19,7 @@ const DevAudit = lazy(() => import('@/pages/DevAudit'));
 const Landing = lazy(() => import('@/pages/Landing'));
 // About: a plain page; load it only when visited.
 const About = lazy(() => import('@/pages/About'));
+const CompanyDocuments = lazy(() => import('@/pages/CompanyDocuments'));
 import WelcomeGate from '@/components/landing/WelcomeGate';
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
@@ -38,6 +39,7 @@ const AppRoutes = () => (
     <Route path="/reset-password" element={<ResetPassword />} />
     <Route path="/welcome" element={<Suspense fallback={null}><Landing /></Suspense>} />
     <Route path="/about" element={<Suspense fallback={null}><About /></Suspense>} />
+    <Route path="/documents/:token" element={<Suspense fallback={null}><CompanyDocuments /></Suspense>} />
     <Route path="/" element={<WelcomeGate><LoanBook /></WelcomeGate>} />
     <Route path="/borrower/:id" element={<CompanyDetail />} />
     <Route path="/assistant" element={<Suspense fallback={null}><Assistant /></Suspense>} />
