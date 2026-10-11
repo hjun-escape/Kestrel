@@ -58,10 +58,10 @@ test("why line matches the CLAUDE.md example", () => {
     sig("strong", "2026-09-12", "CFO departure", "exec_departure"),
     sig("strong", "2026-10-10", "Job postings 84% below normal for company size", "hiring_drop"),
   ];
-  // Strong first, then newest: the hiring drop (Oct 10) comes before the CFO departure (Sep 12).
+  // Strong first, then the worst event: a CFO exit outranks a newer hiring drop (this is the exact CLAUDE.md example).
   assert.deepEqual(scoreBorrower(s, TODAY), {
     status: "red",
-    why: "Red: Job postings 84% below normal for company size + CFO departure (Sep 12).",
+    why: "Red: CFO departure (Sep 12) + Job postings 84% below normal for company size.",
   });
 });
 
@@ -172,4 +172,61 @@ test("eventName recognizes common layoff headline phrasings without overriding c
   for (const [title, expected] of cases) {
     assert.equal(eventName(sig("strong", TODAY, title)), expected);
   }
+});
+
+test("why line leads with the worst event, not the newest (Essendant)", () => {
+  const s = [
+    sig("strong", "2026-10-10", "No open job postings (about 56 expected for a company this size)", "hiring_drop"),
+    sig("strong", "2026-09-25", "Employee review mentions closing", "review_distress"),
+    sig("strong", "2026-09-11", "Major U.S. distributor cuts 1,278 jobs amid liquidation risk"),
+    sig("weak", "2026-10-09", "Lawsuit filed by landlord"),
+  ];
+  const { status, why } = scoreBorrower(s, TODAY);
+  assert.equal(status, "red");
+  assert.match(why, /^Red: Cuts 1,278 jobs amid liquidation risk \(Sep 11\) \+ /);
+  assert.ok(why.indexOf("1,278 jobs") < why.indexOf("No open job postings") || !why.includes("No open job postings"));
+});
+
+test("within strong, existential events beat other strong signals; weak never beats strong", () => {
+  const s = [
+    sig("strong", "2026-10-09", "Equipment lender sues Acme over missed payments"),
+    sig("strong", "2026-09-01", "Acme files for Chapter 11 bankruptcy"),
+    sig("weak", "2026-10-10", "Acme liquidation rumor on forum"),
+  ];
+  assert.equal(scoreBorrower(s, TODAY).why, "Red: Bankruptcy filing (Sep 1) + Lender lawsuit (Oct 9).");
+});
+
+test("same event from two outlets counts once (Amy's Kitchen Santa Rosa closure)", () => {
+  const nyPost = { ...sig("strong", "2026-09-19", "Amy's Kitchen Santa Rosa factory closure, 260 jobs"), source_name: "NY Post", source_url: "https://nypost.com/a" };
+  const inc = { ...sig("strong", "2026-09-26", "Amy's Kitchen closing Santa Rosa plant, 207 jobs"), source_name: "Inc.", source_url: "https://inc.com/b" };
+  const r = scoreBorrower([inc, nyPost], TODAY);
+  assert.equal(r.status, "yellow");
+  assert.equal(r.why, "Yellow: Plant closure (Sep 19).");
+});
+
+test("same event named by place in the snippet merges too", () => {
+  const a = { ...sig("strong", "2026-09-19", "$1B frozen food giant pulls plug on California manufacturing"), snippet: "The company will close its Santa Rosa plant, laying off 260 workers." };
+  const b = { ...sig("weak", "2026-09-26", "Amy's Kitchen Is Closing Its First Factory"), snippet: "The factory in Santa Rosa will close, affecting 207 employees." };
+  assert.equal(scoreBorrower([a, b], TODAY).status, "yellow");
+  assert.equal(scoreBorrower([a, b], TODAY).why, "Yellow: Shutdown (Sep 19).");
+});
+
+test("different plant closures in different cities stay two events", () => {
+  const a = sig("strong", "2026-09-19", "Acme closing Santa Rosa plant, 260 jobs");
+  const b = sig("strong", "2026-09-26", "Acme closing Pocatello plant, 210 jobs");
+  assert.equal(scoreBorrower([a, b], TODAY).status, "red");
+});
+
+test("same place but job counts far apart, or more than 14 days apart, are not merged", () => {
+  const a = sig("strong", "2026-09-01", "Acme closing Santa Rosa plant, 260 jobs");
+  const far = sig("strong", "2026-09-20", "Acme closing Santa Rosa plant, 250 jobs");
+  const diffCount = sig("strong", "2026-09-05", "Acme closing Santa Rosa plant, 90 jobs");
+  assert.equal(scoreBorrower([a, far], TODAY).status, "red");
+  assert.equal(scoreBorrower([a, diffCount], TODAY).status, "red");
+});
+
+test("no shared place or count: same type within 14 days is not merged", () => {
+  const a = sig("strong", "2026-09-19", "Acme announces layoffs");
+  const b = sig("strong", "2026-09-22", "Acme shuts down Texas unit");
+  assert.equal(scoreBorrower([a, b], TODAY).status, "red");
 });

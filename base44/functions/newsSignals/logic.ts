@@ -291,6 +291,9 @@ export function buildTagPrompt(borrower: Borrower, item: Omit<NewsItem, 'text'> 
     '  (president, founder, COO, VP, board member).',
     '- severity for legal_layoffs: "strong" for a WARN notice, a bankruptcy filing, or a lawsuit brought against the',
     '  company by a lender, bank, creditor or supplier; "weak" for other lawsuits (including ones the company brings) and layoffs.',
+    '- Stories about a FORMER employee, executive or alum (their new venture, new job, job search, book or award), or',
+    '  about someone who left the company long ago, are NOT about this company: relevant = false. A lawsuit or wage',
+    '  claim that former employees bring AGAINST this company is still relevant.',
     '- severity "none" if not relevant or not the same company.',
     '- snippet: copy one or two sentences EXACTLY, character for character, from the Text above that show the event.',
     '  Never paraphrase, summarise, shorten words or fix typos. Empty string if there is none.',
@@ -344,12 +347,22 @@ export function findVerbatim(text: string, quote: string): string | null {
 /** An exec_departure must name a senior role; this catches e.g. a store closure tagged as a departure. */
 const EXEC_TITLE = /\b(ceo|cfo|coo|chief [a-z]+ officer|chief executive|chief financial|president|founder|co-founder|chairman|executive|director|vp|vice president)\b/i;
 
+// A headline whose subject is a former employee ("Ex-Acme manager launches…", "Former Acme exec joins…",
+// "Acme alum starts…") is about that person, not the company. Claims they bring against the company still count.
+const FORMER_SUBJECT = /^\s*(?:the\s+)?(?:ex[-‐–\s]|former\s|onetime\s|one-time\s)|^\s*\S+(?:\s+\S+)?\s+(?:alum|alumni|alumnus|alumna|alums)\b/i;
+const AGAINST_COMPANY = /\b(sue[sd]?|suing|lawsuit|suit|alleg\w*|claims?|wages?|WARN|whistleblow\w*|testif\w*|accus\w*)\b/i;
+export function isFormerEmployeeStory(title: string): boolean {
+  const t = str(title);
+  return FORMER_SUBJECT.test(t) && !AGAINST_COMPANY.test(t);
+}
+
 /** Decides whether a tagged item becomes a Signal, and says why not when it does not. */
 export function judge(item: NewsItem, tag: Tag | null): { signal: Signal | null; reason: string } {
   const no = (reason: string) => ({ signal: null, reason });
   if (!tag) return no('unreadable tag');
   if (!tag.relevant) return no('not relevant');
   if (!tag.same_company) return no('not the same company');
+  if (isFormerEmployeeStory(item.title)) return no('about a former employee, not the company');
   if (!(SIGNAL_TYPES as readonly string[]).includes(tag.signal_type)) return no(`type ${tag.signal_type || 'none'}`);
   if (tag.severity !== 'strong' && tag.severity !== 'weak') return no('no severity');
   if (tag.signal_type === 'exec_departure' && !EXEC_TITLE.test(item.text)) return no('exec_departure but no senior role named');

@@ -56,6 +56,8 @@ export function buildPrompt(text: string, b: Borrower, kind: string): string {
     "- same_company: true only if the text is clearly about this company, not one with a similar name. If unsure, false.",
     "- relevant: true only if the text reports a NEW negative event for this company. Good news, or a past event",
     "  mentioned in passing, is not relevant.",
+    "- A story about a FORMER employee, executive or alum (their new venture, new job, job search) or someone who left",
+    "  long ago is not about this company: relevant = false. A claim former employees bring against this company is relevant.",
     '- signal_type: "exec_departure" (a senior executive leaves), "legal_layoffs" (lawsuit, lien, WARN notice, layoffs,',
     '  bankruptcy, closures), "review_distress" (an employee review describing layoffs, furloughs, late or missed pay,',
     '  or closing), or "none".',

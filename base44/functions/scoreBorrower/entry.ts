@@ -7,7 +7,9 @@
 //   RED    = 2+ strong, or 1 strong + 2 weak
 //   YELLOW = 1 strong, or 2+ weak
 //   GREEN  = otherwise
-// Why line: "<Status>: " + up to 2 top signals (strong first, then newest) joined with " + ".
+// Why line: "<Status>: " + up to 2 top signals joined with " + ", ranked by impact: strong before weak; within a
+// severity, existential events (bankruptcy, liquidation, closure/shutdown, WARN, layoffs with a job count, CEO/CFO
+// exit) first; then newest. The same event reported by several outlets counts once (sameEvent).
 
 export type Severity = "strong" | "weak";
 export type SignalType = "hiring_drop" | "review_distress" | "exec_departure" | "legal_layoffs";
@@ -37,8 +39,9 @@ function parseDay(s: string): number | null {
   return d.getUTCFullYear() === +m[1] && d.getUTCMonth() === +m[2] - 1 && d.getUTCDate() === +m[3] ? t : null;
 }
 
-function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+// The bank's business day (America/Los_Angeles), so an evening refresh never counts "tomorrow" in UTC.
+export function todayIso(now: Date = new Date(), timeZone = "America/Los_Angeles"): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
 }
 
 // "2026-09-12" -> "Sep 12"
@@ -102,10 +105,43 @@ export function eventName(s: Signal): string {
   return title;
 }
 
+// "Major U.S. distributor cuts 1,278 jobs amid liquidation risk" -> "Cuts 1,278 jobs amid liquidation risk": a layoff
+// headline with a job count is the fact a banker needs, so the why line keeps it from the verb on.
+const JOB_COUNT = /\b(\d{1,3}(?:,\d{3})+|\d+)\s+(?:[A-Za-z-]+\s+)?(?:jobs|workers|employees|positions|staff|people|roles)\b/i;
+const LAYOFF_CLAUSE = /\b(?:cuts?|cutting|lays? off|laying off|eliminat(?:es|ing)|slash(?:es|ing)?)\b.*$/i;
+const MAX_CLAUSE = 64;
+
+function layoffClause(title: string): string | null {
+  if (!JOB_COUNT.test(title)) return null;
+  const m = LAYOFF_CLAUSE.exec(title);
+  if (!m || !JOB_COUNT.test(m[0])) return null;
+  const clause = m[0].length <= MAX_CLAUSE ? m[0] : `${m[0].slice(0, MAX_CLAUSE).replace(/\s+\S*$/, "")}…`;
+  return clause.charAt(0).toUpperCase() + clause.slice(1);
+}
+
 // hiring_drop is a computed fact as of the refresh, so its date adds nothing to the why line.
 function label(s: Signal): string {
   const name = eventName(s);
-  return s.type === "hiring_drop" ? name : `${name} (${shortDate(s.date)})`;
+  if (s.type === "hiring_drop") return name;
+  const lead = name === "Layoffs" ? layoffClause((s.title ?? "").trim()) : null;
+  return `${lead ?? name} (${shortDate(s.date)})`;
+}
+
+// Existential events: the facts that most threaten repayment. They lead the why line within their severity.
+const EXISTENTIAL_LEGAL = /bankrupt|chapter (7|11)\b|liquidat|receivership|insolven|\bclos(e|es|ing|ure)\b|shut(s|ting)? down|wind(s|ing)? down|ceases? operations|pulls? (the )?plug|\bWARN\b/i;
+function isExistential(s: Signal): boolean {
+  const title = s.title ?? "";
+  if (s.type === "exec_departure") return /\b(CEO|CFO)\b|chief (executive|financial)/i.test(title);
+  if (s.type === "legal_layoffs") return EXISTENTIAL_LEGAL.test(title) || (eventName(s) === "Layoffs" && JOB_COUNT.test(title));
+  return false;
+}
+
+// Strongest first, then the worst event, then newest. Used for the why line only.
+function byImpact(a: Signal, b: Signal): number {
+  if (a.severity !== b.severity) return a.severity === "strong" ? -1 : 1;
+  const ea = isExistential(a), eb = isExistential(b);
+  if (ea !== eb) return ea ? -1 : 1;
+  return (parseDay(b.date) ?? 0) - (parseDay(a.date) ?? 0);
 }
 
 // Signals with a valid date and severity, dated within the last WINDOW_DAYS days (inclusive), not in the future.
@@ -147,8 +183,76 @@ export function dedupeSignals(signals: Signal[]): Signal[] {
   return out;
 }
 
+// ---- Same event, several outlets --------------------------------------------------------------------------------
+// Two news signals are one event when they have the same type, are dated within SAME_EVENT_DAYS, belong to the same
+// event family (closure/shutdown/layoffs/WARN, or the same named executive exit), and either name the same place
+// (with job counts, when both give one, within ±25%) or give the same job count. Conservative on purpose: a false
+// merge hides a real event, a missed merge only double-counts one.
+export const SAME_EVENT_DAYS = 14;
+const COUNT_TOLERANCE = 0.25;
+const JOB_LOSS = new Set(["Plant closure", "Shutdown", "Layoffs", "WARN notice"]);
+const FACILITY = "(?:plant|factory|facility|site|mill|brewery|warehouse|distribution center|headquarters|hq|store|office)s?";
+const PLACE = "([A-Z][A-Za-z.]+(?:\\s+[A-Z][A-Za-z.]+){0,2})";
+const PLACE_BEFORE_FACILITY = new RegExp(`${PLACE}\\s+${FACILITY}\\b`, "g");
+const PLACE_AFTER_IN = new RegExp(`\\b(?:in|at|near)\\s+${PLACE}`, "g");
+const NOT_PLACE = new Set(["the", "its", "their", "his", "her", "our", "a", "an", "first", "new", "main", "original", "oldest", "last", "only", "now", "it", "this", "that"]);
+
+function places(text: string): Set<string> {
+  const out = new Set<string>();
+  for (const re of [PLACE_BEFORE_FACILITY, PLACE_AFTER_IN]) {
+    for (const m of text.matchAll(re)) {
+      const words = m[1].split(/\s+/).filter((w) => !NOT_PLACE.has(w.toLowerCase()) && !/['’]s$/.test(w));
+      // "Kitchen Santa Rosa" (company word run into the place) also yields "santa rosa" and "rosa".
+      for (let i = 0; i < words.length; i += 1) out.add(words.slice(i).join(" ").toLowerCase());
+    }
+  }
+  return out;
+}
+
+function jobCount(text: string): number | null {
+  const m = JOB_COUNT.exec(text);
+  return m ? Number(m[1].replace(/,/g, "")) : null;
+}
+
+function eventFamily(s: Signal): string | null {
+  const name = eventName(s);
+  if (s.type === "legal_layoffs" && JOB_LOSS.has(name)) return "job_loss";
+  if (s.type === "exec_departure" && name.endsWith(" departure")) return name;
+  return null;
+}
+
+export function sameEvent(a: Signal, b: Signal): boolean {
+  if (a.type !== b.type) return false;
+  const ta = parseDay(a.date), tb = parseDay(b.date);
+  if (ta === null || tb === null || Math.abs(ta - tb) / DAY_MS > SAME_EVENT_DAYS) return false;
+  const fam = eventFamily(a);
+  if (!fam || fam !== eventFamily(b)) return false;
+  if (fam !== "job_loss") return true; // the same named role (e.g. CFO) leaving twice in two weeks is one exit
+  const textA = `${a.title ?? ""}. ${a.snippet ?? ""}`, textB = `${b.title ?? ""}. ${b.snippet ?? ""}`;
+  const ca = jobCount(textA), cb = jobCount(textB);
+  const countsAgree = ca !== null && cb !== null && Math.abs(ca - cb) / Math.max(ca, cb) <= COUNT_TOLERANCE;
+  if (ca !== null && cb !== null && !countsAgree) return false;
+  const pb = places(textB);
+  if ([...places(textA)].some((p) => pb.has(p))) return true;
+  return ca !== null && ca === cb && ca >= 50;
+}
+
+// Strongest copy first, then the earliest report: that copy is kept and names the event in the why line.
+function byStrengthThenEarliest(a: Signal, b: Signal): number {
+  if (a.severity !== b.severity) return a.severity === "strong" ? -1 : 1;
+  return (parseDay(a.date) ?? 0) - (parseDay(b.date) ?? 0);
+}
+
+export function mergeSameEvents(signals: Signal[]): Signal[] {
+  const kept: Signal[] = [];
+  for (const s of [...signals].sort(byStrengthThenEarliest)) {
+    if (!kept.some((k) => sameEvent(k, s))) kept.push(s);
+  }
+  return kept;
+}
+
 export function scoreBorrower(signals: Signal[], today: string = todayIso()): { status: Status; why: string } {
-  const recent = dedupeSignals(recentSignals(signals, today));
+  const recent = mergeSameEvents(dedupeSignals(recentSignals(signals, today)));
   const strong = recent.filter((s) => s.severity === "strong").length;
   const weak = recent.length - strong;
 
@@ -158,7 +262,7 @@ export function scoreBorrower(signals: Signal[], today: string = todayIso()): { 
 
   if (status === "green") return { status, why: "Green: no warning signs in the last 90 days." };
 
-  const top = [...recent].sort(byRank).slice(0, 2).map(label);
+  const top = [...recent].sort(byImpact).slice(0, 2).map(label);
 
   const name = status === "red" ? "Red" : "Yellow";
   return { status, why: `${name}: ${top.join(" + ")}.` };
