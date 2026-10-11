@@ -26,6 +26,11 @@
   <img alt="Deno functions" src="https://img.shields.io/badge/functions-Deno-000000?style=flat-square&logo=deno&logoColor=white">
 </p>
 
+<p align="center">
+  <img src="public/brand/talk-to-users-hackathon.jpg" alt="Talk to Users Hackathon poster, SF Tech Week" width="320"><br>
+  <sub>Built at the <b>Talk to Users Hackathon</b> · SF Tech Week · Group 17</sub>
+</p>
+
 **Catch a borrower's trouble before the quarterly financials do.** Kestrel (formerly Early Warning) watches the public signs that a mid-size
 private company is in trouble (executive exits, lawsuits and layoffs, hiring freezes, employee reviews about missed pay)
 and flags them for a bank's credit officer: before the bank lends, and every day after.
@@ -164,10 +169,6 @@ CI runs the same checks on every pull request to `main`.
 
 
 ## Contributors
-
-<p align="center">
-  <img src="public/brand/talk-to-users-hackathon.jpg" alt="Talk to Users Hackathon poster, SF Tech Week" width="360">
-</p>
 
 <p>
   <b>Group 17 · Talk to Users Hackathon, SF Tech Week</b><br>
