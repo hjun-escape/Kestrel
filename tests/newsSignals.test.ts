@@ -573,3 +573,38 @@ describe('dateFromUrl', () => {
     });
   }
 });
+
+describe('former-employee guard', () => {
+  test('isFormerEmployeeStory flags stories about ex-employees, not the company', async () => {
+    const { isFormerEmployeeStory } = await import('../base44/functions/newsSignals/logic.ts');
+    for (const t of [
+      'Ex-Essendant manager launches job search offer',
+      'Former Acme exec joins rival startup',
+      'Acme alum starts her own logistics firm',
+      'Former Acme CFO lands top job at Widgets Inc',
+      'Ex Acme engineer builds AI startup',
+    ]) assert.equal(isFormerEmployeeStory(t), true, t);
+    for (const t of [
+      'Acme CFO resigns; former Google exec named interim',
+      'Former Acme workers sue over unpaid wages',
+      'Ex-Acme employees file WARN Act lawsuit',
+      'Acme cuts 1,278 jobs amid liquidation risk',
+      'Acme names former Google exec as new CFO after CEO exits',
+    ]) assert.equal(isFormerEmployeeStory(t), false, t);
+  });
+
+  test('judge drops a former-employee story even when the model tagged it', () => {
+    const text = 'Ex-Essendant manager launches job search offer for laid-off colleagues.';
+    const r = judge(
+      { url: 'https://x/2', title: 'Ex-Essendant manager launches job search offer', source: 'X', date: '2026-10-01', text, query: 'legal_layoffs' },
+      { relevant: true, same_company: true, signal_type: 'legal_layoffs', severity: 'weak', snippet: 'Ex-Essendant manager launches job search offer' },
+    );
+    assert.equal(r.signal, null);
+    assert.match(r.reason, /former employee/);
+  });
+
+  test('tag prompt tells the model to reject former-employee stories', () => {
+    const p = buildTagPrompt({ name: 'Acme' } as any, { url: 'u', title: 't', source: 's', date: '2026-10-01', text: 'x', query: 'legal_layoffs' });
+    assert.match(p, /former employee/i);
+  });
+});

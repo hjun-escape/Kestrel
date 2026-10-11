@@ -210,3 +210,12 @@ test("crafted snapshot_id is refused before any request is made", async () => {
     globalThis.fetch = realFetch;
   }
 });
+
+test("localToday uses the America/Los_Angeles calendar date, not UTC", async () => {
+  const { localToday } = await import("../base44/functions/hiringSignal/entry.ts");
+  // 17:00 PT on Oct 10 is 00:00 UTC Oct 11; 23:59 PT is 06:59 UTC Oct 11.
+  assert.equal(localToday(new Date("2026-10-11T00:00:00Z")), "2026-10-10");
+  assert.equal(localToday(new Date("2026-10-11T06:59:00Z")), "2026-10-10");
+  assert.equal(localToday(new Date("2026-10-11T07:00:00Z")), "2026-10-11");
+  assert.equal(localToday(new Date("2026-10-10T16:59:00Z")), "2026-10-10");
+});

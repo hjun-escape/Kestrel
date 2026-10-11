@@ -37,3 +37,10 @@ describe('tagItem', () => {
     assert.equal(findVerbatim('The CFO resigned.', 'CFO'), null);
   });
 });
+
+describe('tagItem former-employee rule', () => {
+  test('prompt rejects stories about former employees', async () => {
+    const { buildPrompt } = await import('../base44/functions/tagItem/shared.ts');
+    assert.match(buildPrompt('x', acme, 'news article'), /former employee/i);
+  });
+});

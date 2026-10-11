@@ -264,13 +264,18 @@ export async function hiringSignal(b: Borrower, apiKey: string, today: string, s
 // A snapshot that is still building returns 503 with its snapshot_id, so a later call can pass it back.
 declare const Deno: { env: { get(k: string): string | undefined } };
 
+// The bank's business day (America/Los_Angeles). A UTC "today" dates an evening refresh tomorrow.
+export function localToday(now: Date = new Date(), timeZone = "America/Los_Angeles"): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+}
+
 export default async function (req: Request): Promise<Response> {
   try {
     const body = await req.json();
     if (!body?.borrower?.name) return Response.json({ error: "Jobs: borrower is required" }, { status: 400 });
     const apiKey = Deno.env.get("BRIGHTDATA_API_KEY");
     if (!apiKey) throw new Error("Jobs: BRIGHTDATA_API_KEY secret not set");
-    const today = body.today ?? new Date().toISOString().slice(0, 10);
+    const today = body.today ?? localToday();
     return Response.json(await hiringSignal(body.borrower, apiKey, today, body.snapshot_id));
   } catch (error) {
     const snapshot_id = error instanceof JobsPendingError ? error.snapshot_id : undefined;
