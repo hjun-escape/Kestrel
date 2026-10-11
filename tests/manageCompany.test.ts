@@ -6,6 +6,7 @@ import {
   RESET_CHECK,
   changedFields,
   cleanFields,
+  createCompany,
   deleteCompany,
   updateCompany,
   type Db,
@@ -147,4 +148,36 @@ test("only a signed-in owner or an admin may edit or delete; signed-out visitors
   assert.equal(can(demo, { email: "a@x.com" }), false); // signed in: the demo book is not theirs
   assert.equal(can(demo, { email: "boss@x.com", role: "admin" }), true);
   assert.equal(can(mine, { email: "boss@x.com", role: "admin" }), true);
+});
+
+// ---- createCompany ----
+
+test("createCompany sets owner_email from the signed-in caller, status fields empty", async () => {
+  const created: Record<string, unknown>[] = [];
+  const db: Db = { Borrower: { create: async (d) => (created.push(d), { id: "n1", ...d }) } };
+  const res = await createCompany(db, { name: "Zeta Co", website_domain: "zeta.com", stage: "applicant", owner_email: "evil@x.com", status: "red", last_refreshed: "2026-01-01" }, "a@x.com");
+  assert.equal(res.status, 200);
+  assert.equal((res.body.borrower as { id: string }).id, "n1");
+  assert.equal(created[0].owner_email, "a@x.com");
+  assert.equal(created[0].status, "green");
+  assert.equal(created[0].why, "");
+  assert.deepEqual(created[0].sources_unavailable, []);
+  assert.equal("last_refreshed" in created[0], false);
+  assert.equal(created[0].stage, "applicant");
+});
+
+test("createCompany signed out: no owner_email key; stage defaults to borrower", async () => {
+  const created: Record<string, unknown>[] = [];
+  const db: Db = { Borrower: { create: async (d) => (created.push(d), { id: "n1", ...d }) } };
+  const res = await createCompany(db, { name: "Zeta Co", website_domain: "zeta.com" }, undefined);
+  assert.equal(res.status, 200);
+  assert.equal("owner_email" in created[0], false);
+  assert.equal(created[0].stage, "borrower");
+});
+
+test("createCompany needs a name and a domain", async () => {
+  const db: Db = { Borrower: { create: async () => ({}) } };
+  assert.equal((await createCompany(db, { website_domain: "zeta.com" }, "a@x.com")).body.error, "Enter the company name.");
+  assert.equal((await createCompany(db, { name: "Zeta" }, "a@x.com")).body.error, "Enter a website domain such as harbortool.com.");
+  assert.equal((await createCompany(db, { name: "Zeta", website_domain: "zeta" }, "a@x.com")).status, 400);
 });

@@ -20,12 +20,13 @@ import * as manageCompany from '../base44/functions/manageCompany/access.ts';
 import * as findCompanyPages from '../base44/functions/findCompanyPages/access.ts';
 import * as devinRun from '../base44/functions/devinRun/access.ts';
 import * as readData from '../base44/functions/readData/access.ts';
+import * as recordDecision from '../base44/functions/recordDecision/access.ts';
 import { scopeDataLayer } from '../base44/functions/askPortfolio/scopedData.ts';
 import { runAgent } from '../base44/functions/askPortfolio/logic.ts';
 import { executeAction } from '../base44/functions/confirmAction/logic.ts';
 import type { ConfirmDeps } from '../base44/functions/confirmAction/logic.ts';
 
-const COPIES = { askPortfolio, auditReport, documentExchange, confirmAction, refreshBorrower, analyzeBorrower, lenderCheck, analyzeCashflow, manageCompany, findCompanyPages, devinRun, readData };
+const COPIES = { askPortfolio, auditReport, documentExchange, confirmAction, refreshBorrower, analyzeBorrower, lenderCheck, analyzeCashflow, manageCompany, findCompanyPages, devinRun, readData, recordDecision };
 const FOLDERS = Object.keys(COPIES);
 
 const A = { email: 'a@x.com' };

@@ -12,8 +12,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { base44 } from "@/api/base44Client";
 import { startRefresh } from "@/lib/borrowerUtils";
-import { useAuth } from "@/lib/AuthContext";
-import { ownerEmailFor } from "@/lib/ownership";
 
 const EMPTY = {
   name: "",
@@ -70,9 +68,10 @@ export function validate(form) {
   return null;
 }
 
-// ownerEmail: the signed-in user's email (the company is theirs), or undefined
-// when signed out (the company joins the shared demo book).
-function buildPayload(form, ownerEmail) {
+// Only the fields the officer types. manageCompany sets status/why/sources and the owner
+// (the caller's email, or the shared demo book when signed out); last_refreshed stays empty
+// until the first check lands.
+function buildPayload(form) {
   const payload = {
     name: form.name.trim(),
     website_domain: normalizeDomain(form.website_domain),
@@ -80,12 +79,7 @@ function buildPayload(form, ownerEmail) {
     hq_state: form.hq_state.trim(),
     industry: form.industry.trim(),
     stage: form.stage,
-    status: "green",
-    why: "",
-    sources_unavailable: [],
-    // last_refreshed omitted: the company shows "Not checked" until the first check lands.
   };
-  if (ownerEmail) payload.owner_email = ownerEmail;
   if (form.loan_amount_usd !== "") payload.loan_amount_usd = Number(form.loan_amount_usd);
   if (form.linkedin_url.trim()) payload.linkedin_url = form.linkedin_url.trim();
   if (form.glassdoor_url.trim()) payload.glassdoor_url = form.glassdoor_url.trim();
@@ -97,7 +91,6 @@ function buildPayload(form, ownerEmail) {
 // LinkedIn and Glassdoor URLs feed the Jobs and Reviews checks.
 // initialStage: "applicant" (Screen new applicant) or "borrower" (Add a company).
 export default function AddCompanyDialog({ open, onOpenChange, onCreated, initialStage = "applicant" }) {
-  const { email } = useAuth();
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -183,15 +176,17 @@ export default function AddCompanyDialog({ open, onOpenChange, onCreated, initia
     setSaving(true);
     setError(null);
     try {
-      const created = await base44.entities.Borrower.create(buildPayload(form, ownerEmailFor(email)));
+      const res = await base44.functions.invoke("manageCompany", { action: "create", fields: buildPayload(form) });
+      const created = res?.data?.borrower;
+      if (!created?.id) throw new Error("no borrower returned");
       startRefresh(created.id, { unavailableBefore: [], signalIdsBefore: [] });
       setForm(EMPTY);
       setSuggested({});
       setLookupNote(null);
       onOpenChange(false);
       onCreated(created);
-    } catch {
-      setError("Could not save the company. Check the fields and try again.");
+    } catch (e) {
+      setError(e?.response?.data?.error || e?.data?.error || "Could not save the company. Check the fields and try again.");
     } finally {
       setSaving(false);
     }

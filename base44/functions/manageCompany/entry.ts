@@ -1,7 +1,8 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
-import { canAccessCompany } from './access.ts';
-import { canChangeCompany, deleteCompany, updateCompany, type Db } from './logic.ts';
+import { canAccessCompany, ownerEmailFor } from './access.ts';
+import { canChangeCompany, createCompany, deleteCompany, updateCompany, type Db } from './logic.ts';
 
+// manageCompany({ action: "create", fields })              -> { borrower }
 // manageCompany({ borrower_id, action: "update", fields }) -> { borrower, evidence_cleared }
 // manageCompany({ borrower_id, action: "delete" })          -> { deleted }
 //
@@ -16,10 +17,18 @@ export default async function (req: Request): Promise<Response> {
     } catch {
       return Response.json({ error: 'Request body must be JSON' }, { status: 400 });
     }
+    // Create needs no borrower_id: the caller is the owner (signed out -> the shared demo book).
+    if (body?.action === 'create') {
+      const base44 = createClientFromRequest(req);
+      const caller = await base44.auth.me().catch(() => null);
+      const result = await createCompany(base44.asServiceRole.entities as unknown as Db, body.fields, ownerEmailFor(caller));
+      return Response.json(result.body, { status: result.status });
+    }
+
     const borrowerId = body?.borrower_id;
     if (typeof borrowerId !== 'string' || !borrowerId) return Response.json({ error: 'borrower_id is required' }, { status: 400 });
     if (body?.action !== 'update' && body?.action !== 'delete') {
-      return Response.json({ error: 'action must be "update" or "delete"' }, { status: 400 });
+      return Response.json({ error: 'action must be "create", "update" or "delete"' }, { status: 400 });
     }
 
     const base44 = createClientFromRequest(req);

@@ -372,17 +372,15 @@ export default function ApplicantDecision({ borrower, signals, parts = { documen
         setError("Sign in to record a decision. It is logged under your name.");
         return false;
       }
-      const record = {
+      const res = await base44.functions.invoke("recordDecision", {
         borrower_id: borrowerId,
         decision,
         note,
         documents_requested: decision === "request_documents" ? documents : [],
-        decided_by: decidedBy,
-        created_at: new Date().toISOString(),
         ...(follow_up_date ? { follow_up_date } : {}),
-      };
-      const saved = await base44.entities.Decision.create(record);
-      setDecisions((prev) => [saved || record, ...prev]);
+      });
+      const saved = res?.data?.decision || { borrower_id: borrowerId, decision, note, decided_by: decidedBy, created_at: new Date().toISOString(), ...(follow_up_date ? { follow_up_date } : {}) };
+      setDecisions((prev) => [saved, ...prev]);
       return true;
     } catch (e) {
       setError(errorText(e, "The decision could not be saved. Please try again."));
