@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://kestrel-app.base44.app">
+  <a href="https://kestrel-app.base44.app/welcome">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="public/brand/kestrel-mark-white.svg">
     <img src="public/brand/kestrel-mark.svg" alt="Kestrel logo" width="72" height="72">
@@ -9,11 +9,11 @@
 
 <h1 align="center">Kestrel</h1>
 
-<p align="center"><a href="https://kestrel-app.base44.app"><b>kestrel-app.base44.app</b></a> · no account needed</p>
+<p align="center"><a href="https://kestrel-app.base44.app/welcome"><b>kestrel-app.base44.app/welcome</b></a> · no account needed</p>
 
 <p align="center">
-  <a href="https://kestrel-app.base44.app"><img alt="Live app" src="https://img.shields.io/badge/live-kestrel--app.base44.app-14202e?style=flat-square"></a>
-  <a href="https://github.com/hjun-escape/early-warning/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/hjun-escape/early-warning/actions/workflows/ci.yml/badge.svg?branch=main"></a>
+  <a href="https://kestrel-app.base44.app/welcome"><img alt="Live app" src="https://img.shields.io/badge/live-kestrel--app.base44.app-14202e?style=flat-square"></a>
+  <a href="https://github.com/hjun-escape/Kestrel/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/hjun-escape/Kestrel/actions/workflows/ci.yml/badge.svg?branch=main"></a>
   <img alt="Talk to Users Hackathon, Group 17" src="https://img.shields.io/badge/Talk%20to%20Users%20Hackathon-Group%2017-2d5bd7?style=flat-square">
 </p>
 <p align="center">
@@ -30,7 +30,7 @@
 private company is in trouble (executive exits, lawsuits and layoffs, hiring freezes, employee reviews about missed pay)
 and flags them for a bank's credit officer: before the bank lends, and every day after.
 
-Talk to Users Hackathon, Group 17 · **Live app: https://kestrel-app.base44.app** (no account needed; choose
+Talk to Users Hackathon, Group 17 · **Live app: https://kestrel-app.base44.app/welcome** (no account needed; choose
 "Explore the demo")
 
 ## Why
