@@ -142,7 +142,8 @@ const TOOL_DOCS = `Tools (call one per step):
 - portfolio_summary(): counts by status and stage, exposure_at_risk_usd (loans of red + yellow companies), stale companies (last check over 7 days ago) and never_checked companies.
 - propose_screen({ name, website_domain, hq_city?, hq_state?, industry?, loan_amount_usd? }): proposes adding a new applicant. Does not act; the user confirms.
 - propose_refresh({ id }): proposes re-checking a company's public sources. Does not act; the user confirms.
-- propose_deep_check({ id, question }): proposes an analyst deep check on one question. Does not act; the user confirms.`;
+- propose_deep_check({ id, question }): proposes an analyst deep check on one question. Does not act; the user confirms.
+- propose_devin_investigation({ id, question }): proposes an independent Devin investigation that verifies the company's stored evidence against its cited source pages (question up to 300 characters). Does not act; the user confirms.`;
 
 const RULES = `You are "Ask Kestrel", an assistant for bank credit officers inside the Kestrel app. The app flags public signs of trouble (executive departures, layoffs and legal filings, hiring drops, employee review distress) at companies before lending (applicants) and after (borrowers).
 Rules:

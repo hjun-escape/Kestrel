@@ -2,7 +2,7 @@
 //
 // Runs a pending action from Ask Kestrel after the user confirms it.
 // The action comes from the browser, so it is re-validated here from scratch:
-// only 'screen', 'refresh' and 'deep_check' are allowed, and only whitelisted
+// only 'screen', 'refresh', 'deep_check' and 'devin_investigation' are allowed, and only whitelisted
 // fields are passed on. Nothing here ever sets status on an existing company.
 // This file intentionally does not import from askPortfolio, so each function
 // deploys on its own; tests check that every action askPortfolio proposes is
@@ -15,7 +15,7 @@
 import { canAccessCompany, ownerEmailFor } from './access.ts';
 import type { Caller } from './access.ts';
 
-export type ActionKind = 'screen' | 'refresh' | 'deep_check';
+export type ActionKind = 'screen' | 'refresh' | 'deep_check' | 'devin_investigation';
 
 export interface ValidAction {
   kind: ActionKind;
@@ -43,11 +43,13 @@ const MAX_NAME = 200;
 const MAX_SHORT_FIELD = 100;
 const MAX_QUESTION = 500;
 const MIN_QUESTION = 3;
+const MAX_DEVIN_QUESTION = 300;
 const MAX_LOAN_USD = 1e12;
 const ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 const DOMAIN_PATTERN = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 const ANALYST_FUNCTION = 'analyzeBorrower';
 const REFRESH_FUNCTION = 'refreshBorrower';
+const DEVIN_FUNCTION = 'devinRun';
 
 function fail(error: string): Validation {
   return { ok: false, error };
@@ -110,8 +112,15 @@ export function validateAction(raw: unknown): Validation {
       if (!question) return fail(`question must be ${MIN_QUESTION}-${MAX_QUESTION} characters`);
       return { ok: true, action: { kind: 'deep_check', params: { id, question } } };
     }
+    case 'devin_investigation': {
+      const id = validateId(p);
+      if (!id) return fail('a valid company id is required');
+      const question = text(p.question, MAX_DEVIN_QUESTION, MIN_QUESTION);
+      if (!question) return fail(`question must be ${MIN_QUESTION}-${MAX_DEVIN_QUESTION} characters`);
+      return { ok: true, action: { kind: 'devin_investigation', params: { id, question } } };
+    }
     default:
-      return fail('only screen, refresh and deep_check actions are allowed');
+      return fail('only screen, refresh, deep_check and devin_investigation actions are allowed');
   }
 }
 
@@ -171,6 +180,16 @@ export async function executeAction(raw: unknown, deps: ConfirmDeps): Promise<Co
   if (kind === 'refresh') {
     try {
       const result = await deps.invoke(REFRESH_FUNCTION, { borrower_id: id });
+      return { status: 200, body: { ok: true, kind, result } };
+    } catch (error) {
+      return upstreamFailure(error);
+    }
+  }
+
+  if (kind === 'devin_investigation') {
+    // devinRun re-checks access, the running guard and the hourly limits itself.
+    try {
+      const result = await deps.invoke(DEVIN_FUNCTION, { action: 'start', borrower_id: id, kind: 'investigation', question: params.question });
       return { status: 200, body: { ok: true, kind, result } };
     } catch (error) {
       return upstreamFailure(error);

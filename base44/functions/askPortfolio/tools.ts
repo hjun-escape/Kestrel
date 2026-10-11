@@ -37,7 +37,7 @@ export interface ToolContext {
   nowMs: number;
 }
 
-export type ActionKind = 'screen' | 'refresh' | 'deep_check';
+export type ActionKind = 'screen' | 'refresh' | 'deep_check' | 'devin_investigation';
 
 export interface PendingAction {
   action_id: string;
@@ -53,6 +53,7 @@ export const TOOL_NAMES = [
   'propose_screen',
   'propose_refresh',
   'propose_deep_check',
+  'propose_devin_investigation',
 ] as const;
 
 const STAGES = ['applicant', 'borrower'];
@@ -64,6 +65,7 @@ const MAX_NAME = 200;
 const MAX_SHORT_FIELD = 100;
 const MAX_QUESTION = 500;
 const MIN_QUESTION = 3;
+const MAX_DEVIN_QUESTION = 300; // devinRun sends at most 300 chars to Devin
 const MAX_LOAN_USD = 1e12;
 const ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 const DOMAIN_PATTERN = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
@@ -283,6 +285,21 @@ async function proposeDeepCheck(args: Args, ctx: ToolContext) {
   return { pending_action };
 }
 
+// Proposes an independent Devin investigation (functions/devinRun, kind 'investigation').
+// Like every propose_* tool it never acts; the user confirms through confirmAction.
+async function proposeDevinInvestigation(args: Args, ctx: ToolContext) {
+  const id = requiredId(args);
+  const question = requiredString(args, 'question', MAX_DEVIN_QUESTION, MIN_QUESTION);
+  const borrower = await requireBorrower(ctx.data, id);
+  const pending_action: PendingAction = {
+    action_id: newActionId('devin_investigation', ctx.nowMs),
+    kind: 'devin_investigation',
+    summary: `Ask Devin to independently investigate ${borrower.name} from its cited sources: "${question}"`,
+    params: { id, question },
+  };
+  return { pending_action };
+}
+
 // Runs one tool. Throws on bad input or unknown tool; the agent loop records
 // the error and continues.
 // deno-lint-ignore no-explicit-any
@@ -295,6 +312,7 @@ export async function dispatchTool(name: string, rawArgs: unknown, ctx: ToolCont
     case 'propose_screen': return proposeScreen(args, ctx);
     case 'propose_refresh': return proposeRefresh(args, ctx);
     case 'propose_deep_check': return proposeDeepCheck(args, ctx);
+    case 'propose_devin_investigation': return proposeDevinInvestigation(args, ctx);
     default: throw new Error(`unknown tool "${name}"`);
   }
 }

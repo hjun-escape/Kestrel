@@ -13,7 +13,7 @@ export const RATE_LIMIT_MS = 30_000;
 export const SHARED_SCOPE = "shared";
 
 // Same list as manageCompany/logic.ts CHILD_ENTITIES (tests/loadDemo.test.ts checks).
-export const CHILD_ENTITIES = ["Signal", "Analysis", "LenderCheck", "Decision", "CashflowReview", "CheckRun", "AuditRun"] as const;
+export const CHILD_ENTITIES = ["Signal", "Analysis", "LenderCheck", "Decision", "CashflowReview", "CheckRun", "AuditRun", "DevinRun"] as const;
 
 type Row = Record<string, unknown> & { id?: unknown };
 

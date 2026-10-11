@@ -1,6 +1,16 @@
 import { canAccessCompany } from './access.ts';
 import { buildAudit, InputError, suggestConsiderations, validateConsiderations, validateDecisions, identityKey } from './logic.ts';
 
+// Devin hook (added by ui/ronit-devin, minimal change to this file): deps.devin is optional.
+// Without it, or without DEVIN_SERVICE_KEY, the reviewer stays 'not_connected' exactly as before.
+// With the key set it reports 'connected' plus the latest DevinRun summary (see functions/devinRun).
+async function independentReviewer(deps: any, borrowerId: string) {
+  const info = deps.devin ? await deps.devin(borrowerId).catch(() => null) : null;
+  if (!info?.connected) return { provider: 'Devin', status: 'not_connected' };
+  const r = info.latest;
+  return { provider: 'Devin', status: 'connected', latest_run: r ? { id: r.id, kind: r.kind, status: r.status, summary: r.summary || '', started_at: r.started_at || '', finished_at: r.finished_at || '', devin_url: r.devin_url || '', findings: Array.isArray(r.findings) ? r.findings : [] } : null };
+}
+
 // Injectable orchestration so ownership, immutable versions and failed saves can be tested without a live account.
 export async function handleAudit(body: any, deps: any) {
   const reply = (status: number, data: any) => ({ status, data });
@@ -13,7 +23,7 @@ export async function handleAudit(body: any, deps: any) {
     if (!canAccessCompany(borrower, user)) return reply(403, { error: 'You do not have access to this company.' });
     const records = await deps.history(body.borrower_id);
     const runs = records.map((r: any) => ({ ...r, payload: typeof r.payload === 'string' ? JSON.parse(r.payload) : r.payload }));
-    if (body.action === 'list') return reply(200, { runs, suggestions: suggestConsiderations(runs, borrower), independent_reviewer: { provider: 'Devin', status: 'not_connected' } });
+    if (body.action === 'list') return reply(200, { runs, suggestions: suggestConsiderations(runs, borrower), independent_reviewer: await independentReviewer(deps, body.borrower_id) });
     const latest = runs[0];
     if (typeof body.parent_run_id !== 'string' || body.parent_run_id !== (latest?.id || '')) return reply(409, { error: 'A newer audit was saved. Reload the company before saving another version.' });
     if (body.action === 'review' && (!latest || latest.payload.identity !== identityKey(borrower) || latest.payload.snapshot.refreshed_at !== (borrower.last_refreshed || ''))) return reply(409, { error: 'The company report changed. Run a new audit before saving decisions.' });
