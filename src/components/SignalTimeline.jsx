@@ -77,11 +77,12 @@ function SignalItem({ signal: s, dimmed, isNew }) {
     <li className="grid grid-cols-[64px_minmax(0,1fr)] border-b border-ew-rule-soft last:border-0">
       <time
         dateTime={s.date}
-        title={format(date, "d MMMM yyyy")}
+        title={s.date_approx ? `About ${format(date, "d MMMM yyyy")}` : format(date, "d MMMM yyyy")}
         className="block border-r border-ew-rule-soft px-3 py-3 text-right leading-tight tabular-nums"
       >
         <span className={`block text-[15px] font-semibold ${dimmed ? "text-ew-muted" : "text-ew-ink"}`}>{format(date, "d")}</span>
         <span className="block text-[11px] text-ew-muted">{format(date, "MMM")}</span>
+        {s.date_approx && <span className="block text-[11px] text-ew-muted">approx.</span>}
       </time>
       <article className="min-w-0 px-4 py-3">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">

@@ -68,6 +68,7 @@ export interface Signal {
   type: SignalType;
   severity: Severity;
   date: string;
+  date_approx?: boolean;
   title: string;
   snippet: string;
   source_name: string;
@@ -85,6 +86,7 @@ export interface NewsItem {
   source: string;
   /** YYYY-MM-DD */
   date: string;
+  date_approx?: boolean;
   /** Readable text: SERP title and description, plus the article body when it could be read. */
   text: string;
   /** Which search found it. */
@@ -183,6 +185,11 @@ function parseRelative(s: string, today: number): number | null {
   if (/^(w|wks?|weeks?)$/.test(unit)) return today - n * 7 * DAY_MS;
   if (/^(mo|mos|months?)$/.test(unit)) return minusMonths(today, n);
   return minusMonths(today, 12 * n);
+}
+
+export function isApproximateDate(raw: string): boolean {
+  const s = str(raw).toLowerCase().replace(/\s+/g, ' ');
+  return /^(\d+|an?|one)\s*(w|wks?|weeks?|mo|mos|months?|y|yrs?|years?)\s+ago$/.test(s);
 }
 
 function parseAbsolute(s: string): number | null {
@@ -358,6 +365,7 @@ export function judge(item: NewsItem, tag: Tag | null): { signal: Signal | null;
       snippet,
       source_name: item.source || hostOf(item.url),
       source_url: item.url,
+      ...(item.date_approx ? { date_approx: true } : {}),
     },
   };
 }
@@ -424,7 +432,14 @@ async function search(deps: NewsDeps, apiKey: string, q: NewsQuery, today: strin
     throw new Error('search response had no news results block');
   }
   return normaliseSerpJson(data)
-    .map((r: NewsResult) => ({ ...r, date: dateFromUrl(r.url, today) ?? parseNewsDate(r.date, today) }))
+    .map((r: NewsResult) => {
+      const urlDate = dateFromUrl(r.url, today);
+      return {
+        ...r,
+        date: urlDate ?? parseNewsDate(r.date, today),
+        date_approx: !urlDate && isApproximateDate(r.date),
+      };
+    })
     .filter((r): r is NewsResult => r.date !== null && ageDays(r.date, today) <= MAX_AGE_DAYS)
     .slice(0, MAX_ITEMS_PER_QUERY);
 }
@@ -456,6 +471,7 @@ async function readAndTag(
     title: result.title,
     source: result.source,
     date: result.date,
+    date_approx: result.date_approx,
     text: [serpText, pageText].filter(Boolean).join('\n'),
     query,
   };
