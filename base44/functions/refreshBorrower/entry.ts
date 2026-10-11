@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { canAccessCompany } from './access.ts';
 import { cooldownLeft } from './cooldown.ts';
+import { BANK_TIME_ZONE, todayIn } from './today.ts';
 
 // refreshBorrower(borrower_id). Owner: P1. See docs/PLAN.md §2 and CLAUDE.md "Refresh flow".
 //
@@ -136,6 +137,8 @@ export default async function(req: Request): Promise<Response> {
       ),
     );
     let answered = 0;
+    // Signal dates and scoring use the bank's calendar day, not UTC.
+    const today = todayIn(BANK_TIME_ZONE);
 
     // Saves run one after another so a slower write never overwrites a newer one.
     let saveChain: Promise<unknown> = Promise.resolve();
@@ -172,7 +175,7 @@ export default async function(req: Request): Promise<Response> {
         const res = await withTimeout<any>(
           base44.asServiceRole.functions.invoke(
             fn.name,
-            snapshotId ? { borrower: target, snapshot_id: snapshotId } : { borrower: target },
+            snapshotId ? { borrower: target, snapshot_id: snapshotId, today } : { borrower: target, today },
           ),
           SOURCE_TIMEOUT_MS,
           fn.name,
@@ -249,7 +252,6 @@ export default async function(req: Request): Promise<Response> {
     if (SCORING_ENABLED) {
       let scored: { status?: string; why?: string } | undefined;
       try {
-        const today = new Date().toISOString().slice(0, 10);
         const res = await base44.asServiceRole.functions.invoke('scoreBorrower', { signals: kept, today });
         scored = res?.data;
       } catch (error) {
