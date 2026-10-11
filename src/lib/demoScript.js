@@ -25,6 +25,7 @@
 //   loan book       loanbook-table, status-legend, screen-applicant, load-demo,
 //                   tab-all, tab-applicants, tab-borrowers, row-<company id>
 //   company page    status-why, sources, score, evidence, documents,
+//                   tab-evidence, tab-cashflow, tab-decision, tab-brief (section tabs),
 //                   audit-trail, audit-open (press it to open the audit trail)
 
 export const DEMO_PINS = {
@@ -75,12 +76,14 @@ export const DEMO_STEPS = [
   {
     id: "evidence",
     route: redApplicantPage,
+    press: "tab-evidence",
     target: "evidence",
     caption: "Every signal quotes its source, links to it, and says what to ask the company next.",
   },
   {
     id: "documents",
     route: redApplicantPage,
+    press: "tab-decision",
     target: "documents",
     caption: "Before spending a week on the deal, the officer asks for these documents first.",
   },

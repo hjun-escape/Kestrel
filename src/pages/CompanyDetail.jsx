@@ -20,11 +20,11 @@ import { AUTO_RESUME_DELAY_MS, AUTO_RESUME_MAX, pendingSources, shouldAutoResume
 async function fetchCompany(id) {
   const [borrower, sigRes, runRes] = await Promise.all([
     base44.entities.Borrower.get(id),
-    base44.entities.Signal.filter({ borrower_id: id }, { limit: 200, sort: "-date" }),
+    base44.entities.Signal.filter({ borrower_id: id }, "-date", 200),
     // Latest news check, for "How News and Legal were checked". Optional: never blocks the page.
-    base44.entities.CheckRun.filter({ borrower_id: id }, { limit: 1, sort: "-started_at" }).catch(() => null),
+    base44.entities.CheckRun.filter({ borrower_id: id }, "-started_at", 1).catch(() => []),
   ]);
-  return { borrower, signals: sigRes.items || [], checkRun: runRes?.items?.[0] || null };
+  return { borrower, signals: sigRes || [], checkRun: runRes?.[0] || null };
 }
 
 // Thrown by loadData when the company belongs to someone else (or, signed in,

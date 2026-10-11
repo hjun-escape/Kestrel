@@ -66,12 +66,12 @@ export default function LoanBook() {
     setLoadError(null);
     try {
       const query = me ? { owner_email: me } : {};
-      const [{ items }, sigRes] = await Promise.all([
-        base44.entities.Borrower.filter(query, { limit: 500, sort: "-created_date" }),
-        base44.entities.Signal.filter({}, { limit: 500, sort: "-date" }),
+      const [items, signalItems] = await Promise.all([
+        base44.entities.Borrower.filter(query, "-created_date", 500),
+        base44.entities.Signal.filter({}, "-date", 500),
       ]);
       setBorrowers(visibleCompanies(items, me));
-      setSignalsByBorrower(groupSignals(sigRes.items));
+      setSignalsByBorrower(groupSignals(signalItems));
     } catch {
       setBorrowers([]);
       setLoadError("Could not load the loan book. Check your connection and reload.");

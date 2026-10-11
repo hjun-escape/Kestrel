@@ -1,17 +1,20 @@
 import React from "react";
 import { formatDistanceToNowStrict } from "date-fns";
 import { Pencil, RefreshCw, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button as SharedButton } from "@/components/ui/button";
 import StatusBadge from "@/components/StatusBadge";
 import { StatusLegendPopover } from "@/components/StatusLegend";
 import { countForRules, ruleLine } from "@/lib/statusRules.ts";
 import { SOURCES } from "@/lib/signalTypes";
 import { formatRelative, formatUsdFull, isSampleCompany, reasonText } from "@/lib/borrowerUtils";
 import { coverageText, sourceCoverage } from "@/lib/sourceCoverage";
+import { confidenceTone } from "@/lib/auditMetrics";
+
+const Button = /** @type {React.ComponentType<any>} */ (SharedButton);
 
 // Detail header: identity, status with the reason, key facts, the Refresh
 // control with per-source progress, and Edit / Delete.
-export default function CompanyHeader({ borrower, signals = [], sourceStates, running, refreshError, onRefresh, onEdit, onDelete }) {
+export default function CompanyHeader({ borrower, signals = [], sourceStates, running, refreshError, onRefresh, onEdit, onDelete, onRunActions, confidence = null }) {
   const hq = [borrower.hq_city, borrower.hq_state].filter(Boolean).join(", ");
   const isApplicant = borrower.stage === "applicant";
   // Partial check: say how many of the four sources the status rests on.
@@ -47,6 +50,11 @@ export default function CompanyHeader({ borrower, signals = [], sourceStates, ru
             <div className="flex flex-col items-start gap-2 sm:flex-row sm:gap-3">
               <div className="flex shrink-0 items-center gap-1.5">
                 <StatusBadge status={borrower.status} lastRefreshed={borrower.last_refreshed} size="lg" />
+                {confidence?.percent != null && (
+                  <span className={`rounded-sm border px-2.5 py-1 text-sm font-semibold tabular-nums ${confidenceTone(confidence.percent)}`}>
+                    {confidence.percent}% confidence
+                  </span>
+                )}
                 <StatusLegendPopover iconOnly />
               </div>
               <p className="max-w-[68ch] pt-0.5 text-[15px] leading-snug text-ew-ink-soft">
@@ -66,9 +74,22 @@ export default function CompanyHeader({ borrower, signals = [], sourceStates, ru
           {coverage && (
             <p className="mt-1.5 text-xs text-ew-muted">{coverage}</p>
           )}
+          {onRunActions && (
+            <p className="mt-2 text-xs text-ew-muted" title="Check-based confidence = passed checks divided by all checks. Unresolved checks do not count as passes. Not measured claim accuracy or probability of repayment.">
+              Check-based confidence:{" "}
+              <span className={`rounded-sm border px-1.5 font-semibold tabular-nums ${confidenceTone(confidence?.percent)}`}>{confidence?.percent == null ? "Run audit to assess" : `${confidence.percent}%`}</span>
+              {confidence?.total > 0 && (
+                <>
+                  {" · "}<span className="font-medium text-ew-green">{confidence.passed}/{confidence.total} checks passed</span>
+                  {confidence.failed > 0 && <>{" · "}<span className="font-medium text-ew-red">{confidence.failed} failed</span></>}
+                  {" · "}<span className="font-medium text-ew-amber">{confidence.unresolved} unresolved</span>
+                </>
+              )}
+            </p>
+          )}
         </div>
         <div className="flex w-full shrink-0 flex-col gap-2 md:w-[220px]">
-          <RefreshControl sourceStates={sourceStates} running={running} error={refreshError} onRefresh={onRefresh} sample={isSampleCompany(borrower)} />
+          {onRunActions ? <Button onClick={onRunActions} disabled={running} className="h-9 rounded-sm bg-ew-ink hover:bg-ew-ink-soft"><RefreshCw aria-hidden="true" />{running ? 'Checking sources…' : 'Run checks'}</Button> : <RefreshControl sourceStates={sourceStates} running={running} error={refreshError} onRefresh={onRefresh} sample={isSampleCompany(borrower)} />}
           {(onEdit || onDelete) && (
             <div className="flex justify-end gap-1">
               {/* Disabled during a check: the refresh is still writing this company's evidence. */}

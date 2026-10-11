@@ -1,0 +1,14 @@
+{
+  "name": "AuditRun",
+  "type": "object",
+  "properties": {
+    "borrower_id": { "type": "string" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "reviewed_by": { "type": "string" },
+    "parent_run_id": { "type": "string" },
+    "kind": { "type": "string", "enum": ["audit", "review"] },
+    "payload": { "type": "string", "description": "Immutable versioned audit snapshot, tests, explanations, considerations and reviewer decisions." }
+  },
+  "required": ["borrower_id", "created_at", "reviewed_by", "kind", "payload"],
+  "rls": { "create": false, "read": false, "update": false, "delete": false }
+}

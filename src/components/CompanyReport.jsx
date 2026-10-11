@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { ChevronRight, ExternalLink } from "lucide-react";
 import CompanyHeader from "@/components/CompanyHeader";
 import SourceStatusRow from "@/components/SourceStatusRow";
@@ -9,14 +9,29 @@ import AnalystBrief from "@/components/AnalystBrief";
 import CheckTrace from "@/components/CheckTrace";
 import AutoResumeNote from "@/components/AutoResumeNote";
 import WarningScore from "@/components/WarningScore";
+import ReportAudit from "@/components/ReportAudit";
+import { useAuth } from "@/lib/AuthContext";
+import { createSessionAudit } from "@/lib/sessionAudit";
+import { Dialog, DialogContent as SharedDialogContent, DialogTitle as SharedDialogTitle, DialogDescription as SharedDialogDescription } from "@/components/ui/dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { formatTimeToFlag, timeToFirstFlag } from "@/lib/timeToFlag.ts";
 import { filterRecentSignals } from "@/lib/borrowerUtils";
+
+const DialogContent = /** @type {React.ComponentType<any>} */ (SharedDialogContent);
+const DialogTitle = /** @type {React.ComponentType<any>} */ (SharedDialogTitle);
+const DialogDescription = /** @type {React.ComponentType<any>} */ (SharedDialogDescription);
 
 // The company report: everything shown for one company once it has been checked (status, sources,
 // warning score, how it was checked, evidence, cash flow, decision, analyst brief, profiles).
 // CompanyDetail renders it with live data; /dev/progression renders it for its example company.
 // Mount with key={borrower.id} so per-company state resets when the company changes.
+const SECTIONS = [
+  ["evidence", "Evidence"],
+  ["cashflow", "Cash flow"],
+  ["decision", "Other lenders & decision"],
+  ["brief", "Analyst brief"],
+];
+
 export default function CompanyReport({
   borrower,
   signals,
@@ -35,6 +50,17 @@ export default function CompanyReport({
   onStopAutoResume,
 }) {
   const [cashflowReview, setCashflowReview] = useState(null);
+  const [reviewView, setReviewView] = useState('report');
+  const [section, setSection] = useState("evidence");
+  const { isAuthenticated } = useAuth();
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const [runRequest, setRunRequest] = useState(0);
+  const [confidence, setConfidence] = useState(null);
+  const sessionRequest = useMemo(() => createSessionAudit(borrower, signals, checkRun), [borrower.id, borrower.last_refreshed, signals, checkRun]);
+  function openReview(view) {
+    setReviewView(view);
+  }
+  function startAudit() { setActionsOpen(false); setReviewView('summary'); setRunRequest(n => n + 1); }
   const recentSignals = filterRecentSignals(signals);
   const olderCount = signals.length - recentSignals.length;
   const isApplicant = borrower.stage === "applicant";
@@ -47,16 +73,23 @@ export default function CompanyReport({
           borrower={borrower}
           signals={signals}
           sourceStates={sourceStates}
-          running={running}          refreshError={refreshError}
+          running={running}
+          refreshError={refreshError}
           onRefresh={onRefresh}
           onEdit={onEdit}
           onDelete={onDelete}
+          onRunActions={() => setActionsOpen(true)}
+          confidence={confidence}
         />
         {notice && (
           <p role="status" className="border-t border-ew-rule-soft px-5 py-2 text-xs text-ew-ink-soft">
             {notice}
           </p>
         )}
+        <nav aria-label="Company report sections" className="flex flex-wrap gap-1 border-t border-ew-rule-soft px-5">
+          {[['report', 'Company report'], ['summary', 'Audit report']].map(([view, label]) => <button key={view} type="button" aria-current={reviewView === view ? 'page' : undefined} onClick={() => openReview(view)} className={`border-b-2 px-3 py-3 text-sm font-medium focus-visible:outline-ew-focus ${reviewView === view ? 'border-ew-ink text-ew-ink' : 'border-transparent text-ew-muted hover:text-ew-ink'}`}>{label}</button>)}
+        </nav>
+        <div hidden={reviewView !== 'report'}>
         <SourceStatusRow borrower={borrower} states={sourceStates} recentSignals={recentSignals} running={running} startedAt={startedAt} />
         <AutoResumeNote state={autoResume} onStop={onStopAutoResume} />
         <WarningScore borrower={borrower} signals={signals} />
@@ -64,12 +97,46 @@ export default function CompanyReport({
         {flagLine && (
           <p className="border-t border-ew-rule-soft px-5 py-2 text-xs text-ew-ink-soft">{flagLine}</p>
         )}
+        </div>
       </div>
 
-      {/* Evidence first: the signals behind the status, each with its source and
-          what to ask. Next steps (decision, other lenders, analyst) sit beside it. */}
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_400px]">
-        <section aria-labelledby="evidence-heading" className="min-w-0">
+      <Dialog open={actionsOpen} onOpenChange={setActionsOpen}>
+        <DialogContent className="rounded-sm border-ew-rule bg-ew-surface text-ew-ink sm:rounded-sm">
+          <DialogTitle>Run checks for {borrower.name}</DialogTitle>
+          <DialogDescription>Choose how to update or review this report. The original report stays intact when auditing.</DialogDescription>
+          <div className="space-y-2">
+            <button type="button" disabled={running} onClick={() => { setActionsOpen(false); setReviewView('report'); onRefresh(); }} className="w-full rounded-sm border border-ew-rule p-4 text-left hover:bg-ew-hover disabled:opacity-50"><span className="block text-sm font-semibold">Refresh source data</span><span className="mt-1 block text-xs text-ew-muted">Collect current signals and update the company report.</span></button>
+            <button type="button" disabled={running} onClick={startAudit} className="w-full rounded-sm border border-ew-rule p-4 text-left hover:bg-ew-hover disabled:opacity-50"><span className="block text-sm font-semibold">Audit this report</span><span className="mt-1 block text-xs text-ew-muted">Run evidence checks, then view progression and activity logs.</span></button>
+            <button type="button" disabled={running} onClick={() => { setActionsOpen(false); setReviewView('considerations'); }} className="w-full rounded-sm border border-ew-rule p-4 text-left hover:bg-ew-hover disabled:opacity-50"><span className="block text-sm font-semibold">Rerun with considerations</span><span className="mt-1 block text-xs text-ew-muted">Apply or skip instructions and choose evidence to test.</span></button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <div hidden={reviewView === 'report'}><ReportAudit borrower={borrower} currentSignals={signals} refreshing={running} view={reviewView} onViewChange={openReview} request={isAuthenticated ? undefined : sessionRequest} sessionOnly={!isAuthenticated} runRequest={runRequest} onConfidenceChange={setConfidence} /></div>
+
+      {/* Below the header, one section at a time: evidence first (the signals behind the status, each with its
+          source and what to ask), then cash flow, other lenders and the decision, and the analyst brief.
+          Inactive tabs stay mounted (hidden) so their state survives switching. */}
+      <div hidden={reviewView !== 'report'} className="mt-6">
+        <div role="tablist" aria-label="Report sections" className="flex flex-wrap gap-x-6 border-b border-ew-rule">
+          {SECTIONS.map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              id={`section-tab-${key}`}
+              data-demo={`tab-${key}`}
+              aria-selected={section === key}
+              aria-controls={`section-panel-${key}`}
+              onClick={() => setSection(key)}
+              className={`-mb-px border-b-2 py-2.5 text-sm font-medium focus-visible:outline-ew-focus ${section === key ? "border-ew-ink text-ew-ink" : "border-transparent text-ew-muted hover:text-ew-ink"}`}
+            >
+              {label}
+              {key === "evidence" && <span className="ml-1.5 tabular-nums text-ew-muted">{recentSignals.length}</span>}
+            </button>
+          ))}
+        </div>
+
+        <section role="tabpanel" id="section-panel-evidence" aria-labelledby="section-tab-evidence" hidden={section !== "evidence"} className="pt-5">
           <div data-demo="evidence">
             <div className="mb-3 flex items-baseline justify-between gap-4">
               <h2 id="evidence-heading" className="font-heading text-xl font-bold tracking-tight text-ew-ink">
@@ -86,12 +153,13 @@ export default function CompanyReport({
               newIds={newIds}
             />
           </div>
+        </section>
+
+        <section role="tabpanel" id="section-panel-cashflow" aria-labelledby="section-tab-cashflow" hidden={section !== "cashflow"} className="max-w-3xl pt-5">
           {isApplicant ? (
-            <div className="mt-6">
-              <CashflowReview borrower={borrower} onReviewChange={setCashflowReview} />
-            </div>
+            <CashflowReview borrower={borrower} onReviewChange={setCashflowReview} />
           ) : (
-            <Collapsible className="mt-6 border border-ew-rule bg-ew-surface">
+            <Collapsible className="border border-ew-rule bg-ew-surface">
               <CollapsibleTrigger className="group flex w-full items-center gap-2 px-4 py-3 text-left font-heading text-sm font-bold text-ew-ink">
                 <ChevronRight aria-hidden="true" className="h-4 w-4 transition-transform group-data-[state=open]:rotate-90" />
                 Upload latest statement
@@ -103,11 +171,17 @@ export default function CompanyReport({
           )}
         </section>
 
-        <aside aria-label="Next steps" className="flex min-w-0 flex-col gap-4">
+        <section role="tabpanel" id="section-panel-decision" aria-labelledby="section-tab-decision" hidden={section !== "decision"} className="max-w-3xl pt-5">
           <ApplicantDecision key={borrower.id} borrower={borrower} signals={signals} />
+        </section>
+
+        <section role="tabpanel" id="section-panel-brief" aria-labelledby="section-tab-brief" hidden={section !== "brief"} className="max-w-3xl pt-5">
           <AnalystBrief borrower={borrower} />
+        </section>
+
+        <div className="mt-6 max-w-3xl">
           <CompanyLinks borrower={borrower} />
-        </aside>
+        </div>
       </div>
     </>
   );
