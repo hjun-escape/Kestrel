@@ -4,6 +4,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { STATUS_STYLES } from "@/components/StatusBadge";
 import { NOT_AI_TEXT, STATUS_RULES, STRONG_EXAMPLES, WEAK_EXAMPLES } from "@/lib/statusRules.ts";
 
+// What each colour asks the officer to do, before the rule behind it.
+const MEANING = { red: "High risk: act now.", yellow: "Watch: ask questions.", green: "No warning signs." };
+
 // What Red / Yellow / Green mean, in plain English (from user testing: testers asked
 // what the colours mean and whether AI decides them). Same rules as scoreBorrower.
 export default function StatusLegend({ compact = false }) {
@@ -18,18 +21,18 @@ export default function StatusLegend({ compact = false }) {
               <span aria-hidden="true" className={`inline-block shrink-0 ${STATUS_STYLES[r.status].glyph}`} />
               {r.label}
             </span>
-            <span className="leading-snug">{r.rule}</span>
+            <span className="leading-snug"><span className="font-semibold text-ew-ink">{MEANING[r.status]}</span> {r.rule}</span>
           </li>
         ))}
       </ul>
       {!compact && (
         <dl className="mt-3 flex flex-col gap-1.5 border-t border-ew-rule-soft pt-3 text-xs leading-snug">
           <div>
-            <dt className="inline font-semibold text-ew-ink">Strong: </dt>
+            <dt className="inline font-semibold text-ew-ink">Strong warning sign: </dt>
             <dd className="inline">{STRONG_EXAMPLES}</dd>
           </div>
           <div>
-            <dt className="inline font-semibold text-ew-ink">Weak: </dt>
+            <dt className="inline font-semibold text-ew-ink">Weak warning sign: </dt>
             <dd className="inline">{WEAK_EXAMPLES}</dd>
           </div>
         </dl>
@@ -50,7 +53,7 @@ export function StatusLegendPopover({ label = "What do the colors mean?", iconOn
         className={`inline-flex shrink-0 items-center gap-1 rounded-sm text-xs font-medium text-ew-ink-soft underline-offset-2 hover:text-ew-ink hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ew-ink ${iconOnly ? "h-7 w-7 justify-center border border-ew-rule bg-ew-surface hover:bg-ew-hover hover:no-underline" : ""}`}
       >
         <Info aria-hidden="true" className="h-3.5 w-3.5" />
-        {!iconOnly && label}
+        {!iconOnly && <span className="underline decoration-ew-rule underline-offset-2">{label}</span>}
       </PopoverTrigger>
       <PopoverContent align={align} className="w-[360px] max-w-[calc(100vw-32px)] rounded-sm border-ew-rule bg-ew-surface p-4">
         <p className="mb-2 font-heading text-sm font-bold text-ew-ink">What the colors mean</p>
