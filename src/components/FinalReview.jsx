@@ -59,7 +59,8 @@ export default function FinalReview({ borrower, signals, payload, stale, histori
 
   const confidence = checkConfidence(payload.tests);
   const callOf = id => decisions.find(d => d.signal_id === id);
-  const assessed = signals.filter(s => ['confirmed', 'incorrect'].includes(callOf(s.id)?.decision)).length;
+  // Every flag needs a call; Uncertain is a call too (say why in its reason).
+  const assessed = signals.filter(s => ['confirmed', 'incorrect', 'uncertain'].includes(callOf(s.id)?.decision)).length;
   const unavailable = borrower.sources_unavailable || [];
   const docs = payload.documents || [];
   const passagesOf = id => (payload.document_context || []).find(c => c.signal_id === id)?.passages || [];
@@ -67,10 +68,10 @@ export default function FinalReview({ borrower, signals, payload, stale, histori
   const incorrectIds = signals.filter(s => callOf(s.id)?.decision === 'incorrect').map(s => s.id);
   const scoreNow = warningScore(signals);
   const scoreAfter = warningScore(signals.filter(s => !incorrectIds.includes(s.id)));
-  const ready = !stale && !historical && allAssessed && !!outcome && (outcome === 'proceed' || note.trim());
 
   function submit() {
     setError('');
+    if (!allAssessed) return setError(`Make a call on the ${signals.length - assessed} remaining flag${signals.length - assessed === 1 ? '' : 's'} first (Confirm, Incorrect or Uncertain).`);
     if (!outcome) return setError('Choose a final outcome.');
     if (outcome !== 'proceed' && !note.trim()) return setError('Add a note explaining the outcome.');
     onSignoff({ outcome, note });
@@ -91,7 +92,7 @@ export default function FinalReview({ borrower, signals, payload, stale, histori
         <ul className="mt-1 divide-y divide-ew-rule-soft">
           <Item state={borrower.last_refreshed && !unavailable.length ? 'done' : 'warn'} title="Sources checked" detail={!borrower.last_refreshed ? 'This company has not been checked.' : unavailable.length ? `${unavailable.join(', ')} did not answer. The status rests on the other sources.` : 'Every source answered in the last check.'} />
           <Item state={stale ? 'warn' : 'done'} title="Audit covers the current report" detail={stale ? 'The report changed after this audit. Run the audit again.' : `Check-based confidence ${confidence.percent ?? 0}% · ${confidence.passed}/${confidence.total} checks passed.`} />
-          <Item state={allAssessed ? 'done' : 'todo'} title="Every flag confirmed or rejected" detail={`${assessed} of ${signals.length} flags called. Uncertain flags need a decision before you sign.`} />
+          <Item state={allAssessed ? 'done' : 'todo'} title="A call on every flag" detail={`${assessed} of ${signals.length} flags called: Confirm, Incorrect or Uncertain.`} />
           <Item state={(payload.accepted_documents || []).length ? 'done' : 'todo'} title="Documents exchanged and reviewed (optional)" detail={(payload.accepted_documents || []).length ? `${payload.accepted_documents.length} accepted document${payload.accepted_documents.length === 1 ? '' : 's'} used in this audit: ${payload.accepted_documents.map(d => d.name).join(', ')}.` : 'None accepted yet. Request or add documents in the Documents tab, then run the audit again.'} />
           <Item state={docs.length ? 'done' : 'todo'} title="Context documents considered (optional)" detail={docs.length ? docs.map(d => d.name).join(', ') : 'None added. Add them in Rerun with considerations.'} />
         </ul>
@@ -164,10 +165,10 @@ export default function FinalReview({ borrower, signals, payload, stale, histori
         <textarea id="final-note" rows={3} maxLength={1000} value={note} onChange={e => setNote(e.target.value)} disabled={busy || stale || historical} className={`${field} mt-1`} placeholder="Conditions, documents to request, or why you declined." />
         {error && <p role="alert" className="mt-2 text-sm text-ew-red">{error}</p>}
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          <button type="button" onClick={submit} disabled={!ready || busy} className="inline-flex h-9 items-center gap-2 rounded-sm bg-ew-ink px-4 text-sm font-semibold text-white disabled:opacity-50">
+          <button type="button" onClick={submit} disabled={busy || stale || historical} className="inline-flex h-9 items-center gap-2 rounded-sm bg-ew-ink px-4 text-sm font-semibold text-white disabled:opacity-50">
             {busy && <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />}Sign off
           </button>
-          <p className="text-xs text-ew-muted">{!allAssessed ? `Confirm or reject the ${signals.length - assessed} remaining flag${signals.length - assessed === 1 ? '' : 's'} first.` : 'Saved as a new audit version with your name and time. The status does not change.'}</p>
+          <p className="text-xs text-ew-muted">{!allAssessed ? `Make a call on the ${signals.length - assessed} remaining flag${signals.length - assessed === 1 ? '' : 's'} first.` : outcome && outcome !== 'proceed' && !note.trim() ? 'Add a note explaining the outcome, then sign off.' : 'Saved as a new audit version with your name and time. The status does not change.'}</p>
         </div>
       </section>
     </div>
