@@ -9,6 +9,8 @@ import { readFileSync } from 'node:fs';
 // every folder that enforces it; these tests run the same table on every copy
 // and check the copies stay identical.
 import * as askPortfolio from '../base44/functions/askPortfolio/access.ts';
+import * as auditReport from '../base44/functions/auditReport/access.ts';
+import * as documentExchange from '../base44/functions/documentExchange/access.ts';
 import * as confirmAction from '../base44/functions/confirmAction/access.ts';
 import * as refreshBorrower from '../base44/functions/refreshBorrower/access.ts';
 import * as analyzeBorrower from '../base44/functions/analyzeBorrower/access.ts';
@@ -21,7 +23,7 @@ import { runAgent } from '../base44/functions/askPortfolio/logic.ts';
 import { executeAction } from '../base44/functions/confirmAction/logic.ts';
 import type { ConfirmDeps } from '../base44/functions/confirmAction/logic.ts';
 
-const COPIES = { askPortfolio, confirmAction, refreshBorrower, analyzeBorrower, lenderCheck, analyzeCashflow, manageCompany, findCompanyPages };
+const COPIES = { askPortfolio, auditReport, documentExchange, confirmAction, refreshBorrower, analyzeBorrower, lenderCheck, analyzeCashflow, manageCompany, findCompanyPages };
 const FOLDERS = Object.keys(COPIES);
 
 const A = { email: 'a@x.com' };

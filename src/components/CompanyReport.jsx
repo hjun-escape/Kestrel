@@ -11,6 +11,9 @@ import CheckTrace from "@/components/CheckTrace";
 import AutoResumeNote from "@/components/AutoResumeNote";
 import WarningScore from "@/components/WarningScore";
 import ReportAudit from "@/components/ReportAudit";
+import DocumentExchange from "@/components/DocumentExchange";
+import { OUTCOMES } from "@/components/FinalReview";
+import { base44 } from "@/api/base44Client";
 import { useAuth } from "@/lib/AuthContext";
 import { createSessionAudit } from "@/lib/sessionAudit";
 import { Dialog, DialogContent as SharedDialogContent, DialogTitle as SharedDialogTitle, DialogDescription as SharedDialogDescription } from "@/components/ui/dialog";
@@ -24,7 +27,7 @@ const DialogDescription = /** @type {React.ComponentType<any>} */ (SharedDialogD
 // then one scrolling report with a heading per section. Detail-heavy sections start collapsed.
 // CompanyDetail renders it with live data; /dev/progression renders it for its example company.
 // Mount with key={borrower.id} so per-company state resets when the company changes.
-const DEFAULT_OPEN = { evidence: false, review: true, sources: false, score: false, brief: false, doublecheck: false };
+const DEFAULT_OPEN = { evidence: false, review: true, sources: false, score: false, brief: false, documents: false, doublecheck: false };
 
 function prefersReducedMotion() {
   return typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -62,8 +65,10 @@ export default function CompanyReport({
   const [auditView, setAuditView] = useState("summary");
   const [actionsOpen, setActionsOpen] = useState(false);
   const [runRequest, setRunRequest] = useState(0);
+  const [signoff, setSignoff] = useState(null);
   const { isAuthenticated } = useAuth();
-  const sessionRequest = useMemo(() => createSessionAudit(borrower, signals, checkRun), [borrower.id, borrower.last_refreshed, signals, checkRun]);
+  // Signed out (shared demo book): audits run in the page, and still use documents accepted in the exchange.
+  const sessionRequest = useMemo(() => createSessionAudit(borrower, signals, checkRun, async () => (await base44.functions.invoke('documentExchange', { action: 'accepted', borrower_id: borrower.id })).data?.items || []), [borrower.id, borrower.last_refreshed, signals, checkRun]);
   const recentSignals = filterRecentSignals(signals);
   const olderCount = signals.length - recentSignals.length;
   const isApplicant = borrower.stage === "applicant";
@@ -80,6 +85,10 @@ export default function CompanyReport({
     setActionsOpen(false);
     setAuditView("summary");
     setRunRequest((n) => n + 1);
+    reveal("doublecheck", "doublecheck");
+  }
+  function openFinalReview() {
+    setAuditView("final");
     reveal("doublecheck", "doublecheck");
   }
 
@@ -99,6 +108,7 @@ export default function CompanyReport({
         onShowAllEvidence={() => reveal("evidence", "evidence")}
         onNextStep={(kind) => (kind === "documents" ? reveal("review", "applicant-documents") : reveal("review", "review"))}
       />
+      {signoff && <SignoffBanner signoff={signoff} onOpen={openFinalReview} />}
       {notice && (
         <p role="status" className="mt-2 border-l-2 border-ew-ink bg-ew-surface px-3 py-2 text-xs text-ew-ink-soft">
           {notice}
@@ -208,12 +218,35 @@ export default function CompanyReport({
         </ReportSection>
 
         <ReportSection
+          id="documents"
+          title="Document exchange"
+          summary="Ask for documents, review what comes back, accept it"
+          open={open.documents}
+          onToggle={() => toggle("documents")}
+        >
+          <DocumentExchange borrower={borrower} signals={signals} onRerunAudit={startAudit} />
+        </ReportSection>
+
+        <ReportSection
           id="doublecheck"
-          title="Double-check"
-          summary="Each quote, date and company match, checked again"
+          title="Double-check and sign-off"
+          summary="Each quote, date and company match, checked again, then signed off"
           open={open.doublecheck}
           onToggle={() => toggle("doublecheck")}
         >
+          <div role="group" aria-label="Double-check view" className="flex flex-wrap gap-2">
+            {[["summary", "Double-check results"], ["final", "Final review and sign-off"]].map(([view, label]) => (
+              <button
+                key={view}
+                type="button"
+                aria-pressed={view === "final" ? auditView === "final" : auditView !== "final"}
+                onClick={() => setAuditView(view)}
+                className={`rounded-sm border px-3 py-1.5 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-ew-focus ${(view === "final" ? auditView === "final" : auditView !== "final") ? "border-ew-ink bg-ew-ink text-white" : "border-ew-rule text-ew-ink hover:bg-ew-hover"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <ReportAudit
             borrower={borrower}
             currentSignals={signals}
@@ -223,6 +256,7 @@ export default function CompanyReport({
             request={isAuthenticated ? undefined : sessionRequest}
             sessionOnly={!isAuthenticated}
             runRequest={runRequest}
+            onSignoffChange={setSignoff}
           />
         </ReportSection>
 
@@ -285,5 +319,20 @@ function CompanyLinks({ borrower }) {
         </p>
       )}
     </section>
+  );
+}
+
+const SIGNOFF_TONE = { proceed: "border-ew-green-rule bg-ew-green-bg text-ew-green", proceed_with_conditions: "border-ew-amber-rule bg-ew-amber-bg text-ew-amber", request_documents: "border-ew-amber-rule bg-ew-amber-bg text-ew-amber", decline: "border-ew-red-rule bg-ew-red-bg text-ew-red" };
+
+/** The latest final review sign-off, shown under the verdict card. */
+function SignoffBanner({ signoff, onOpen }) {
+  const label = OUTCOMES.find(([k]) => k === signoff.outcome)?.[1] || signoff.outcome;
+  return (
+    <div className={`mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border px-3 py-2 text-sm ${SIGNOFF_TONE[signoff.outcome] || "border-ew-rule"}`}>
+      <span className="font-semibold">Signed off: {label}</span>
+      <span className="text-xs">{signoff.by} · {new Date(signoff.at).toLocaleString()}</span>
+      {signoff.note && <span className="min-w-0 flex-1 truncate text-ew-ink">{signoff.note}</span>}
+      <button type="button" onClick={onOpen} className="text-xs font-semibold underline underline-offset-2">Final review</button>
+    </div>
   );
 }
