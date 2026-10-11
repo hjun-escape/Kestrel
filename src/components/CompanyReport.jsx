@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { ExternalLink } from "lucide-react";
 import VerdictCard from "@/components/company/VerdictCard";
 import ReportSection from "@/components/company/ReportSection";
@@ -32,6 +33,10 @@ const DEFAULT_OPEN = { evidence: false, review: true, sources: false, score: fal
 function prefersReducedMotion() {
   return typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 }
+
+const DEVIN_ANCHOR = "devin-review";
+const ANCHOR_WAIT_MS = 4000;
+const ANCHOR_POLL_MS = 150;
 
 // Scroll to an element once the section holding it has rendered open, and move focus there.
 function revealLater(targetId) {
@@ -73,6 +78,20 @@ export default function CompanyReport({
   const olderCount = signals.length - recentSignals.length;
   const isApplicant = borrower.stage === "applicant";
 
+  const { hash } = useLocation();
+  // Links to #devin-review (e.g. from the assistant) open the double-check section, then scroll once Devin's panel renders.
+  useEffect(() => {
+    if (hash !== `#${DEVIN_ANCHOR}`) return undefined;
+    setOpen((prev) => ({ ...prev, doublecheck: true }));
+    setAuditView((v) => (v === "considerations" || v === "history" ? "summary" : v));
+    const started = Date.now();
+    const timer = window.setInterval(() => {
+      const el = document.getElementById(DEVIN_ANCHOR);
+      if (el && !el.closest("[hidden]")) { window.clearInterval(timer); revealLater(DEVIN_ANCHOR); }
+      else if (Date.now() - started > ANCHOR_WAIT_MS) window.clearInterval(timer);
+    }, ANCHOR_POLL_MS);
+    return () => window.clearInterval(timer);
+  }, [hash]);
   const toggle = (key) => setOpen((prev) => ({ ...prev, [key]: !prev[key] }));
   const reveal = (key, targetId) => {
     setOpen((prev) => ({ ...prev, [key]: true }));

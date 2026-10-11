@@ -19,6 +19,8 @@ export default async function(req: Request): Promise<Response> {
       if (!['green', 'yellow', 'red'].includes(result?.status) || typeof result.why !== 'string') throw new Error('Scoring unavailable');
       return result;
     },
+    // Devin hook (ui/ronit-devin): connected when the DEVIN_SERVICE_KEY secret is set; latest DevinRun for the summary.
+    devin: async (id: string) => ({ connected: !!Deno.env.get('DEVIN_SERVICE_KEY'), latest: items(await db.DevinRun.filter({ borrower_id: id }, '-started_at', 1).catch(() => []))[0] || null }),
     now: () => new Date().toISOString(),
     save: (record: any) => db.AuditRun.create(record),
     // Documents the bank accepted in the document exchange (documentExchange), for this company.

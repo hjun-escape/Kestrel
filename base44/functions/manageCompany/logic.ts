@@ -23,7 +23,7 @@ export const EDITABLE = [
 export const IDENTITY = ["name", "website_domain", "linkedin_url", "glassdoor_url"] as const;
 
 // Entities that point at a company with borrower_id. Deleting a company deletes these too.
-export const CHILD_ENTITIES = ["Signal", "Analysis", "LenderCheck", "Decision", "CashflowReview", "CheckRun", "AuditRun", "DocumentExchange"] as const;
+export const CHILD_ENTITIES = ["Signal", "Analysis", "LenderCheck", "Decision", "CashflowReview", "CheckRun", "AuditRun", "DocumentExchange", "DevinRun"] as const;
 
 type Patch = Record<string, unknown>;
 

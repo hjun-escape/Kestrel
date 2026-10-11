@@ -6,7 +6,8 @@ import StatusBadge from "@/components/StatusBadge";
 import { deriveSourceStates } from "@/lib/borrowerUtils";
 import { useAssistantPage } from "./AssistantContext";
 import { setActionState, useActionState } from "./actionStore";
-import { asList, errorText } from "./assistantData";
+import { asList, errorText, safeHref } from "./assistantData";
+import { devinErrorMessage } from "@/components/devin/devinRunUtils";
 import { useCompanyLive } from "./useCompanyLive";
 import SourceProgress from "./SourceProgress";
 
@@ -14,12 +15,14 @@ const KIND_LABEL = {
   screen: "Screen new applicant",
   refresh: "Re-check public sources",
   deep_check: "Analyst deep check",
+  devin_investigation: "Ask Devin to investigate",
 };
 
 const CONFIRM_LABEL = {
   screen: "Add and check",
   refresh: "Run check",
   deep_check: "Run deep check",
+  devin_investigation: "Ask Devin",
 };
 
 const PARAM_LABEL = {
@@ -69,6 +72,7 @@ function doneMessage(action, data) {
       : `${name} was added as an applicant. The first check did not finish: ${data?.refresh?.error || "unknown error"}.`;
   }
   if (action.kind === "refresh") return "Check finished.";
+  if (action.kind === "devin_investigation") return "Devin is investigating. This takes a few minutes.";
   const summary = data?.result?.summary;
   return summary ? `Deep check finished: ${summary}` : "Deep check finished. The analyst brief is on the company page.";
 }
@@ -86,6 +90,7 @@ function useConfirm(action, onFinished) {
       snapshot,
       message: "",
       startedAt: Date.now(),
+      devinUrl: null,
     });
     try {
       const { state: _ignored, ...clean } = action;
@@ -96,12 +101,13 @@ function useConfirm(action, onFinished) {
         status: "done",
         companyId: settledId,
         message: doneMessage(action, data),
+        devinUrl: action.kind === "devin_investigation" ? safeHref(data?.result?.run?.devin_url) : null,
       });
       onFinished(settledId);
     } catch (e) {
       setActionState(action.action_id, {
         status: "error",
-        message: errorText(e, "The action could not be completed. Try again."),
+        message: action.kind === "devin_investigation" ? devinErrorMessage(e) : errorText(e, "The action could not be completed. Try again."),
       });
       onFinished(null);
     }
@@ -151,7 +157,7 @@ function LiveProgress({ state, action }) {
 export function ActionCard({ data }) {
   const action = data?.action;
   const live = useActionState(action?.action_id);
-  const { reloadCompanies, setMentionedId } = useAssistantPage();
+  const { reloadCompanies, setMentionedId, byId } = useAssistantPage();
   const confirm = useConfirm(action || {}, (settledId) => {
     reloadCompanies();
     if (settledId) setMentionedId(settledId);
@@ -164,6 +170,9 @@ export function ActionCard({ data }) {
   const showProgress =
     (action.kind === "refresh" || action.kind === "screen") && live && status !== "cancelled" && Boolean(live.companyId || live.domain);
 
+  const isDevin = action.kind === "devin_investigation";
+  const devinCompany = isDevin ? byId?.[action.params?.id]?.name || "this company" : "";
+  const title = isDevin ? `Ask Devin to investigate ${devinCompany}` : KIND_LABEL[action.kind] || action.kind;
   const handleConfirm = () => {
     if (action.params?.id) setMentionedId(action.params.id);
     confirm();
@@ -172,13 +181,13 @@ export function ActionCard({ data }) {
 
   return (
     <section
-      aria-label={KIND_LABEL[action.kind] || "Proposed action"}
+      aria-label={isDevin ? title : KIND_LABEL[action.kind] || "Proposed action"}
       className={`mt-4 rounded-sm border bg-ew-surface px-4 py-3 transition-colors ${
         status === "pending" ? "border-ew-ink shadow-[3px_3px_0_var(--ew-rule-soft)]" : "border-ew-rule"
       }`}
     >
       <div className="flex items-baseline justify-between gap-3">
-        <h3 className="font-heading text-sm font-bold text-ew-ink">{KIND_LABEL[action.kind] || action.kind}</h3>
+        <h3 className="font-heading text-sm font-bold text-ew-ink">{title}</h3>
         <span className={`inline-flex items-center gap-1 text-xs ${status === "error" ? "text-ew-red" : "text-ew-muted"}`}>
           {running && <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />}
           {STATUS_NOTE[status] || status}
@@ -216,6 +225,20 @@ export function ActionCard({ data }) {
           >
             Cancel
           </button>
+        </div>
+      )}
+      {isDevin && status === "done" && (
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+          {live?.companyId && (
+            <Link to={`/borrower/${live.companyId}#devin-review`} className="font-medium text-ew-ink underline decoration-ew-rule underline-offset-2 hover:decoration-ew-ink">
+              See the review section on the company page
+            </Link>
+          )}
+          {live?.devinUrl && (
+            <a href={live.devinUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-ew-ink underline decoration-ew-rule underline-offset-2 hover:decoration-ew-ink">
+              Open in Devin<span className="sr-only"> (opens in a new tab)</span>
+            </a>
+          )}
         </div>
       )}
       {showProgress && <LiveProgress state={live} action={action} />}
