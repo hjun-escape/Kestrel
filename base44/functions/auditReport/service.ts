@@ -1,6 +1,6 @@
 import { canAccessCompany } from './access.ts';
 import { buildAudit, InputError, suggestConsiderations, validateConsiderations, validateDecisions, identityKey } from './logic.ts';
-import { documentContext, MAX_DOCUMENT_CHARS, validateDocuments, validateSignoff } from './documents.ts';
+import { applyExchange, MAX_DOCUMENT_CHARS, validateDocuments, validateSignoff } from './documents.ts';
 
 // Injectable orchestration so ownership, immutable versions and failed saves can be tested without a live account.
 export async function handleAudit(body: any, deps: any) {
@@ -39,7 +39,10 @@ export async function handleAudit(body: any, deps: any) {
       // Documents were read by the audit being reviewed; the review keeps what they showed.
       Object.assign(payload, { documents: latest.payload.documents || [], document_context: latest.payload.document_context || [] });
       if (signoff) Object.assign(payload, { signoff: { ...signoff, by: user.email, at: deps.now() } });
-    } else Object.assign(payload, documentContext(signals, documents));
+    } else {
+      const accepted = deps.accepted ? await deps.accepted(body.borrower_id).catch(() => []) : [];
+      await applyExchange(payload, signals, documents, accepted, (ss: any[]) => deps.score(ss, deps.now().slice(0, 10)), !!borrower.last_refreshed);
+    }
     const saved = await deps.save({ borrower_id: body.borrower_id, created_at: deps.now(), reviewed_by: user.email, parent_run_id: latest?.id || '', kind: body.action === 'review' ? 'review' : 'audit', payload: JSON.stringify(payload) });
     const run = { ...saved, payload };
     return reply(200, { run, suggestions: suggestConsiderations([run, ...runs], borrower) });

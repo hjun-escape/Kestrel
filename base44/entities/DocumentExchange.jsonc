@@ -1,0 +1,33 @@
+{
+  // Documents exchanged between the bank and a company to prove or disprove the flags in its report.
+  // kind "portal": the company's private upload link (token). kind "document": a request or a document.
+  // Read and written only by the documentExchange function (service role).
+  "name": "DocumentExchange",
+  "type": "object",
+  "properties": {
+    "borrower_id": { "type": "string" },
+    "kind": { "type": "string", "enum": ["portal", "document"] },
+    "token": { "type": "string" },
+    "from": { "type": "string", "enum": ["bank", "company"] },
+    "status": { "type": "string", "enum": ["requested", "submitted", "accepted", "rejected"] },
+    "purpose": { "type": "string", "enum": ["prove", "disprove", "context"] },
+    "signal_id": { "type": "string" },
+    "signal_title": { "type": "string" },
+    "title": { "type": "string" },
+    "reason": { "type": "string" },
+    "name": { "type": "string" },
+    "text": { "type": "string" },
+    "file_url": { "type": "string" },
+    "note": { "type": "string" },
+    "finding": { "type": "string", "enum": ["supports", "contradicts", "no_bearing"] },
+    "review_note": { "type": "string" },
+    "created_by": { "type": "string" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "submitted_by": { "type": "string" },
+    "submitted_at": { "type": "string", "format": "date-time" },
+    "reviewed_by": { "type": "string" },
+    "reviewed_at": { "type": "string", "format": "date-time" }
+  },
+  "required": ["borrower_id", "kind", "created_at"],
+  "rls": { "create": false, "read": false, "update": false, "delete": false }
+}

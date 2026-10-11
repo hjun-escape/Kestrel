@@ -10,6 +10,8 @@ import CheckTrace from "@/components/CheckTrace";
 import AutoResumeNote from "@/components/AutoResumeNote";
 import WarningScore from "@/components/WarningScore";
 import ReportAudit from "@/components/ReportAudit";
+import DocumentExchange from "@/components/DocumentExchange";
+import { base44 } from "@/api/base44Client";
 import { useAuth } from "@/lib/AuthContext";
 import { createSessionAudit } from "@/lib/sessionAudit";
 import { Dialog, DialogContent as SharedDialogContent, DialogTitle as SharedDialogTitle, DialogDescription as SharedDialogDescription } from "@/components/ui/dialog";
@@ -56,7 +58,8 @@ export default function CompanyReport({
   const [actionsOpen, setActionsOpen] = useState(false);
   const [runRequest, setRunRequest] = useState(0);
   const [confidence, setConfidence] = useState(null);
-  const sessionRequest = useMemo(() => createSessionAudit(borrower, signals, checkRun), [borrower.id, borrower.last_refreshed, signals, checkRun]);
+  // Signed out (shared demo book): audits run in the page, and still use documents accepted in the exchange.
+  const sessionRequest = useMemo(() => createSessionAudit(borrower, signals, checkRun, async () => (await base44.functions.invoke('documentExchange', { action: 'accepted', borrower_id: borrower.id })).data?.items || []), [borrower.id, borrower.last_refreshed, signals, checkRun]);
   function openReview(view) {
     setReviewView(view);
   }
@@ -87,7 +90,7 @@ export default function CompanyReport({
           </p>
         )}
         <nav aria-label="Company report sections" className="flex flex-wrap gap-1 border-t border-ew-rule-soft px-5">
-          {[['report', 'Company report'], ['summary', 'Audit report'], ['final', 'Final review']].map(([view, label]) => <button key={view} type="button" aria-current={reviewView === view ? 'page' : undefined} onClick={() => openReview(view)} className={`border-b-2 px-3 py-3 text-sm font-medium focus-visible:outline-ew-focus ${reviewView === view ? 'border-ew-ink text-ew-ink' : 'border-transparent text-ew-muted hover:text-ew-ink'}`}>{label}</button>)}
+          {[['report', 'Company report'], ['summary', 'Audit report'], ['documents', 'Documents'], ['final', 'Final review']].map(([view, label]) => <button key={view} type="button" aria-current={reviewView === view ? 'page' : undefined} onClick={() => openReview(view)} className={`border-b-2 px-3 py-3 text-sm font-medium focus-visible:outline-ew-focus ${reviewView === view ? 'border-ew-ink text-ew-ink' : 'border-transparent text-ew-muted hover:text-ew-ink'}`}>{label}</button>)}
         </nav>
         <div hidden={reviewView !== 'report'}>
         <SourceStatusRow borrower={borrower} states={sourceStates} recentSignals={recentSignals} running={running} startedAt={startedAt} />
@@ -111,7 +114,8 @@ export default function CompanyReport({
           </div>
         </DialogContent>
       </Dialog>
-      <div hidden={reviewView === 'report'}><ReportAudit borrower={borrower} currentSignals={signals} refreshing={running} view={reviewView} onViewChange={openReview} request={isAuthenticated ? undefined : sessionRequest} sessionOnly={!isAuthenticated} runRequest={runRequest} onConfidenceChange={setConfidence} /></div>
+      {reviewView === 'documents' && <div className="mt-6"><DocumentExchange borrower={borrower} signals={signals} /></div>}
+      <div hidden={reviewView === 'report' || reviewView === 'documents'}><ReportAudit borrower={borrower} currentSignals={signals} refreshing={running} view={reviewView === 'documents' ? 'summary' : reviewView} onViewChange={openReview} request={isAuthenticated ? undefined : sessionRequest} sessionOnly={!isAuthenticated} runRequest={runRequest} onConfidenceChange={setConfidence} /></div>
 
       {/* Below the header, one section at a time: evidence first (the signals behind the status, each with its
           source and what to ask), then cash flow, other lenders and the decision, and the analyst brief.

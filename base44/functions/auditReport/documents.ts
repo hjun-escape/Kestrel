@@ -85,3 +85,34 @@ export function validateSignoff(raw: unknown) {
   if (s.outcome !== 'proceed' && !s.note.trim()) throw new InputError('Add a note explaining the outcome.');
   return { outcome: s.outcome, note: s.note.trim() };
 }
+
+export type AcceptedDocument = { id: string; name: string; title?: string; text: string; signal_id: string; finding: 'supports' | 'contradicts' | 'no_bearing'; reviewed_by?: string; review_note?: string };
+
+/**
+ * Documents the bank accepted in the document exchange, applied to an audit payload:
+ *   - their sentences join the per-flag passages (with any documents added for this run)
+ *   - "supports" turns that flag's claim-support check into a pass, "contradicts" into a fail,
+ *     and a contradicted flag is left out of the review risk preview (rescored). The status never changes.
+ */
+export async function applyExchange(payload: any, signals: any[], runDocs: ContextDocument[], accepted: AcceptedDocument[], rescore: (signals: any[]) => Promise<{ status: string; why: string }>, canRescore = true) {
+  const docs = [...runDocs, ...accepted.map((a) => ({ id: a.id, name: a.name || a.title || 'Accepted document', text: a.text || '' })).filter((d) => d.text)];
+  Object.assign(payload, documentContext(signals, docs));
+  payload.accepted_documents = accepted.map(({ text: _text, ...rest }) => rest);
+  for (const a of accepted) {
+    if (a.finding === 'no_bearing' || !a.signal_id) continue;
+    const t = payload.tests.find((x: any) => x.check === 'support' && x.signal_id === a.signal_id);
+    if (!t) continue;
+    const by = a.reviewed_by ? ` (accepted by ${a.reviewed_by})` : '';
+    t.verdict = a.finding === 'supports' ? 'pass' : 'fail';
+    t.actual = `${a.finding === 'supports' ? 'Supported' : 'Contradicted'} by an accepted document: ${a.name || a.title}${by}.`;
+    t.reason = `${a.review_note ? `${a.review_note} ` : ''}The bank reviewed this document in the document exchange and recorded that it ${a.finding === 'supports' ? 'supports' : 'contradicts'} the claim.`;
+  }
+  const contradicted = [...new Set(accepted.filter((a) => a.finding === 'contradicts' && a.signal_id).map((a) => a.signal_id))].filter((id) => signals.some((s) => s.id === id));
+  const added = contradicted.filter((id) => !payload.excluded_signal_ids.includes(id));
+  if (added.length && canRescore) {
+    payload.excluded_signal_ids = [...payload.excluded_signal_ids, ...added];
+    const excluded = new Set(payload.excluded_signal_ids);
+    payload.result = await rescore(signals.filter((s) => !excluded.has(s.id)));
+  }
+  return payload;
+}

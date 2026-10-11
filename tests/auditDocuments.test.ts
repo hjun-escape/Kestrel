@@ -70,3 +70,24 @@ test('service: a run stores document passages; a review with sign-off keeps them
   assert.equal(pdf.status, 200);
   assert.match(pdf.data.text, /CFO who resigned/);
 });
+
+test('accepted exchange documents resolve claim support and leave contradicted flags out of the review preview', async () => {
+  const { applyExchange } = await import('../base44/functions/auditReport/documents.ts');
+  const payload: any = {
+    tests: [{ id: 's1:support', check: 'support', signal_id: 's1', verdict: 'needs_review', actual: '', reason: '' }, { id: 's2:support', check: 'support', signal_id: 's2', verdict: 'needs_review', actual: '', reason: '' }],
+    excluded_signal_ids: [], result: { status: 'red', why: 'Red' },
+  };
+  const signals = [{ id: 's1', type: 'exec_departure', title: 'CFO steps down' }, { id: 's2', type: 'review_distress', title: 'Review mentions closing' }];
+  const accepted = [
+    { id: 'd1', name: 'minutes.txt', text: 'The board confirmed the chief financial officer resigned in September.', signal_id: 's1', finding: 'supports' as const, reviewed_by: 'a@x.com' },
+    { id: 'd2', name: 'letter.txt', text: 'No warehouse is closing; the review refers to a competitor.', signal_id: 's2', finding: 'contradicts' as const },
+  ];
+  let rescored: string[] = [];
+  await applyExchange(payload, signals, [], accepted, async (ss) => { rescored = ss.map((s: any) => s.id); return { status: 'yellow', why: 'Yellow' }; });
+  assert.deepEqual(payload.tests.map((t: any) => t.verdict), ['pass', 'fail']);
+  assert.deepEqual(payload.excluded_signal_ids, ['s2']);
+  assert.deepEqual(rescored, ['s1']);
+  assert.equal(payload.result.status, 'yellow');
+  assert.match(payload.document_context[0].passages[0].quote, /chief financial officer resigned/);
+  assert.equal(JSON.stringify(payload.accepted_documents).includes('board confirmed'), false);
+});
