@@ -23,6 +23,8 @@ export default async function(req: Request): Promise<Response> {
     devin: async (id: string) => ({ connected: !!Deno.env.get('DEVIN_SERVICE_KEY'), latest: items(await db.DevinRun.filter({ borrower_id: id }, '-started_at', 1).catch(() => []))[0] || null }),
     now: () => new Date().toISOString(),
     save: (record: any) => db.AuditRun.create(record),
+    // Newest first: the caller's saved reviews (sign-offs are saved as reviews).
+    signoffRuns: async (email: string) => items(await db.AuditRun.filter({ reviewed_by: email, kind: 'review' }, '-created_at', 300)),
     // Documents the bank accepted in the document exchange (documentExchange), for this company.
     accepted: async (id: string) => items(await db.DocumentExchange.filter({ borrower_id: id, kind: 'document', status: 'accepted' }, '-created_at', 50)).map((d: any) => ({ id: d.id, name: d.name || d.title, title: d.title, text: d.text || '', signal_id: d.signal_id || '', finding: d.finding || 'no_bearing', reviewed_by: d.reviewed_by || '', review_note: d.review_note || '' })),
     extractText: async (file_url: string) => {

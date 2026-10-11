@@ -39,6 +39,12 @@ export default function LoanBook() {
   const { email, isAuthenticated, isLoadingAuth, navigateToLogin } = useAuth();
   const me = isAuthenticated ? normalizeEmail(email) : "";
   const [borrowers, setBorrowers] = useState(null);
+  // Latest final-review sign-off per company (signed in only; extra, never blocks the table).
+  const [signoffs, setSignoffs] = useState({});
+  useEffect(() => {
+    if (!me || !borrowers?.length) return;
+    base44.functions.invoke("auditReport", { action: "signoffs" }).then((res) => setSignoffs(res?.data?.signoffs || {})).catch(() => {});
+  }, [me, borrowers]);
   const [tab, setTab] = useState("all");
   const [statusFilter, setStatusFilter] = useState(null);
   const [sort, setSort] = useState(DEFAULT_SORT);
@@ -267,7 +273,7 @@ export default function LoanBook() {
           (isMobile ? (
             <LoanBookCards rows={rows} sort={sort} onSortSet={handleSortSet} loading={loading} />
           ) : (
-            <LoanBookTable rows={rows} sort={sort} onSort={handleSort} loading={loading} />
+            <LoanBookTable rows={rows} sort={sort} onSort={handleSort} loading={loading} signoffs={signoffs} />
           ))}
       </main>
 
