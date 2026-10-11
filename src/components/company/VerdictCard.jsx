@@ -6,6 +6,8 @@ import { STATUS_STYLES } from "@/components/StatusBadge";
 import { StatusLegendPopover } from "@/components/StatusLegend";
 import EvidenceList from "@/components/company/EvidenceList";
 import { countForRules } from "@/lib/statusRules.ts";
+import { BANDS, warningScore } from "@/lib/warningScore.ts";
+import { confidenceTone } from "@/lib/auditMetrics";
 import { SOURCES } from "@/lib/signalTypes";
 import { formatRelative, formatUsdFull, isSampleCompany, reasonText } from "@/lib/borrowerUtils";
 import { joinList, sourceCoverage } from "@/lib/sourceCoverage";
@@ -66,6 +68,9 @@ export default function VerdictCard({
   onNextStep,
   onShowAllEvidence,
   evidenceCount = 0,
+  // Check-based confidence from the latest double-check (null until one has run).
+  confidence = null,
+  onConfidence = null,
 }) {
   const key = running && !borrower.last_refreshed ? "not_checked" : verdictKey(borrower);
   const verdict = VERDICT[key];
@@ -181,6 +186,17 @@ export default function VerdictCard({
                 {verdict.label}
               </span>
             )}
+            {!running && borrower.last_refreshed && (
+              confidence?.total ? (
+                <button type="button" onClick={onConfidence} title="Share of double-check tests that passed. Unresolved tests do not count as passes." className={`rounded-sm border px-2 py-0.5 text-sm font-semibold tabular-nums ${confidenceTone(confidence.percent)}`}>
+                  {confidence.percent}% confidence
+                </button>
+              ) : (
+                <button type="button" onClick={onConfidence} className="rounded-sm border border-dashed border-ew-rule px-2 py-0.5 text-sm text-ew-muted hover:text-ew-ink">
+                  Confidence: run a double-check
+                </button>
+              )
+            )}
             <span className={`font-heading text-[24px] font-bold leading-tight tracking-tight md:text-[28px] ${HEADLINE_TONE[key]}`}>
               {running ? "Checking sources…" : verdict.headline}
             </span>
@@ -204,6 +220,8 @@ export default function VerdictCard({
                 ? "First check in progress. Status is set when it finishes."
                 : "Not checked yet. Run the first check to set a status."}
           </p>
+
+          {!running && borrower.last_refreshed && <PointsBar signals={signals} />}
 
           {running && (
             <div className="mt-3 max-w-sm">
@@ -298,5 +316,34 @@ function TrustFooter({ borrower, coverage, sample, running }) {
         </>
       )}
     </p>
+  );
+}
+
+const POINTS_BAR = { red: "bg-ew-red", yellow: "bg-[#d68a1c]", green: "bg-ew-green" };
+const POINTS_TEXT = { red: "text-ew-red", yellow: "text-ew-amber", green: "text-ew-green" };
+
+/** The warning score in points, small: the same rules as the status, with the Yellow and Red lines. */
+function PointsBar({ signals }) {
+  const ws = warningScore(signals);
+  return (
+    <div className="mt-3 max-w-md">
+      <div className="flex items-baseline gap-2">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ew-muted">Points</span>
+        <span className="font-heading text-xl font-bold tabular-nums text-ew-ink">{ws.score}</span>
+        <span className="text-xs text-ew-muted">/ 100</span>
+        <span className={`text-xs font-semibold ${POINTS_TEXT[ws.band]}`}>{ws.band === "red" ? "Red" : ws.band === "yellow" ? "Yellow" : "Green"}</span>
+        <span className="ml-auto text-[11px] text-ew-muted">Same rules as the status, not a separate rating</span>
+      </div>
+      <div role="meter" aria-label="Warning score" aria-valuemin={0} aria-valuemax={100} aria-valuenow={ws.score} className="relative mt-1 h-1.5 rounded-sm bg-ew-rule">
+        <div className={`h-full rounded-sm ${POINTS_BAR[ws.band]}`} style={{ width: `${Math.max(ws.score, 1)}%` }} />
+        {[BANDS.yellow, BANDS.red].map((t) => (
+          <span key={t} aria-hidden="true" className="absolute top-[-3px] h-3 w-px bg-ew-ink-soft" style={{ left: `${t}%` }} />
+        ))}
+      </div>
+      <div className="relative mt-0.5 h-3 text-[10px] tabular-nums text-ew-muted">
+        <span className="absolute -translate-x-1/2" style={{ left: `${BANDS.yellow}%` }}>Yellow {BANDS.yellow}</span>
+        <span className="absolute -translate-x-1/2" style={{ left: `${BANDS.red}%` }}>Red {BANDS.red}</span>
+      </div>
+    </div>
   );
 }

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Copy, FileText, Loader2, RotateCcw, Send } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { warningScore } from '@/lib/warningScore.ts';
+import { buildDocumentRequest } from '@/lib/documents.ts';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent as SharedDialogContent, DialogTitle as SharedDialogTitle, DialogDescription as SharedDialogDescription } from '@/components/ui/dialog';
 
@@ -80,7 +81,7 @@ export function FilePicker({ value, onChange, disabled, id }) {
   );
 }
 
-export default function DocumentExchange({ borrower, signals, onRerunAudit = null }) {
+export default function DocumentExchange({ borrower, signals, onRerunAudit = null, onItemsChange = null }) {
   const [items, setItems] = useState([]);
   const [token, setToken] = useState('');
   const [loading, setLoading] = useState(true);
@@ -94,6 +95,7 @@ export default function DocumentExchange({ borrower, signals, onRerunAudit = nul
     try {
       const data = await call({ action: 'list', borrower_id: borrower.id });
       setItems(data.items || []);
+      onItemsChange?.(data.items || []);
       setToken(data.portal_token || '');
       setError('');
     } catch (e) {
@@ -101,7 +103,7 @@ export default function DocumentExchange({ borrower, signals, onRerunAudit = nul
     } finally {
       setLoading(false);
     }
-  }, [borrower.id]);
+  }, [borrower.id, onItemsChange]);
   useEffect(() => { load(); }, [load]);
   // Pick up what the company sends while the tab is open.
   useEffect(() => {
@@ -162,6 +164,16 @@ export default function DocumentExchange({ borrower, signals, onRerunAudit = nul
           <button type="button" onClick={() => { setAcceptedSince(0); onRerunAudit(); }} className="inline-flex h-8 items-center gap-1.5 rounded-sm bg-ew-ink px-3 text-xs font-semibold text-white"><RotateCcw aria-hidden="true" className="h-3.5 w-3.5" />Rerun audit</button>
         </div>
       )}
+
+      <Recommended
+        borrower={borrower}
+        signals={signals}
+        requested={items}
+        onRequest={async picks => {
+          for (const p of picks) await call({ borrower_id: borrower.id, action: 'request', ...p });
+          await load();
+        }}
+      />
 
       <div role="log" aria-label="Document conversation" className="max-h-[520px] space-y-3 overflow-y-auto bg-ew-paper px-5 py-4">
         {error && <p role="alert" className="border border-ew-red-rule bg-ew-red-bg p-3 text-sm text-ew-red">{error}</p>}
@@ -350,5 +362,76 @@ function ReviewModal({ doc, signals, onClose, onDone, borrowerId }) {
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * The documents to ask for, built from the evidence (the same list as before the exchange): tick the ones
+ * you want and request them in one go. Each item is linked to the flag it came from when there is one.
+ */
+function Recommended({ borrower, signals, requested, onRequest }) {
+  const items = useMemo(() => buildDocumentRequest(borrower, signals, null, null), [borrower, signals]);
+  const asked = new Set(requested.map(d => (d.title || '').trim().toLowerCase()));
+  const [picked, setPicked] = useState(() => new Set());
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const flagFor = item => signals.find(s => item.source_url && s.source_url === item.source_url) || null;
+  const open = items.filter(it => !asked.has(it.item.trim().toLowerCase()));
+  if (!items.length) return null;
+
+  async function send() {
+    setBusy(true);
+    setError('');
+    try {
+      await onRequest(open.filter(it => picked.has(it.item)).map(it => {
+        const flag = flagFor(it);
+        return { title: it.item, reason: it.reason, signal_id: flag?.id || '', purpose: flag ? 'prove' : 'context' };
+      }));
+      setPicked(new Set());
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div data-demo="documents" className="border-b border-ew-rule px-5 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-semibold">Recommended documents</p>
+        <div className="flex items-center gap-3 text-xs">
+          {open.length > 0 && (
+            <button type="button" onClick={() => setPicked(picked.size === open.length ? new Set() : new Set(open.map(it => it.item)))} className="font-medium text-ew-ink-soft underline underline-offset-2 hover:text-ew-ink">
+              {picked.size === open.length ? 'Clear' : 'Select all'}
+            </button>
+          )}
+          <button type="button" disabled={busy || picked.size === 0} onClick={send} className="inline-flex h-8 items-center gap-1.5 rounded-sm bg-ew-ink px-3 font-semibold text-white disabled:opacity-40">
+            {busy ? <Loader2 aria-hidden="true" className="h-3.5 w-3.5 animate-spin" /> : <Send aria-hidden="true" className="h-3.5 w-3.5" />}
+            Request {picked.size || ''} selected
+          </button>
+        </div>
+      </div>
+      <p className="mt-0.5 text-xs text-ew-muted">Built from the evidence. Ask the company for these before credit committee.</p>
+      <ul className="mt-2 divide-y divide-ew-rule-soft border border-ew-rule-soft">
+        {items.map(it => {
+          const done = asked.has(it.item.trim().toLowerCase());
+          const flag = flagFor(it);
+          return (
+            <li key={it.item}>
+              <label className={`flex items-start gap-3 px-3 py-2 ${done ? 'opacity-60' : 'cursor-pointer hover:bg-ew-hover'}`}>
+                <input type="checkbox" disabled={done} checked={done || picked.has(it.item)} onChange={e => setPicked(p => { const n = new Set(p); if (e.target.checked) n.add(it.item); else n.delete(it.item); return n; })} className="mt-1 h-4 w-4 shrink-0 accent-ew-ink" />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium">{it.item}</span>
+                  <span className="block text-xs text-ew-muted">{it.reason}</span>
+                  {flag && <span className="block text-xs text-ew-ink-soft">Flag: {flag.title}</span>}
+                </span>
+                {done && <Chip className={STATUS.requested[1]}>Requested</Chip>}
+              </label>
+            </li>
+          );
+        })}
+      </ul>
+      {error && <p role="alert" className="mt-2 text-sm text-ew-red">{error}</p>}
+    </div>
   );
 }

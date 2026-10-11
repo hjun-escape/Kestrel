@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { ExternalLink } from "lucide-react";
+import { Check, ChevronRight, ExternalLink } from "lucide-react";
 import VerdictCard from "@/components/company/VerdictCard";
 import ReportSection from "@/components/company/ReportSection";
 import SourceStatusRow from "@/components/SourceStatusRow";
@@ -28,7 +28,7 @@ const DialogDescription = /** @type {React.ComponentType<any>} */ (SharedDialogD
 // then one scrolling report with a heading per section. Detail-heavy sections start collapsed.
 // CompanyDetail renders it with live data; /dev/progression renders it for its example company.
 // Mount with key={borrower.id} so per-company state resets when the company changes.
-const DEFAULT_OPEN = { evidence: false, review: true, sources: false, score: false, brief: false, documents: false, doublecheck: false };
+const DEFAULT_OPEN = { evidence: false, review: true, sources: false, score: false, brief: false, documents: false, doublecheck: false, cashflow: false, lenders: false };
 
 function prefersReducedMotion() {
   return typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -71,6 +71,10 @@ export default function CompanyReport({
   const [actionsOpen, setActionsOpen] = useState(false);
   const [runRequest, setRunRequest] = useState(0);
   const [signoff, setSignoff] = useState(null);
+  // Review and sign-off, in order: 1 double-check, 2 document exchange, 3 final check and sign-off.
+  const [step, setStep] = useState("report");
+  const [confidence, setConfidence] = useState(null);
+  const [docItems, setDocItems] = useState([]);
   const { isAuthenticated } = useAuth();
   // Signed out (shared demo book): audits run in the page, and still use documents accepted in the exchange.
   const sessionRequest = useMemo(() => createSessionAudit(borrower, signals, checkRun, async () => (await base44.functions.invoke('documentExchange', { action: 'accepted', borrower_id: borrower.id })).data?.items || []), [borrower.id, borrower.last_refreshed, signals, checkRun]);
@@ -83,6 +87,7 @@ export default function CompanyReport({
   useEffect(() => {
     if (hash !== `#${DEVIN_ANCHOR}`) return undefined;
     setOpen((prev) => ({ ...prev, doublecheck: true }));
+    setStep("check");
     setAuditView((v) => (v === "considerations" || v === "history" ? "summary" : v));
     const started = Date.now();
     const timer = window.setInterval(() => {
@@ -93,22 +98,29 @@ export default function CompanyReport({
     return () => window.clearInterval(timer);
   }, [hash]);
   const toggle = (key) => setOpen((prev) => ({ ...prev, [key]: !prev[key] }));
+  // Open a section of the report (step 1) and scroll to it.
   const reveal = (key, targetId) => {
+    setStep("report");
     setOpen((prev) => ({ ...prev, [key]: true }));
     revealLater(targetId);
   };
   // ReportAudit only knows its own views; "report" was the old tab and means "show the summary" here.
-  const changeAuditView = (view) => setAuditView(view === "report" || !view ? "summary" : view);
+  const changeAuditView = (view) => {
+    if (view === "final") return setStep("final");
+    setStep("check");
+    setAuditView(view === "report" || !view ? "summary" : view);
+  };
 
   function startAudit() {
     setActionsOpen(false);
     setAuditView("summary");
+    setStep("check");
     setRunRequest((n) => n + 1);
-    reveal("doublecheck", "doublecheck");
+    revealLater("doublecheck");
   }
   function openFinalReview() {
-    setAuditView("final");
-    reveal("doublecheck", "doublecheck");
+    setStep("final");
+    revealLater("doublecheck");
   }
 
   return (
@@ -125,9 +137,12 @@ export default function CompanyReport({
         onDelete={onDelete}
         evidenceCount={recentSignals.length}
         onShowAllEvidence={() => reveal("evidence", "evidence")}
-        onNextStep={(kind) => (kind === "documents" ? reveal("review", "applicant-documents") : reveal("review", "review"))}
+        confidence={confidence}
+        onConfidence={() => { setStep("check"); revealLater("doublecheck"); }}
+        onNextStep={(kind) => { if (kind === "documents") { setStep("documents"); revealLater("doublecheck"); } else reveal("evidence", "evidence"); }}
       />
       {signoff && <SignoffBanner signoff={signoff} onOpen={openFinalReview} />}
+      <SignoffStamp signoff={signoff} />
       {notice && (
         <p role="status" className="mt-2 border-l-2 border-ew-ink bg-ew-surface px-3 py-2 text-xs text-ew-ink-soft">
           {notice}
@@ -156,13 +171,41 @@ export default function CompanyReport({
               disabled={running}
               title="Double-check with your notes"
               detail="Choose which evidence to test and add instructions before double-checking."
-              onClick={() => { setActionsOpen(false); setAuditView("considerations"); }}
+              onClick={() => { setActionsOpen(false); setStep("check"); setAuditView("considerations"); revealLater("doublecheck"); }}
             />
           </div>
         </DialogContent>
       </Dialog>
 
-      <div className="mt-8 border-t border-ew-rule">
+      {/* The workflow, right under the card: 1 review the report, 2 double-check it, 3 exchange documents,
+          4 final check and sign-off. The selected step's content shows below it. */}
+      <div id="doublecheck" className="mt-6 scroll-mt-4 border border-ew-rule bg-ew-surface px-5 py-4">
+        <ReviewSteps
+          step={step}
+          onStep={setStep}
+          done={{
+            report: !!borrower.last_refreshed && (step !== "report" || !!confidence?.total),
+            check: !!confidence && confidence.total > 0,
+            documents: docItems.some((d) => d.status === "accepted" || d.status === "rejected"),
+            final: !!signoff,
+          }}
+          started={{
+            report: false,
+            check: false,
+            documents: docItems.length > 0,
+            final: false,
+          }}
+          notes={{
+            extra: "Lenders, cash flow, AI summary · not used for the status",
+            report: borrower.last_refreshed ? `${recentSignals.length} warning sign${recentSignals.length === 1 ? "" : "s"} · sources · status` : "Not checked yet",
+            check: confidence?.total ? `${confidence.percent}% confidence · ${confidence.passed}/${confidence.total} passed` : "Not run yet",
+            documents: docItems.length ? `${docItems.filter((d) => d.status === "submitted").length} to review · ${docItems.filter((d) => d.status === "accepted").length} accepted` : "Optional",
+            final: signoff ? "Signed off" : "Confirm each flag, then sign off",
+          }}
+        />
+      </div>
+
+      <div className="mt-4 border-t border-ew-rule" hidden={step !== "report"}>
         <ReportSection
           id="evidence"
           demoId="tab-evidence"
@@ -173,25 +216,6 @@ export default function CompanyReport({
         >
           <div data-demo="evidence" tabIndex={-1} className="outline-none">
             <SignalTimeline signals={signals} neverRefreshed={!borrower.last_refreshed} checking={running} newIds={newIds} isApplicant={isApplicant} />
-          </div>
-        </ReportSection>
-
-        <ReportSection
-          id="review"
-          demoId="tab-decision"
-          title={isApplicant ? "Applicant review" : "Borrower review"}
-          summary="Documents, cash flow, other lenders, decision"
-          open={open.review}
-          onToggle={() => toggle("review")}
-        >
-          <div className="grid max-w-3xl gap-4">
-            <div id="applicant-documents" tabIndex={-1} className="scroll-mt-4 outline-none">
-              <ApplicantDecision key={borrower.id} borrower={borrower} signals={signals} />
-            </div>
-            <div data-demo="tab-cashflow">
-              <h3 className="mb-2 font-heading text-sm font-bold text-ew-ink">Cash flow</h3>
-              <CashflowReview borrower={borrower} />
-            </div>
           </div>
         </ReportSection>
 
@@ -223,6 +247,55 @@ export default function CompanyReport({
           </div>
         </ReportSection>
 
+        {auditTrail}
+      </div>
+
+      <div className="mt-4" hidden={step !== "documents"}>
+        <DocumentExchange borrower={borrower} signals={signals} onRerunAudit={startAudit} onItemsChange={setDocItems} />
+      </div>
+      {/* Stays mounted on every step so a running double-check and your calls are never lost. */}
+      <div className="mt-4" hidden={step !== "check" && step !== "final"}>
+        <ReportAudit
+          borrower={borrower}
+          currentSignals={signals}
+          refreshing={running}
+          view={step === "final" ? "final" : auditView}
+          onViewChange={changeAuditView}
+          request={isAuthenticated ? undefined : sessionRequest}
+          sessionOnly={!isAuthenticated}
+          runRequest={runRequest}
+          onSignoffChange={setSignoff}
+          onConfidenceChange={setConfidence}
+        />
+      </div>
+
+      <div className="mt-4 border-t border-ew-rule" hidden={step !== "extra"}>
+        <ReportSection
+          id="lenders"
+          demoId="tab-decision"
+          title="Other lenders"
+          summary="Public liens, lender lawsuits and loan news"
+          open={open.lenders}
+          onToggle={() => toggle("lenders")}
+        >
+          <div className="max-w-3xl">
+            <ApplicantDecision key={borrower.id} borrower={borrower} signals={signals} parts={{ documents: false, lenders: true, decision: false }} />
+          </div>
+        </ReportSection>
+
+        <ReportSection
+          id="cashflow"
+          demoId="tab-cashflow"
+          title="Cash flow"
+          summary="Bank statement check: who they pay, late and bounced payments"
+          open={open.cashflow}
+          onToggle={() => toggle("cashflow")}
+        >
+          <div className="max-w-3xl">
+            <CashflowReview borrower={borrower} />
+          </div>
+        </ReportSection>
+
         <ReportSection
           id="brief"
           demoId="tab-brief"
@@ -235,51 +308,16 @@ export default function CompanyReport({
             <AnalystBrief borrower={borrower} />
           </div>
         </ReportSection>
-
-        <ReportSection
-          id="documents"
-          title="Document exchange"
-          summary="Ask for documents, review what comes back, accept it"
-          open={open.documents}
-          onToggle={() => toggle("documents")}
-        >
-          <DocumentExchange borrower={borrower} signals={signals} onRerunAudit={startAudit} />
-        </ReportSection>
-
-        <ReportSection
-          id="doublecheck"
-          title="Double-check and sign-off"
-          summary="Each quote, date and company match, checked again, then signed off"
-          open={open.doublecheck}
-          onToggle={() => toggle("doublecheck")}
-        >
-          <div role="group" aria-label="Double-check view" className="flex flex-wrap gap-2">
-            {[["summary", "Double-check results"], ["final", "Final review and sign-off"]].map(([view, label]) => (
-              <button
-                key={view}
-                type="button"
-                aria-pressed={view === "final" ? auditView === "final" : auditView !== "final"}
-                onClick={() => setAuditView(view)}
-                className={`rounded-sm border px-3 py-1.5 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-ew-focus ${(view === "final" ? auditView === "final" : auditView !== "final") ? "border-ew-ink bg-ew-ink text-white" : "border-ew-rule text-ew-ink hover:bg-ew-hover"}`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <ReportAudit
-            borrower={borrower}
-            currentSignals={signals}
-            refreshing={running}
-            view={auditView}
-            onViewChange={changeAuditView}
-            request={isAuthenticated ? undefined : sessionRequest}
-            sessionOnly={!isAuthenticated}
-            runRequest={runRequest}
-            onSignoffChange={setSignoff}
-          />
-        </ReportSection>
-        {auditTrail}
       </div>
+      {step !== "final" && (
+        <div className="mt-4 flex justify-end">
+          <button type="button" onClick={() => setStep(NEXT[step][0])} className="inline-flex h-9 items-center gap-1.5 rounded-sm bg-ew-ink px-4 text-sm font-semibold text-white hover:bg-ew-ink-soft">
+            Next: {NEXT[step][1]}
+            <ChevronRight aria-hidden="true" className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
     </>
   );
 }
@@ -351,6 +389,110 @@ function SignoffBanner({ signoff, onOpen }) {
       <span className="text-xs">{signoff.by} · {new Date(signoff.at).toLocaleString()}</span>
       {signoff.note && <span className="min-w-0 flex-1 truncate text-ew-ink">{signoff.note}</span>}
       <button type="button" onClick={onOpen} className="text-xs font-semibold underline underline-offset-2">Final review</button>
+    </div>
+  );
+}
+
+const NEXT = { report: ["check", "double-check"], check: ["documents", "document exchange"], documents: ["extra", "additional AI checks (optional)"], extra: ["final", "final check"] };
+const OPTIONAL = new Set(["extra"]);
+const STEPS = [
+  ["report", "Review report", "Warning signs, sources, how the status was counted"],
+  ["check", "Double-check", "Each quote, date and company match"],
+  ["documents", "Document exchange", "Ask the company, review what comes back"],
+  ["extra", "Additional AI checks", "Other lenders, cash flow, AI news summary"],
+  ["final", "Final check and sign-off", "Your call on every flag"],
+];
+
+/**
+ * The three review steps as a workflow diagram: green = done, yellow = in progress, blank = not started.
+ * The state is always written out too (Done / In progress / Not started), never colour alone.
+ */
+function ReviewSteps({ step, onStep, done, started, notes }) {
+  const stateOf = (key) => (done[key] ? "done" : step === key || started[key] ? "progress" : OPTIONAL.has(key) ? "optional" : "todo");
+  const NODE = {
+    done: "border-ew-green bg-ew-green text-white",
+    progress: "border-[#d68a1c] bg-[#fdf3e1] text-ew-amber",
+    todo: "border-ew-rule bg-ew-surface text-ew-muted",
+    optional: "border-dashed border-ew-rule bg-ew-surface text-ew-muted",
+  };
+  const LABEL = { done: ["Done", "text-ew-green"], progress: ["In progress", "text-ew-amber"], todo: ["Not started", "text-ew-muted"], optional: ["Optional", "text-ew-muted"] };
+  return (
+    <ol className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-0" aria-label="Review steps">
+      {STEPS.map(([key, title, hint], i) => {
+        const state = stateOf(key);
+        const current = step === key;
+        const [label, labelTone] = LABEL[state];
+        return (
+          <li key={key} className="relative flex flex-1 sm:flex-col sm:items-center">
+            {/* connector to the next step: green once this step is done */}
+            {i < STEPS.length - 1 && (
+              <span aria-hidden="true" className="absolute left-[calc(50%+26px)] right-[calc(-50%+26px)] top-[22px] hidden h-[3px] rounded-full bg-ew-rule sm:block">
+                <span className="block h-full rounded-full bg-ew-green transition-[width] duration-700 ease-out" style={{ width: state === "done" ? "100%" : "0%" }} />
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => onStep(key)}
+              data-demo={`step-${key}`}
+              aria-current={current ? "step" : undefined}
+              className="group flex items-start gap-3 rounded-sm p-1 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-ew-focus sm:flex-col sm:items-center sm:text-center"
+            >
+              <span className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-[3px] text-sm font-bold transition-colors duration-500 ${NODE[state]} ${current ? "ring-4 ring-[#14202e]/10" : ""}`}>
+                {state === "done" ? <Check aria-hidden="true" className="h-5 w-5" /> : i + 1}
+                {state === "progress" && <span aria-hidden="true" className="absolute -right-0.5 -top-0.5 h-3 w-3 animate-pulse rounded-full bg-[#d68a1c] motion-reduce:animate-none" />}
+              </span>
+              <span className="min-w-0 sm:mt-1">
+                <span className={`block text-sm font-semibold ${current ? "text-ew-ink underline decoration-2 underline-offset-4" : "text-ew-ink"}`}>{title}</span>
+                <span className={`block text-[11px] font-semibold uppercase tracking-wider ${labelTone}`}>{label}</span>
+                <span className="block text-xs text-ew-muted">{notes[key] || hint}</span>
+              </span>
+            </button>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+/**
+ * The moment of sign-off: a stamp lands on the page with the outcome, holds, then lifts away, and the banner
+ * stays. Only for a sign-off made just now (not one loaded with the page). Reduced motion: a plain fade.
+ */
+function SignoffStamp({ signoff }) {
+  const [shown, setShown] = useState(null);
+  const [phase, setPhase] = useState("idle"); // idle | in | land | out
+  const seen = useRef(signoff?.at || null);
+  useEffect(() => {
+    if (!signoff?.at || signoff.at === seen.current) return undefined;
+    seen.current = signoff.at;
+    if (Date.now() - Date.parse(signoff.at) > 15000) return undefined;
+    setShown(signoff);
+    setPhase("in");
+    const t = [
+      window.setTimeout(() => setPhase("land"), 30),
+      window.setTimeout(() => setPhase("out"), 1900),
+      window.setTimeout(() => { setPhase("idle"); setShown(null); }, 2600),
+    ];
+    return () => t.forEach(window.clearTimeout);
+  }, [signoff]);
+  if (!shown || phase === "idle") return null;
+  const reduce = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  const label = OUTCOMES.find(([k]) => k === shown.outcome)?.[1] || shown.outcome;
+  const tone = { proceed: "#1d6b43", proceed_with_conditions: "#965006", request_documents: "#965006", decline: "#b42318" }[shown.outcome] || "#14202e";
+  const style = reduce
+    ? { opacity: phase === "land" ? 1 : 0, transition: "opacity 300ms ease-out" }
+    : {
+        opacity: phase === "land" ? 1 : 0,
+        transform: phase === "in" ? "scale(1.9) rotate(-14deg)" : phase === "land" ? "scale(1) rotate(-6deg)" : "scale(1.04) rotate(-6deg) translateY(-12px)",
+        transition: phase === "out" ? "opacity 600ms ease-in, transform 600ms ease-in" : "opacity 260ms ease-out, transform 380ms cubic-bezier(.2,1.4,.4,1)",
+      };
+  return (
+    <div role="status" aria-live="polite" className="pointer-events-none fixed inset-0 z-[60] flex items-center justify-center" style={{ background: phase === "land" ? "rgba(20,32,46,0.08)" : "transparent", transition: "background 400ms ease-out" }}>
+      <div style={{ ...style, borderColor: tone, color: tone }} className="rounded-md border-[5px] bg-white/95 px-10 py-5 text-center shadow-[0_24px_60px_-20px_rgba(20,32,46,0.5)]">
+        <p className="font-heading text-[34px] font-black uppercase leading-none tracking-[0.12em]">Signed off</p>
+        <p className="mt-2 text-base font-bold">{label}</p>
+        <p className="mt-1 text-xs font-medium opacity-80">{shown.by} · {new Date(shown.at).toLocaleString()}</p>
+      </div>
     </div>
   );
 }
