@@ -27,7 +27,7 @@ Target borrowers are mid-size PRIVATE companies: no analyst coverage, quarterly 
   - backend functions: `base44/functions/<name>/entry.ts` (Deno, `export default async function(req)`). Import the SDK pinned like the existing functions: `npm:@base44/sdk@0.8.52`.
   - screens: `src/pages/`
   - signal type table: `src/lib/signalTypes.js`
-  - Base44 tooling (CLI, local dev, SDK): see `AGENTS.md` and `README.md`.
+- Base44 tooling (CLI, local dev, SDK): see `AGENTS.md` and `README.md`.
 
 ## Team ownership (stay in your lane to avoid merge conflicts)
 | Owner | Branch prefix | Owns |
