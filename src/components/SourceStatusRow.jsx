@@ -30,7 +30,7 @@ export default function SourceStatusRow({ borrower, states, recentSignals, runni
   return (
     <section data-demo="sources" aria-labelledby="sources-heading">
       <div className="flex items-baseline justify-between px-5 pb-2 pt-4">
-        <h2 id="sources-heading" className="text-xs font-semibold text-ew-muted">
+        <h2 id="sources-heading" className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ew-muted">
           Sources
         </h2>
         <p aria-live="polite" className="sr-only">

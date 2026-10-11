@@ -154,7 +154,7 @@ export function hiringSignalFromData(b: Borrower, open: number, company: Company
       type: "hiring_drop",
       severity: g.gapPct >= 75 ? "strong" : "weak",
       date: today,
-      title: `Job postings ${g.gapPct}% below normal for company size`,
+      title: open === 0 ? `No open job postings (about ${Math.round(g.expected)} expected for company size)` : `Job postings ${g.gapPct}% below normal for company size`,
       snippet: `${g.open} open postings vs ~${Math.round(g.expected)} expected for ${g.employees} employees (${g.sector}: ${g.rate}% openings rate, BLS)`,
       source_name: "LinkedIn Jobs",
       source_url: company.company_id ? jobsPageUrl(String(company.company_id)) : "https://www.linkedin.com/jobs/",

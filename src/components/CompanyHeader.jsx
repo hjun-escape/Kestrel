@@ -29,8 +29,8 @@ export default function CompanyHeader({ borrower, signals = [], sourceStates, ru
     { term: "Headquarters", value: hq || "—" },
     { term: "Industry", value: borrower.industry || "—" },
     { term: "Stage", value: isApplicant ? "Applicant" : "Borrower" },
-    { term: isApplicant ? "Amount requested" : "Loan amount", value: formatUsdFull(borrower.loan_amount_usd), numeric: true },
-    { term: "Last refreshed", value: <LastRefreshed value={borrower.last_refreshed} /> },
+    { term: isApplicant ? "Amount requested" : "Loan amount", value: formatUsdFull(borrower.loan_amount_usd), mono: true },
+    { term: "Last refreshed", value: <LastRefreshed value={borrower.last_refreshed} />, mono: true },
   ];
 
   return (
@@ -113,8 +113,8 @@ export default function CompanyHeader({ borrower, signals = [], sourceStates, ru
       <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-3 border-t border-ew-rule-soft pt-4 sm:grid-cols-3 xl:grid-cols-6">
         {facts.map((f) => (
           <div key={f.term} className="min-w-0">
-            <dt className="text-xs text-ew-muted">{f.term}</dt>
-            <dd title={typeof f.value === "string" ? f.value : undefined} className={`mt-0.5 truncate text-sm font-medium text-ew-ink ${f.numeric ? "tabular-nums" : ""}`}>
+            <dt className="text-[11px] uppercase tracking-[0.06em] text-ew-muted">{f.term}</dt>
+            <dd title={typeof f.value === "string" ? f.value : undefined} className={`mt-0.5 truncate text-sm font-medium text-ew-ink ${f.mono ? "font-mono" : ""}`}>
               {f.value}
             </dd>
           </div>

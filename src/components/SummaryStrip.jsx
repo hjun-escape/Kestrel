@@ -30,10 +30,10 @@ export default function SummaryStrip({ borrowers, statusFilter, onStatusFilter, 
                   active ? "bg-ew-paper" : "bg-ew-surface hover:bg-ew-hover"
                 }`}
               >
-                <span className="flex min-w-0 flex-wrap items-center gap-x-2 text-sm font-medium text-ew-ink-soft">
+                <span className="flex min-w-0 flex-wrap items-center gap-x-2 text-[11px] font-medium uppercase tracking-[0.06em] text-ew-ink-soft">
                   <span aria-hidden="true" className={`inline-block ${style.glyph}`} />
                   {style.label}
-                  {active && <span className="text-xs font-normal text-ew-muted">(filter on)</span>}
+                  {active && <span className="font-normal normal-case text-ew-muted">(filter on)</span>}
                 </span>
                 <span className="font-mono text-2xl font-medium leading-none text-ew-ink">
                   {loading ? "–" : counts[key]}
@@ -46,7 +46,7 @@ export default function SummaryStrip({ borrowers, statusFilter, onStatusFilter, 
       </div>
 
       <div className="flex flex-col justify-center border-t border-ew-rule bg-ew-hover px-4 py-3 md:min-w-[220px] md:border-l md:border-t-0 md:px-5">
-        <span className="text-xs font-medium text-ew-muted">Exposure at risk</span>
+        <span className="text-[11px] font-medium uppercase tracking-[0.06em] text-ew-muted">Exposure at risk</span>
         <span className="font-mono text-[28px] font-semibold leading-tight text-ew-ink">
           {loading ? "–" : formatUsd(atRisk)}
         </span>

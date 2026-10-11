@@ -181,6 +181,14 @@ export default function LoanBook() {
                 </button>
               </p>
             )}
+            <div data-demo="status-legend" className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+              <p className="hidden text-xs text-ew-muted xl:block">
+                <span className="font-semibold text-ew-red">Red</span> 2+ strong signs, or 1 strong + 2 weak ·{" "}
+                <span className="font-semibold text-ew-amber">Yellow</span> 1 strong, or 2+ weak ·{" "}
+                <span className="font-semibold text-ew-green">Green</span> none that count · set by fixed rules, not AI
+              </p>
+              <StatusLegendPopover align="start" />
+            </div>
           </div>
           <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:justify-end">
             <LoadDemoButton signedIn={!!me} running={demo.running} onClick={demo.start} />
@@ -204,14 +212,6 @@ export default function LoanBook() {
           <DemoEmptyPanel running={demo.running} onLoad={demo.start} />
         )}
 
-        <div data-demo="status-legend" className="mb-2 flex flex-wrap items-center justify-end gap-x-4 gap-y-1">
-          <p className="hidden text-xs text-ew-muted xl:block">
-            <span className="font-semibold text-ew-red">Red</span> 2+ strong signs, or 1 strong + 2 weak ·{" "}
-            <span className="font-semibold text-ew-amber">Yellow</span> 1 strong, or 2+ weak ·{" "}
-            <span className="font-semibold text-ew-green">Green</span> none that count · set by fixed rules, not AI
-          </p>
-          <StatusLegendPopover align="end" />
-        </div>
         <SummaryStrip
           borrowers={inTab}
           loading={loading}

@@ -17,15 +17,15 @@ import {
 const ACTIONS = {
   proceed: {
     label: "Proceed",
-    className: "border-emerald-200 bg-emerald-50 text-emerald-800",
+    className: "border-ew-green-rule bg-ew-green-bg text-ew-green",
   },
   request_documents: {
     label: "Request documents",
-    className: "border-amber-200 bg-amber-50 text-amber-800",
+    className: "border-ew-amber-rule bg-ew-amber-bg text-ew-amber",
   },
   escalate: {
     label: "Escalate",
-    className: "border-red-200 bg-red-50 text-red-800",
+    className: "border-ew-red-rule bg-ew-red-bg text-ew-red",
   },
 };
 
@@ -73,18 +73,18 @@ function Finding({ finding }) {
   const href = safeHref(finding.source_url);
   const sourceLabel = finding.source_name || hostOf(finding.source_url) || "Source";
   return (
-    <li className="border-l-2 border-gray-300 pl-4">
-      <p className="text-sm font-medium text-gray-900">{finding.claim}</p>
-      <blockquote className="mt-1.5 text-sm italic text-gray-600">
+    <li className="border-l-2 border-ew-rule pl-4">
+      <p className="text-sm font-medium text-ew-ink">{finding.claim}</p>
+      <blockquote className="mt-1.5 text-sm italic text-ew-ink-soft">
         &ldquo;{finding.quote}&rdquo;
       </blockquote>
-      <div className="mt-1.5 flex flex-wrap items-center gap-x-2 text-xs text-gray-500">
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-2 text-xs text-ew-muted">
         {href ? (
           <a
             href={href}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 underline-offset-2 hover:text-gray-900 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-400"
+            className="inline-flex items-center gap-1 underline-offset-2 hover:text-ew-ink hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-ew-focus"
           >
             {sourceLabel}
             <ExternalLink className="h-3 w-3" aria-hidden="true" />
@@ -95,7 +95,7 @@ function Finding({ finding }) {
         )}
         {finding.date && (
           <>
-            <span className="text-gray-300">·</span>
+            <span className="text-ew-rule">·</span>
             <span>{finding.date}</span>
           </>
         )}
@@ -108,8 +108,8 @@ function Steps({ steps, dropped }) {
   const [open, setOpen] = useState(false);
   if ((!steps || steps.length === 0) && !dropped) return null;
   return (
-    <Collapsible open={open} onOpenChange={setOpen} className="border-t border-gray-100 pt-3">
-      <CollapsibleTrigger className="inline-flex items-center gap-1 text-xs font-medium text-gray-600 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-400">
+    <Collapsible open={open} onOpenChange={setOpen} className="border-t border-ew-rule-soft pt-3">
+      <CollapsibleTrigger className="inline-flex items-center gap-1 text-xs font-medium text-ew-ink-soft hover:text-ew-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-ew-focus">
         <ChevronDown
           className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`}
           aria-hidden="true"
@@ -119,14 +119,14 @@ function Steps({ steps, dropped }) {
       <CollapsibleContent>
         <ol className="mt-2 space-y-1.5">
           {(steps || []).map((step, i) => (
-            <li key={i} className="flex gap-2 text-xs text-gray-600">
-              <span className="w-4 shrink-0 text-right tabular-nums text-gray-400">{i + 1}.</span>
+            <li key={i} className="flex gap-2 text-xs text-ew-ink-soft">
+              <span className="w-4 shrink-0 text-right font-mono text-ew-rule">{i + 1}.</span>
               <span className="min-w-0">
-                <span className="font-medium text-gray-700">
+                <span className="font-medium text-ew-ink-soft">
                   {TOOL_LABELS[step.tool] || step.tool}
                 </span>
                 {step.input && <span className="break-all"> &mdash; {step.input}</span>}
-                <span className={step.ok ? "text-gray-400" : "text-red-600"}>
+                <span className={step.ok ? "text-ew-rule" : "text-ew-red"}>
                   {" "}
                   ({step.ok ? step.detail || "ok" : `failed${step.detail ? `: ${step.detail}` : ""}`})
                 </span>
@@ -134,11 +134,11 @@ function Steps({ steps, dropped }) {
             </li>
           ))}
           {(!steps || steps.length === 0) && (
-            <li className="text-xs text-gray-500">No web lookups; brief based on stored signals.</li>
+            <li className="text-xs text-ew-muted">No web lookups; brief based on stored signals.</li>
           )}
         </ol>
         {dropped > 0 && (
-          <p className="mt-2 text-xs text-gray-500">
+          <p className="mt-2 text-xs text-ew-muted">
             {dropped} finding{dropped === 1 ? " was" : "s were"} discarded because the quote
             could not be matched word for word to its source.
           </p>
@@ -197,68 +197,88 @@ export default function AnalystBrief({ borrower }) {
   const findings = analysis?.findings || [];
   const questions = analysis?.open_questions || [];
 
+  const runButton = (
+    <Button size="sm" variant="outline" onClick={runAnalyst} disabled={running || !borrowerId} className="h-8 shrink-0 rounded-sm">
+      {running ? (
+        <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden="true" />
+      ) : (
+        <FileSearch className="mr-1.5 h-4 w-4" aria-hidden="true" />
+      )}
+      {running ? "Investigating…" : analysis ? "Run again" : "Run analyst"}
+    </Button>
+  );
+
+  if (!analysis && !running) {
+    return (
+      <section aria-labelledby="analyst-brief-heading" className="border border-ew-rule bg-ew-surface px-4 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h2 id="analyst-brief-heading" className="font-heading text-sm font-bold text-ew-ink">
+              Analyst brief
+            </h2>
+            <p className="mt-0.5 text-xs text-ew-muted">
+              {loading
+                ? "Loading…"
+                : "Not run. Reads public news for lawsuits, new lenders, executive exits and layoffs."}
+            </p>
+          </div>
+          {runButton}
+        </div>
+        {error && (
+          <p role="alert" className="mt-2 rounded-sm border border-ew-red-rule bg-ew-red-bg px-3 py-2 text-xs text-ew-red">
+            {error}
+          </p>
+        )}
+      </section>
+    );
+  }
+
   return (
     <section
       aria-labelledby="analyst-brief-heading"
-      className="rounded-md border border-gray-200 bg-white"
+      className="border border-ew-rule bg-ew-surface"
     >
-      <header className="flex flex-wrap items-start justify-between gap-3 border-b border-gray-100 px-5 py-4">
+      <header className="flex flex-wrap items-start justify-between gap-3 border-b border-ew-rule-soft px-4 py-3">
         <div className="min-w-0">
-          <h2 id="analyst-brief-heading" className="text-sm font-semibold text-gray-900">
+          <h2 id="analyst-brief-heading" className="font-heading text-sm font-bold text-ew-ink">
             Analyst brief
           </h2>
-          <p className="mt-0.5 text-xs text-gray-500">
+          <p className="mt-0.5 text-xs text-ew-muted">
             {analysis?.created_at
               ? `Written ${formatDistanceToNow(new Date(analysis.created_at), { addSuffix: true })} · ${format(new Date(analysis.created_at), "MMM d, yyyy HH:mm")}`
               : "AI investigation of public news. Quotes are checked against their sources."}
           </p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1.5">
-          <Button size="sm" variant="outline" onClick={runAnalyst} disabled={running || !borrowerId}>
-            {running ? (
-              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden="true" />
-            ) : (
-              <FileSearch className="mr-1.5 h-4 w-4" aria-hidden="true" />
-            )}
-            {running ? "Investigating…" : analysis ? "Run again" : "Run analyst"}
-          </Button>
+          {runButton}
           {running && (
-            <p className="text-xs text-gray-500" aria-live="polite">
+            <p className="text-xs text-ew-muted" aria-live="polite">
               Searching news and reading sources. This can take up to 2 minutes.
             </p>
           )}
         </div>
       </header>
 
-      <div className="space-y-5 px-5 py-4">
+      <div className="space-y-5 px-4 py-3">
         {error && (
-          <p role="alert" className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+          <p role="alert" className="rounded-sm border border-ew-red-rule bg-ew-red-bg px-3 py-2 text-xs text-ew-red">
             {error}
-          </p>
-        )}
-
-        {loading && <p className="text-sm text-gray-500">Loading…</p>}
-
-        {!loading && !analysis && !running && (
-          <p className="text-sm text-gray-500">
-            No brief yet. Run the analyst to investigate lawsuits, new lenders, executive
-            exits and layoffs for this company.
           </p>
         )}
 
         {analysis && (
           <>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-medium text-gray-500">Recommended action</span>
+              <span className="text-xs font-medium text-ew-muted">Recommended action</span>
               <Badge
                 variant="outline"
-                className={`rounded font-medium ${action?.className || "border-gray-200 bg-gray-50 text-gray-700"}`}
+                className={`rounded-sm font-medium ${action?.className || "border-ew-rule bg-ew-hover text-ew-ink-soft"}`}
               >
                 {action?.label || analysis.recommended_action}
               </Badge>
             </div>
 
-            <p className="max-w-3xl text-sm leading-relaxed text-gray-800">{analysis.summary}</p>
+            <p className="max-w-3xl text-sm leading-relaxed text-ew-ink-soft">{analysis.summary}</p>
 
             <div className="space-y-2">
               <SectionLabel>Findings</SectionLabel>
@@ -269,14 +289,14 @@ export default function AnalystBrief({ borrower }) {
                   ))}
                 </ul>
               ) : (
-                <p className="text-sm text-gray-500">No verified findings.</p>
+                <p className="text-sm text-ew-muted">No verified findings.</p>
               )}
             </div>
 
             {questions.length > 0 && (
               <div className="space-y-2">
                 <SectionLabel>Open questions</SectionLabel>
-                <ul className="list-disc space-y-1 pl-5 text-sm text-gray-700">
+                <ul className="list-disc space-y-1 pl-5 text-sm text-ew-ink-soft">
                   {questions.map((q, i) => (
                     <li key={i}>{q}</li>
                   ))}

@@ -51,14 +51,14 @@ export default function SourceChip({ source, description, state = "not_checked",
   return (
     <li className={`flex min-w-0 flex-col gap-0.5 px-4 py-3 ${s.cell}`}>
       <div className="flex items-center justify-between gap-2">
-        <span className="font-heading text-sm font-bold text-ew-ink">{source}</span>
+        <span className="text-[13px] font-semibold text-ew-ink">{source}</span>
         <span className={`inline-flex items-center gap-1 text-xs font-semibold ${s.text}`}>
           <Icon aria-hidden="true" className={`h-3.5 w-3.5 ${s.spin ? "animate-spin" : ""}`} />
           {s.label}
         </span>
       </div>
       <span className="text-xs text-ew-muted">{description}</span>
-      <span className={`text-xs ${state === "ok" && recentCount > 0 ? "font-medium text-ew-ink-soft" : "text-ew-muted"}`}>
+      <span className={`font-mono text-xs ${state === "ok" && recentCount > 0 ? "font-medium text-ew-ink-soft" : "text-ew-muted"}`}>
         {state === "unavailable" && note ? note : DETAIL[state](recentCount)}
       </span>
     </li>
