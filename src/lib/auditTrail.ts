@@ -24,17 +24,18 @@ export interface AuditEntry {
   event: string;
   details: string;
   source_url: string;
+  count?: number; // identical consecutive check entries folded into this one (>= 2); `at` is the latest
 }
 
 export const ACTOR_SYSTEM = "System check";
-export const ACTOR_AI = "Analyst (AI) · findings verified by code";
+export const ACTOR_AI = "AI news summary · quotes checked by code";
 export const ACTOR_GUEST = "Guest (demo)";
 
 const SIGNAL_LABELS: Record<string, string> = {
-  hiring_drop: "Hiring drop",
-  review_distress: "Employee review distress",
-  exec_departure: "Executive departure",
-  legal_layoffs: "Lawsuit / layoffs / liens",
+  hiring_drop: "Sharp drop in job postings",
+  review_distress: "Employee reviews report trouble",
+  exec_departure: "Executive change",
+  legal_layoffs: "Lawsuit, layoffs or closure",
 };
 const STATUS_LABELS: Record<string, string> = { red: "Red", yellow: "Yellow", green: "Green" };
 const DECISION_LABELS: Record<string, string> = {
@@ -55,6 +56,9 @@ const CASHFLOW_METHODS: Record<string, string> = {
   llm: "read by AI (fallback), then lenders and late payments found by code",
 };
 
+const SEVERITY_LABELS = { strong: "serious", weak: "minor" } as const;
+const severityLabel = (v: unknown) => (v === "strong" ? SEVERITY_LABELS.strong : SEVERITY_LABELS.weak);
+
 const text = (v: unknown): string => (v === null || v === undefined ? "" : String(v)).trim();
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : /(s|sh|ch|x)$/.test(word) ? "es" : "s"}`;
 const join = (parts: string[]) => parts.filter(Boolean).join(" ");
@@ -67,6 +71,20 @@ const safeUrl = (v: unknown) => (/^https?:\/\//i.test(text(v)) ? text(v) : "");
 // values that already have a zone are left alone.
 function asUtc(s: string): string {
   return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(s) ? `${s}Z` : s;
+}
+
+// One date style everywhere in the trail: "Oct 10, 5:42 PM" (local time), or "Sep 25" for a bare date.
+// The year is added only when it is not the current year.
+export function formatTrailDate(at: string, now: Date = new Date()): string {
+  const s = text(at);
+  if (!s) return "Unknown";
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(s);
+  const d = new Date(dateOnly ? `${s}T00:00:00` : asUtc(s));
+  if (Number.isNaN(d.getTime())) return s;
+  const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
+  if (d.getFullYear() !== now.getFullYear()) opts.year = "numeric";
+  if (!dateOnly) { opts.hour = "numeric"; opts.minute = "2-digit"; }
+  return d.toLocaleString("en-US", opts);
 }
 
 function when(...candidates: unknown[]): string {
@@ -87,7 +105,7 @@ function statusEntry(b: Rec | null | undefined): AuditEntry[] {
     kind: "status",
     actor: ACTOR_SYSTEM,
     event: `Status set to ${label} by the fixed rules`,
-    details: join([sentence(text(b.why)), sources, "Earlier statuses are not stored."]),
+    details: join([sentence(text(b.why)), sources, ""]),
     source_url: "",
   }];
 }
@@ -111,8 +129,8 @@ function checkRunEntry(r: Rec): AuditEntry {
   const state = r.status === "failed" ? "failed" : r.status === "running" ? "started (not finished)" : "finished";
   const details = [
     searches.length ? `${ok} of ${plural(searches.length, "search")} answered${ok < searches.length ? `, ${searches.length - ok} unavailable` : ""}.` : "",
-    `${plural(articles.length, "article")} found: ${kept} kept, ${dropped} dropped.`,
-    reasons ? `Dropped because: ${reasons}.` : "",
+    `${plural(articles.length, "article")} found: ${kept} confirmed, ${dropped} set aside.`,
+    reasons ? `Set aside because: ${reasons}.` : "",
     typeof r.signal_count === "number" ? `${plural(r.signal_count, "warning sign")} saved.` : "",
     r.error ? `Error: ${text(r.error)}.` : "",
   ];
@@ -120,7 +138,7 @@ function checkRunEntry(r: Rec): AuditEntry {
     at: when(r.finished_at, r.updated_at, r.started_at, r.created_date),
     kind: "check_run",
     actor: ACTOR_SYSTEM,
-    event: `${text(r.source) || "News"} and Legal check ${state}`,
+    event: `${text(r.source) || "News"} and legal check ${state}`,
     details: join(details),
     source_url: "",
   };
@@ -133,9 +151,9 @@ function signalEntry(s: Rec): AuditEntry {
     at: when(s.created_date, s.date),
     kind: "signal",
     actor: ACTOR_SYSTEM,
-    event: `Warning sign found: ${label} (${s.severity === "strong" ? "strong" : "weak"})`,
+    event: `Warning sign found: ${label} (${severityLabel(s.severity)})`,
     details: join([
-      s.date ? `Dated ${text(s.date)}.` : "",
+      s.date ? `Dated ${formatTrailDate(text(s.date))}.` : "",
       sentence(text(s.title)),
       quote ? `Quote: "${quote}"` : "",
       s.source_name ? `Source: ${text(s.source_name)}.` : "",
@@ -151,10 +169,10 @@ function analysisEntry(a: Rec): AuditEntry {
     at: when(a.created_at, a.created_date),
     kind: "analysis",
     actor: ACTOR_AI,
-    event: `Analyst brief written (recommends: ${ACTION_LABELS[a.recommended_action] ?? text(a.recommended_action)})`,
+    event: `AI news summary written (recommends: ${ACTION_LABELS[a.recommended_action] ?? text(a.recommended_action)})`,
     details: join([
       sentence(text(a.summary)),
-      `${plural(findings.length, "finding")} kept with quotes found word for word in the source; ${dropped} dropped because the quote was not in the source.`,
+      `${plural(findings.length, "finding")} confirmed with quotes found word for word in the source; ${dropped} set aside because the quote was not in the source.`,
     ]),
     source_url: safeUrl(findings[0]?.source_url),
   };
@@ -168,7 +186,7 @@ function lenderCheckEntry(c: Rec): AuditEntry {
     at: when(c.created_at, c.created_date),
     kind: "lender_check",
     actor: ACTOR_AI,
-    event: `Other-lender check: ${plural(Number(c.lender_count) || 0, "lender")} found`,
+    event: `Other-lenders check: ${plural(Number(c.lender_count) || 0, "lender")} found`,
     details: join([
       sentence(text(c.summary)),
       searched.length ? `${ok} of ${plural(searched.length, "search")} answered.` : "",
@@ -188,9 +206,9 @@ function cashflowEntry(r: Rec): AuditEntry {
     event: "Cash-flow statement reviewed",
     details: join([
       `Statement ${method}.`,
-      typeof r.transaction_count === "number" ? `${plural(r.transaction_count, "transaction")}${r.period_start ? ` from ${text(r.period_start)} to ${text(r.period_end)}` : ""}.` : "",
+      typeof r.transaction_count === "number" ? `${plural(r.transaction_count, "transaction")}${r.period_start ? ` from ${formatTrailDate(text(r.period_start))} to ${formatTrailDate(text(r.period_end))}` : ""}.` : "",
       sentence(text(r.summary)),
-      flags.length ? `Flags: ${flags.map((f) => `${text(f?.text)} (${f?.severity === "strong" ? "strong" : "weak"})`).join("; ")}.` : "",
+      flags.length ? `Flags: ${flags.map((f) => `${text(f?.text)} (${severityLabel(f?.severity)})`).join("; ")}.` : "",
     ]),
     source_url: safeUrl(r.file_url),
   };
@@ -206,7 +224,7 @@ function decisionEntry(d: Rec): AuditEntry {
     details: join([
       d.note ? `Note: ${sentence(text(d.note))}` : "",
       docs.length ? `Documents requested: ${docs.map((x) => join([text(x?.item), x?.reason ? `(${text(x.reason)})` : ""])).join("; ")}.` : "",
-      d.follow_up_date ? `Follow up by ${text(d.follow_up_date)}.` : "",
+      d.follow_up_date ? `Follow up by ${formatTrailDate(text(d.follow_up_date))}.` : "",
     ]),
     source_url: safeUrl(docs.find((x) => safeUrl(x?.source_url))?.source_url),
   };
@@ -230,6 +248,23 @@ export function buildAuditTrail(records: AuditRecords): AuditEntry[] {
     .map((e, i) => ({ e, i }))
     .sort((a, b) => time(b.e) - time(a.e) || a.i - b.i)
     .map(({ e }) => e);
+}
+
+// Folds runs of identical, adjacent check entries (same event and details) into one row for display and
+// export: the newest time, a count, and a plain "Checked N times" note. Nothing else is merged.
+export function collapseRepeatedChecks(entries: AuditEntry[]): AuditEntry[] {
+  const out: AuditEntry[] = [];
+  for (const e of entries ?? []) {
+    const prev = out[out.length - 1];
+    if (prev && e.kind === "check_run" && prev.kind === "check_run" && prev.event === e.event && prev.details === e.details) {
+      out[out.length - 1] = { ...prev, count: (prev.count ?? 1) + 1 };
+    } else {
+      out.push(e);
+    }
+  }
+  return out.map((e) => (e.count && e.count > 1
+    ? { ...e, details: join([e.details, `Checked ${e.count} times, latest ${formatTrailDate(e.at)}.`]) }
+    : e));
 }
 
 export const CSV_HEADER = ["Timestamp", "Actor", "Event", "Details", "Source"];

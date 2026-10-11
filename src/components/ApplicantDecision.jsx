@@ -31,7 +31,7 @@ const DECISIONS = [
 const DECISION_BY_VALUE = Object.fromEntries(DECISIONS.map((d) => [d.value, d]));
 
 const KIND_LABELS = {
-  lien: "Lien (UCC)",
+  lien: "Lien (claim on assets)",
   lender_lawsuit: "Lender lawsuit",
   judgment: "Judgment",
   new_loan: "New loan",
@@ -163,7 +163,7 @@ function SearchLog({ searched }) {
     <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger className={`inline-flex items-center gap-1 text-xs font-medium text-ew-ink-soft hover:text-ew-ink ${focusRing}`}>
         <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
-        What was searched{failed > 0 ? ` (${failed} failed)` : ""}
+        Where we looked{failed > 0 ? ` (${failed} could not be reached)` : ""}
       </CollapsibleTrigger>
       <CollapsibleContent>
         <ul className="mt-2 space-y-1 text-xs text-ew-ink-soft">
@@ -422,6 +422,7 @@ export default function ApplicantDecision({ borrower, signals }) {
           {copied ? "Document request copied to clipboard" : ""}
         </span>
         <div className="border-t border-ew-rule-soft px-4 py-3">
+          <p className="mb-2 text-xs text-ew-muted">Ask the applicant for these before credit committee.</p>
           <DocumentList items={documents} />
         </div>
       </section>
@@ -433,7 +434,7 @@ export default function ApplicantDecision({ borrower, signals }) {
               Other lenders
             </h2>
             <p className="mt-0.5 text-xs text-ew-muted">
-              Not checked. Loans at several other banks are an early warning sign.
+              Not checked yet. Loans from several other lenders can be an early warning sign.
             </p>
           </div>
           {checkButton}
@@ -446,14 +447,14 @@ export default function ApplicantDecision({ borrower, signals }) {
                 Other lenders
               </h2>
               <p className="mt-0.5 text-xs text-ew-muted">
-                Public liens, lender lawsuits and loan news. Quotes are checked against their sources.
+                Looks for loans from other lenders, liens (claims on assets), lender lawsuits and loan news. Each quote is checked against its source.
               </p>
             </div>
             <div className="flex shrink-0 flex-col items-end gap-1.5">
               {checkButton}
               {running && (
                 <p className="text-xs text-ew-muted" aria-live="polite">
-                  Searching liens, court records and loan news. This can take up to 90 seconds.
+                  Searching public records and news. This can take up to 90 seconds.
                 </p>
               )}
             </div>
@@ -467,7 +468,7 @@ export default function ApplicantDecision({ borrower, signals }) {
                     : "font-mono text-2xl font-semibold text-ew-ink"
                 }
               >
-                Other lenders: {loading ? "…" : count === null ? "not checked" : count}
+                Other lenders found: {loading ? "…" : count === null ? "not checked yet" : count}
               </p>
               {check?.created_at && <p className="text-xs text-ew-muted">Checked {formatWhen(check.created_at)}</p>}
             </div>
@@ -485,7 +486,7 @@ export default function ApplicantDecision({ borrower, signals }) {
             Record a decision
           </h2>
           <p className="mt-0.5 text-xs text-ew-muted">
-            Every decision is logged with who made it, a note and an optional follow-up date.
+            Each decision is saved with your name, a note and an optional follow-up date.
           </p>
         </div>
         <div className="space-y-4 border-t border-ew-rule-soft px-4 py-3">

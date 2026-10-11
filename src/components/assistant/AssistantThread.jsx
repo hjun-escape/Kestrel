@@ -9,7 +9,9 @@ import {
   useAui,
   useAuiState,
 } from "@assistant-ui/react";
+import { Link } from "react-router-dom";
 import { ArrowDown, ArrowUp, RotateCcw, Square } from "lucide-react";
+import { useAuth } from "@/lib/AuthContext";
 import { useAssistantPage } from "./AssistantContext";
 import { AnswerText, SourcesFooter } from "./CitationParts";
 import { CompanyCards, PortfolioSummaryCard } from "./CompanyCards";
@@ -17,6 +19,7 @@ import { ActionCard } from "./ActionCard";
 import { PART, suggestedQuestions } from "./assistantData";
 
 export const COMPOSER_ID = "ew-assistant-composer";
+const SIGN_IN_TO_ASK_PATH = "/login?returnTo=%2Fassistant";
 
 const PART_COMPONENTS = {
   Text: AnswerText,
@@ -97,7 +100,19 @@ function AssistantMessage() {
   );
 }
 
+function SignInButton() {
+  return (
+    <Link
+      to={SIGN_IN_TO_ASK_PATH}
+      className="inline-flex h-8 items-center rounded-sm bg-ew-ink px-3 text-sm font-semibold text-white hover:bg-ew-ink-soft"
+    >
+      Sign in
+    </Link>
+  );
+}
+
 function Welcome() {
+  const { isAuthenticated } = useAuth();
   const { companies, byId, pinnedId } = useAssistantPage();
   const pinned = pinnedId ? byId[pinnedId] : null;
   const count = companies?.length;
@@ -115,9 +130,19 @@ function Welcome() {
           Questions that do not name a company will be about <span className="font-semibold">{pinned.name}</span>.
         </p>
       )}
-      <ul className="mt-7 grid gap-1.5 sm:grid-cols-2" aria-label="Suggested questions">
+      {!isAuthenticated && (
+        <p role="status" className="mt-4 text-sm font-medium text-ew-ink">
+          Sign in to ask Kestrel questions. These are the kinds of questions it can answer.
+        </p>
+      )}
+      <ul className="mt-7 grid gap-1.5 sm:grid-cols-2" aria-label={isAuthenticated ? "Suggested questions" : "Example questions"}>
         {suggestedQuestions(companies).map((s) => (
           <li key={s.prompt}>
+            {!isAuthenticated ? (
+              <span className="flex w-full items-center rounded-sm border border-ew-rule-soft bg-ew-paper px-3.5 py-2.5 text-left text-sm font-medium text-ew-muted">
+                {s.label || s.prompt}
+              </span>
+            ) : (
             <ThreadPrimitive.Suggestion
               prompt={s.prompt}
               send={s.send}
@@ -128,6 +153,7 @@ function Welcome() {
                 {s.send ? "Ask" : "Draft"}
               </span>
             </ThreadPrimitive.Suggestion>
+            )}
           </li>
         ))}
       </ul>
@@ -135,7 +161,22 @@ function Welcome() {
   );
 }
 
+function SignedOutComposer() {
+  return (
+    <div className="mx-auto flex w-full max-w-[760px] flex-wrap items-center justify-between gap-3 rounded-sm border border-ew-rule bg-ew-paper px-3.5 py-3">
+      <p className="text-sm text-ew-ink">Sign in to ask Kestrel questions about your loan book.</p>
+      <SignInButton />
+    </div>
+  );
+}
+
 function Composer() {
+  const { isAuthenticated } = useAuth();
+  if (!isAuthenticated) return <SignedOutComposer />;
+  return <SignedInComposer />;
+}
+
+function SignedInComposer() {
   const aui = useAui();
   const { byId, pinnedId } = useAssistantPage();
   const pinned = pinnedId ? byId[pinnedId] : null;

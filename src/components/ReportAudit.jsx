@@ -103,12 +103,12 @@ export default function ReportAudit({ borrower, currentSignals = [], refreshing 
     if (!preview) onViewChange?.('summary');
     try {
       setPhase(1);
-      log('Running deterministic evidence checks. No Devin session or independent AI verdict is being requested.');
+      log('Running evidence checks. They run by fixed rules, not AI.');
       await new Promise(resolve => requestAnimationFrame(() => resolve(null)));
       const data = await request({ action, borrower_id: borrower.id, considerations, decisions, parent_run_id: runs[0]?.id || '' });
       if (!current()) return;
       setProgressTests(data.run.payload.tests);
-      log('Checks returned. The following animation reveals completed results; it is not live Devin execution.');
+      log('Checks returned. Results appear one at a time below.');
       const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       for (let i = 0; i < AUDIT_CHECKS.length; i++) {
         const check = AUDIT_CHECKS[i];
@@ -119,7 +119,7 @@ export default function ReportAudit({ borrower, currentSignals = [], refreshing 
         setRevealed(i + 1);
       }
       setPhase(2);
-      log(`Review risk: ${data.run.payload.result.status}. ${data.run.payload.excluded_signal_ids.length} findings excluded; original report unchanged.`, { kind: 'result', status: data.run.payload.result.status, why: data.run.payload.result.why });
+      log(`Status after double-check: ${data.run.payload.result.status}. ${data.run.payload.excluded_signal_ids.length} findings excluded; original report unchanged.`, { kind: 'result', status: data.run.payload.result.status, why: data.run.payload.result.why });
       setPhase(3);
       setRuns(rs => [data.run, ...rs]); setSelectedId(data.run.id);
       setDecisions(data.run.payload.decisions || []); setSuggestions(data.suggestions || []); setDismissed([]);
@@ -139,11 +139,11 @@ export default function ReportAudit({ borrower, currentSignals = [], refreshing 
     <header className="flex flex-wrap items-start justify-between gap-4 border-b border-ew-rule px-5 py-5">
       <div><h2 id="audit-heading" className="font-heading text-xl font-bold">{view === 'considerations' ? 'Rerun with considerations' : view === 'summary' ? 'Audit report' : view === 'history' ? 'Review history' : 'Evidence checks'}</h2>
         <p className="mt-1 text-sm text-ew-muted">{view === 'considerations' ? 'Choose what to apply. Your next run is saved separately.' : view === 'history' ? 'Open a past version to inspect its evidence and decisions.' : 'Inspect the evidence and record your judgment.'}</p></div>
-      {view !== 'history' && <Button className={`h-9 rounded-sm bg-ew-ink px-3.5 hover:bg-ew-ink-soft ${view === 'considerations' && !preview ? 'mr-7' : ''}`} onClick={() => execute('run')} disabled={!canRun}>{busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RotateCcw className="mr-2 h-4 w-4" />}{busy === 'run' ? 'Running checks…' : view === 'considerations' ? 'Run with considerations' : runs.length ? 'Run audit again' : 'Audit this report'}</Button>}
+      {view !== 'history' && !(view === 'summary' && !runs.length && phase < 0 && !loading) && <Button className={`h-9 rounded-sm bg-ew-ink px-3.5 hover:bg-ew-ink-soft ${view === 'considerations' && !preview ? 'mr-7' : ''}`} onClick={() => execute('run')} disabled={!canRun}>{busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RotateCcw className="mr-2 h-4 w-4" />}{busy === 'run' ? 'Running checks…' : view === 'considerations' ? 'Run with considerations' : runs.length ? 'Run audit again' : 'Run audit'}</Button>}
     </header>
     {!allowed ? <p className="p-5 text-sm text-ew-muted">Sign in to audit your company reports and save review history.</p> : <>
-      {view !== 'considerations' && <AuditRunProgress phase={phase} logs={activity} failed={failed} running={!!busy} tests={progressTests.length || phase >= 0 ? progressTests : payload?.tests || []} revealed={progressTests.length || phase >= 0 ? revealed : AUDIT_CHECKS.length} report={tab === 'summary' ? summaryReport : null} />}
-      {sessionOnly && <p className="border-b border-ew-rule-soft px-5 py-3 text-xs text-ew-muted">Session-only demo audit of this company’s recorded evidence. No shared data is changed. Devin is not connected.</p>}
+      {view !== 'considerations' && <AuditRunProgress phase={phase} logs={activity} failed={failed} running={!!busy} tests={progressTests.length || phase >= 0 ? progressTests : payload?.tests || []} revealed={progressTests.length || phase >= 0 ? revealed : AUDIT_CHECKS.length} report={tab === 'summary' ? summaryReport : null} onRun={() => execute('run')} canRun={canRun} />}
+      {sessionOnly && <p className="border-b border-ew-rule-soft px-5 py-3 text-xs text-ew-muted">Session-only demo audit of this company’s recorded evidence. No shared data is changed.</p>}
       {!view && <ol aria-label="Audit workflow" className="flex flex-wrap gap-x-5 gap-y-2 border-b border-ew-rule-soft bg-ew-paper px-5 py-3 text-xs text-ew-ink-soft">
         {['Report ready', 'Run checks', 'Review evidence', 'Edit considerations', 'Rerun & compare'].map((step, i) => <li key={step} className="flex items-center gap-2"><span className="flex h-5 w-5 items-center justify-center rounded-full border border-ew-rule">{i + 1}</span>{step}{i < 4 && <ChevronRight className="h-3 w-3 text-ew-muted" />}</li>)}
       </ol>}

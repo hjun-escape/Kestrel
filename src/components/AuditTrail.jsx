@@ -1,11 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { format } from "date-fns";
 import { ChevronRight, Download, ExternalLink, Printer } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { auditFileName, auditTrailCsv, buildAuditTrail } from "@/lib/auditTrail.ts";
+import { auditFileName, auditTrailCsv, buildAuditTrail, collapseRepeatedChecks, formatTrailDate } from "@/lib/auditTrail.ts";
 import { NOT_AI_TEXT } from "@/lib/statusRules.ts";
 
 // Per-company audit trail (from user testing: "best in class... with an audit trail").
@@ -26,8 +25,8 @@ const KIND_LABEL = {
   status: "Status",
   check_run: "Check",
   signal: "Evidence",
-  analysis: "Analyst brief",
-  lender_check: "Lender check",
+  analysis: "AI news summary",
+  lender_check: "Other lenders",
   cashflow: "Cash flow",
   decision: "Decision",
 };
@@ -35,8 +34,8 @@ const KIND_LABEL = {
 const asList = (res) => (Array.isArray(res) ? res : res?.items || []);
 
 const SOURCES = [
-  { key: "checkRuns", label: "check runs", load: (q) => base44.entities.CheckRun.filter(q, "-started_at", 100) },
-  { key: "analyses", label: "analyst briefs", load: (q) => base44.entities.Analysis.filter(q, "-created_at", 100) },
+  { key: "checkRuns", label: "source checks", load: (q) => base44.entities.CheckRun.filter(q, "-started_at", 100) },
+  { key: "analyses", label: "AI news summaries", load: (q) => base44.entities.Analysis.filter(q, "-created_at", 100) },
   { key: "lenderChecks", label: "lender checks", load: (q) => base44.entities.LenderCheck.filter(q, "-created_at", 100) },
   { key: "cashflowReviews", label: "cash-flow reviews", load: (q) => base44.entities.CashflowReview.filter(q, "-created_at", 100) },
   { key: "decisions", label: "decisions", load: (q) => base44.entities.Decision.filter(q, "-created_at", 200) },
@@ -64,15 +63,6 @@ function useAuditRecords(borrowerId, enabled, reloadKey) {
     };
   }, [borrowerId, enabled, reloadKey]);
   return state;
-}
-
-function formatWhen(at) {
-  if (!at) return "Unknown";
-  try {
-    return /^\d{4}-\d{2}-\d{2}$/.test(at) ? format(new Date(`${at}T00:00:00`), "MMM d, yyyy") : format(new Date(at), "MMM d, yyyy, h:mm a");
-  } catch {
-    return at;
-  }
 }
 
 function downloadCsv(entries, companyName) {
@@ -109,7 +99,8 @@ export default function AuditTrail({ borrower, signals }) {
   const [open, setOpen] = useState(false);
   const { loading, records, failed } = useAuditRecords(borrower.id, open, borrower.last_refreshed);
   const entries = buildAuditTrail({ borrower, signals, ...records });
-  const generated = format(new Date(), "MMM d, yyyy, h:mm a");
+  const shown = collapseRepeatedChecks(entries);
+  const generated = formatTrailDate(new Date().toISOString());
   const [printing, startPrint] = usePrint();
   const intro = `Newest first. Generated ${generated}. ${NOT_AI_TEXT}`;
 
@@ -122,7 +113,7 @@ export default function AuditTrail({ borrower, signals }) {
             <h1 className="font-heading text-lg font-bold">Kestrel audit trail: {borrower.name}</h1>
             <p className="mt-1 text-xs text-ew-ink-soft">{intro}</p>
             {failed.length > 0 && <p className="mt-1 text-xs">Not included (could not be loaded): {failed.join(", ")}.</p>}
-            <AuditTable entries={entries} loading={false} forPrint />
+            <AuditTable entries={shown} loading={false} forPrint />
           </div>,
           document.body
         )}
@@ -158,7 +149,7 @@ export default function AuditTrail({ borrower, signals }) {
                 Could not load {failed.join(", ")} for this viewer, so they are not listed.
               </p>
             )}
-            <AuditTable entries={entries} loading={loading} />
+            <AuditTable entries={shown} loading={loading} />
           </div>
         </CollapsibleContent>
       </Collapsible>
@@ -185,7 +176,7 @@ function AuditTable({ entries, loading, forPrint = false }) {
           {entries.map((e, i) => (
             <tr key={`${e.kind}-${e.at}-${i}`} className="border-b border-ew-rule-soft align-top">
               <td className="py-2 pr-3 tabular-nums text-ew-ink-soft">
-                {e.at ? <time dateTime={e.at}>{formatWhen(e.at)}</time> : "Unknown"}
+                {e.at ? <time dateTime={e.at}>{formatTrailDate(e.at)}</time> : "Unknown"}
               </td>
               <td className="break-words py-2 pr-3 text-ew-ink-soft">{e.actor}</td>
               <td className="py-2 pr-3">
@@ -194,6 +185,7 @@ function AuditTable({ entries, loading, forPrint = false }) {
                     {KIND_LABEL[e.kind]}
                   </span>
                   {e.event}
+                  {e.count > 1 && <span className="ml-1.5 tabular-nums text-ew-muted">×{e.count}</span>}
                 </p>
                 {e.details && <p className="mt-0.5 leading-snug text-ew-ink-soft">{e.details}</p>}
                 {forPrint && e.source_url && <p className="mt-0.5 break-all text-ew-muted">Source: {e.source_url}</p>}

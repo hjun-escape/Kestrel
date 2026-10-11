@@ -8,6 +8,8 @@ import {
   auditFileName,
   auditTrailCsv,
   buildAuditTrail,
+  collapseRepeatedChecks,
+  formatTrailDate,
   csvCell,
 } from '../src/lib/auditTrail.ts';
 import { countForRules, ruleLine } from '../src/lib/statusRules.ts';
@@ -64,14 +66,14 @@ describe('buildAuditTrail', () => {
     assert.match(entries[0].details, /Payroll summary \(CFO left\)/);
     assert.equal(entries[1].actor, ACTOR_GUEST);
     assert.equal(entries[2].actor, ACTOR_AI);
-    assert.match(entries[2].details, /2 dropped/);
+    assert.match(entries[2].details, /2 set aside/);
     assert.match(entries[3].event, /Red/);
     assert.match(entries[3].details, /Sources unavailable: Reviews/);
     assert.equal(entries[4].actor, ACTOR_SYSTEM);
     assert.match(entries[4].details, /Quote: "The CFO resigned\."/);
     assert.equal(entries[4].source_url, 'https://news.example/a');
     assert.match(entries[5].details, /1 of 2 searches answered, 1 unavailable/);
-    assert.match(entries[5].details, /3 articles found: 1 kept, 2 dropped/);
+    assert.match(entries[5].details, /3 articles found: 1 confirmed, 2 set aside/);
     assert.match(entries[5].details, /different company \(2\)/);
     assert.match(entries[7].details, /isolated sandbox/);
   });
@@ -146,5 +148,37 @@ describe('status rule line', () => {
 
   test('no signals reads as Green, and a full timestamp works as today', () => {
     assert.equal(ruleLine(countForRules([], '2026-10-10T15:00:00Z')), 'No warning signs in the last 90 days → Green');
+  });
+});
+
+describe('collapseRepeatedChecks', () => {
+  const run = (finished_at: string, over = {}) => ({ source: 'News', status: 'done', started_at: finished_at, finished_at, searches: [{ ok: true }, { ok: true }], articles: [{ decision: 'kept' }], signal_count: 2, ...over });
+
+  test('folds identical adjacent checks into one row with a count and the latest time', () => {
+    const entries = buildAuditTrail({ checkRuns: [run('2026-10-10T17:10:00Z'), run('2026-10-10T17:20:00Z'), run('2026-10-10T17:42:00Z')] });
+    assert.equal(entries.length, 3);
+    const shown = collapseRepeatedChecks(entries);
+    assert.equal(shown.length, 1);
+    assert.equal(shown[0].count, 3);
+    assert.equal(shown[0].at, '2026-10-10T17:42:00Z');
+    assert.match(shown[0].details, /Checked 3 times, latest/);
+    assert.match(shown[0].details, /\d{1,2}:\d{2}\s?(AM|PM)/);
+  });
+
+  test('keeps checks with different results, and other entries, separate; export stays complete', () => {
+    const entries = buildAuditTrail({
+      checkRuns: [run('2026-10-10T17:10:00Z'), run('2026-10-10T17:20:00Z', { signal_count: 3 })],
+      decisions: [{ decision: 'proceed', created_at: '2026-10-10T17:15:00Z' }],
+    });
+    assert.equal(collapseRepeatedChecks(entries).length, 3);
+    assert.equal(auditTrailCsv(entries).trim().split('\r\n').length, 4);
+  });
+
+  test('uses one plain date style and no longer says earlier statuses are not stored', () => {
+    assert.match(formatTrailDate('2026-09-25'), /^Sep 25(, 2026)?$/);
+    assert.match(formatTrailDate('2026-10-10T17:42:00Z'), /^Oct 1[01](, 2026)?, \d{1,2}:\d{2}\s?(AM|PM)$/);
+    assert.equal(formatTrailDate(''), 'Unknown');
+    const [status] = buildAuditTrail({ borrower });
+    assert.doesNotMatch(status.details, /not stored/);
   });
 });
