@@ -99,13 +99,17 @@ export default function ReportAudit({ borrower, currentSignals = [], refreshing 
     setFailed(false); setPhase(0); setActivity([]);
     setProgressTests([]); setRevealed(0);
     const log = (message, meta = {}) => setActivity(ls => [...ls, { time: new Date().toLocaleTimeString(), message, kind: 'info', ...meta }]);
-    log(`Preparing ${borrower.name}: ${signals.length} findings and ${considerations.filter(c => c.enabled).length} active considerations.`);
+    // Send only usable considerations: blank ones are skipped, and evidence a later refresh replaced is dropped.
+    const validIds = new Set(signals.map(s => s.id));
+    const usable = considerations.filter(c => c.text.trim()).map(c => ({ ...c, signal_ids: c.signal_ids.filter(id => validIds.has(id)) }));
+    const skipped = considerations.length - usable.length;
+    log(`Preparing ${borrower.name}: ${signals.length} findings and ${usable.filter(c => c.enabled).length} active considerations.${skipped ? ` Skipped ${skipped} blank consideration${skipped === 1 ? '' : 's'}.` : ''}`);
     if (!preview) onViewChange?.('summary');
     try {
       setPhase(1);
       log('Running deterministic evidence checks. No Devin session or independent AI verdict is being requested.');
       await new Promise(resolve => requestAnimationFrame(() => resolve(null)));
-      const data = await request({ action, borrower_id: borrower.id, considerations, decisions, parent_run_id: runs[0]?.id || '' });
+      const data = await request({ action, borrower_id: borrower.id, considerations: usable, decisions, parent_run_id: runs[0]?.id || '' });
       if (!current()) return;
       setProgressTests(data.run.payload.tests);
       log('Checks returned. The following animation reveals completed results; it is not live Devin execution.');

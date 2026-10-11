@@ -29,12 +29,16 @@ export function validateConsiderations(raw: unknown, signals: Signal[]): Conside
   if (!Array.isArray(raw) || raw.length > 20) throw new InputError('Provide at most 20 considerations.');
   const ids = new Set(signals.map(s => s.id));
   const seen = new Set<string>();
-  return raw.map((c: any) => {
-    if (!c || typeof c.id !== 'string' || !c.id || c.id.length > 100 || seen.has(c.id) ||
-      typeof c.text !== 'string' || !c.text.trim() || c.text.length > 600 || typeof c.enabled !== 'boolean' ||
-      !['consider', 'exclude'].includes(c.mode) || !CHECKS.includes(c.check) ||
-      !Array.isArray(c.signal_ids) || c.signal_ids.length > 200 || c.signal_ids.some((id: any) => typeof id !== 'string' || !ids.has(id))) {
-      throw new InputError('Each consideration needs unique ID, text, a check, and valid evidence selections.');
+  return raw.map((c: any, i: number) => {
+    const n = `Consideration ${i + 1}`;
+    if (!c || typeof c.id !== 'string' || !c.id || c.id.length > 100 || seen.has(c.id) || typeof c.enabled !== 'boolean' ||
+      !['consider', 'exclude'].includes(c.mode) || !CHECKS.includes(c.check) || !Array.isArray(c.signal_ids) || c.signal_ids.length > 200) {
+      throw new InputError(`${n} is malformed. Remove it and add it again.`);
+    }
+    if (typeof c.text !== 'string' || !c.text.trim()) throw new InputError(`${n} has no text. Write what to consider, or remove it.`);
+    if (c.text.length > 600) throw new InputError(`${n} is longer than 600 characters.`);
+    if (c.signal_ids.some((id: any) => typeof id !== 'string' || !ids.has(id))) {
+      throw new InputError(`${n} selects evidence that is no longer in this report. Reselect its evidence.`);
     }
     seen.add(c.id);
     if (c.enabled && c.mode === 'exclude' && c.signal_ids.length === 0) throw new InputError('Select the evidence to exclude.');

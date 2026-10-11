@@ -67,3 +67,12 @@ test('suggestions reuse only prior applied considerations for the same company i
   assert.equal(suggestConsiderations(runs, borrower)[0].outcome, 'unresolved');
   assert.deepEqual(suggestConsiderations(runs, { ...borrower, website_domain: 'different.example' }), []);
 });
+
+test('validateConsiderations says which consideration is wrong and why', async () => {
+  const { validateConsiderations } = await import('../base44/functions/auditReport/logic.ts');
+  const signals = [{ id: 's1' }] as never;
+  const base = { id: 'c1', text: 'Check the parent company', enabled: true, mode: 'consider', check: 'identity', signal_ids: [] };
+  assert.throws(() => validateConsiderations([base, { ...base, id: 'c2', text: '  ' }], signals), /Consideration 2 has no text/);
+  assert.throws(() => validateConsiderations([{ ...base, signal_ids: ['gone'] }], signals), /Consideration 1 selects evidence that is no longer in this report/);
+  assert.equal(validateConsiderations([{ ...base, signal_ids: ['s1'] }], signals).length, 1);
+});
