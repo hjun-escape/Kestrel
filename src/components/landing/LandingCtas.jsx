@@ -1,5 +1,6 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/lib/AuthContext";
 import { DEMO_LOAD_PATH, browserStorage, chooseDemo } from "./gate";
 
 export const SIGN_IN_PATH = "/login?returnTo=%2F";
@@ -24,7 +25,18 @@ const BASE =
 // real demo companies if the shared book has none yet.
 export default function LandingCtas({ tone = "dark", className = "" }) {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const styles = TONES[tone];
+
+  if (isAuthenticated) {
+    return (
+      <div className={`flex flex-col gap-3 sm:flex-row sm:items-center ${className}`}>
+        <Link to="/" className={`${BASE} ${styles.primary}`}>
+          Open loan book
+        </Link>
+      </div>
+    );
+  }
 
   const handleExplore = (e) => {
     e.preventDefault();
