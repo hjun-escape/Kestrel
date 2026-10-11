@@ -49,7 +49,7 @@ export default function CompanyDocuments() {
         ) : (
           <>
             <h1 className="font-heading text-2xl font-bold">{data.company}</h1>
-            <p className="mt-1 text-sm text-ew-muted">Your lender asked for the documents below. Upload each one here. Text files and PDFs.</p>
+            <p className="mt-1 text-sm text-ew-muted">Upload what your lender asked for, or send a document of your own. Text files and PDFs.</p>
 
             <section className="mt-6" aria-labelledby="asked-heading">
               <h2 id="asked-heading" className="text-sm font-semibold">Requested by your lender · {asked.length}</h2>
@@ -57,6 +57,8 @@ export default function CompanyDocuments() {
               <ul className="mt-2 space-y-3">{asked.map(d => <Asked key={d.id} item={d} token={token} onSent={load} />)}</ul>
             </section>
 
+
+            <SendDocument token={token} onSent={load} />
 
             {history.length > 0 && (
               <section className="mt-8" aria-labelledby="history-heading">
@@ -107,10 +109,51 @@ function Asked({ item: d, token, onSent }) {
       {d.reason && <p className="mt-2 text-sm text-ew-ink-soft">{d.reason}</p>}
       <div className="mt-3 space-y-2">
         <FilePicker value={file} onChange={setFile} disabled={busy} id={`file-${d.id}`} />
-        <input aria-label="Note for your lender" value={note} maxLength={1000} onChange={e => setNote(e.target.value)} placeholder="Note for your lender (optional)" className={`${field} h-8 py-1 text-xs`} />
+        <input aria-label="Note for your lender" value={note} maxLength={1000} onChange={e => setNote(e.target.value)} placeholder="Note for your lender (optional)" className={field} />
         {error && <p role="alert" className="text-xs text-ew-red">{error}</p>}
-        <button type="button" onClick={send} disabled={busy} className="inline-flex h-8 items-center gap-1.5 rounded-sm bg-ew-ink px-3 text-xs font-semibold text-white disabled:opacity-50">{busy ? <Loader2 aria-hidden="true" className="h-3.5 w-3.5 animate-spin" /> : <Send aria-hidden="true" className="h-3.5 w-3.5" />}Send</button>
+        <button type="button" onClick={send} disabled={busy} className="inline-flex h-9 items-center gap-2 rounded-sm bg-ew-ink px-4 text-sm font-semibold text-white disabled:opacity-50">{busy ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> : <Send aria-hidden="true" className="h-4 w-4" />}Send</button>
       </div>
     </li>
+  );
+}
+
+/** Send a document nobody asked for yet: to correct or confirm something, or for context. */
+function SendDocument({ token, onSent }) {
+  const [file, setFile] = useState(null);
+  const [title, setTitle] = useState('');
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  async function send(e) {
+    e.preventDefault();
+    if (!file) return setError('Choose a file to send.');
+    setBusy(true);
+    setError('');
+    try {
+      await call({ action: 'portal_send', token, purpose: 'context', title: title || file.name, ...file, note });
+      setFile(null);
+      setTitle('');
+      setNote('');
+      await onSent();
+    } catch (err) {
+      setError(errorText(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <form onSubmit={send} className="mt-6 border border-ew-rule bg-ew-surface p-4">
+      <h2 className="text-sm font-semibold">Send a document</h2>
+      <p className="mt-0.5 text-xs text-ew-muted">Anything that helps your lender check what they found.</p>
+      <div className="mt-3 space-y-2">
+        <input aria-label="Title" className={field} value={title} maxLength={200} onChange={e => setTitle(e.target.value)} placeholder="Title (defaults to the file name)" />
+        <input aria-label="Note for your lender" className={field} value={note} maxLength={1000} onChange={e => setNote(e.target.value)} placeholder="Note for your lender (optional)" />
+        <FilePicker value={file} onChange={setFile} disabled={busy} id="send-file" />
+      </div>
+      {error && <p role="alert" className="mt-2 text-xs text-ew-red">{error}</p>}
+      <button type="submit" disabled={busy} className="mt-3 inline-flex h-9 items-center gap-2 rounded-sm bg-ew-ink px-4 text-sm font-semibold text-white disabled:opacity-50">
+        {busy ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> : <Send aria-hidden="true" className="h-4 w-4" />}Send
+      </button>
+    </form>
   );
 }
