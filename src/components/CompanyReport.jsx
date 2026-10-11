@@ -196,6 +196,7 @@ export default function CompanyReport({
             final: false,
           }}
           notes={{
+            extra: "Lenders, cash flow, AI summary · not used for the status",
             report: borrower.last_refreshed ? `${recentSignals.length} warning sign${recentSignals.length === 1 ? "" : "s"} · sources · status` : "Not checked yet",
             check: confidence?.total ? `${confidence.percent}% confidence · ${confidence.passed}/${confidence.total} passed` : "Not run yet",
             documents: docItems.length ? `${docItems.filter((d) => d.status === "submitted").length} to review · ${docItems.filter((d) => d.status === "accepted").length} accepted` : "Optional",
@@ -266,18 +267,8 @@ export default function CompanyReport({
           onConfidenceChange={setConfidence}
         />
       </div>
-      {step !== "final" && (
-        <div className="mt-4 flex justify-end">
-          <button type="button" onClick={() => setStep(NEXT[step][0])} className="inline-flex h-9 items-center gap-1.5 rounded-sm bg-ew-ink px-4 text-sm font-semibold text-white hover:bg-ew-ink-soft">
-            Next: {NEXT[step][1]}
-            <ChevronRight aria-hidden="true" className="h-4 w-4" />
-          </button>
-        </div>
-      )}
 
-      <p className="mt-10 text-[11px] font-semibold uppercase tracking-[0.14em] text-ew-muted">Additional AI checks</p>
-      <p className="mt-0.5 text-xs text-ew-muted">Optional. Not used for the status.</p>
-      <div className="mt-2 border-t border-ew-rule">
+      <div className="mt-4 border-t border-ew-rule" hidden={step !== "extra"}>
         <ReportSection
           id="lenders"
           demoId="tab-decision"
@@ -317,6 +308,15 @@ export default function CompanyReport({
           </div>
         </ReportSection>
       </div>
+      {step !== "final" && (
+        <div className="mt-4 flex justify-end">
+          <button type="button" onClick={() => setStep(NEXT[step][0])} className="inline-flex h-9 items-center gap-1.5 rounded-sm bg-ew-ink px-4 text-sm font-semibold text-white hover:bg-ew-ink-soft">
+            Next: {NEXT[step][1]}
+            <ChevronRight aria-hidden="true" className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       {auditTrail && <div className="max-w-3xl">{auditTrail}</div>}
     </>
   );
@@ -393,11 +393,13 @@ function SignoffBanner({ signoff, onOpen }) {
   );
 }
 
-const NEXT = { report: ["check", "double-check"], check: ["documents", "document exchange"], documents: ["final", "final check"] };
+const NEXT = { report: ["check", "double-check"], check: ["documents", "document exchange"], documents: ["extra", "additional AI checks (optional)"], extra: ["final", "final check"] };
+const OPTIONAL = new Set(["extra"]);
 const STEPS = [
   ["report", "Review report", "Warning signs, sources, how the status was counted"],
   ["check", "Double-check", "Each quote, date and company match"],
   ["documents", "Document exchange", "Ask the company, review what comes back"],
+  ["extra", "Additional AI checks", "Other lenders, cash flow, AI news summary"],
   ["final", "Final check and sign-off", "Your call on every flag"],
 ];
 
@@ -406,13 +408,14 @@ const STEPS = [
  * The state is always written out too (Done / In progress / Not started), never colour alone.
  */
 function ReviewSteps({ step, onStep, done, started, notes }) {
-  const stateOf = (key) => (done[key] ? "done" : step === key || started[key] ? "progress" : "todo");
+  const stateOf = (key) => (done[key] ? "done" : step === key || started[key] ? "progress" : OPTIONAL.has(key) ? "optional" : "todo");
   const NODE = {
     done: "border-ew-green bg-ew-green text-white",
     progress: "border-[#d68a1c] bg-[#fdf3e1] text-ew-amber",
     todo: "border-ew-rule bg-ew-surface text-ew-muted",
+    optional: "border-dashed border-ew-rule bg-ew-surface text-ew-muted",
   };
-  const LABEL = { done: ["Done", "text-ew-green"], progress: ["In progress", "text-ew-amber"], todo: ["Not started", "text-ew-muted"] };
+  const LABEL = { done: ["Done", "text-ew-green"], progress: ["In progress", "text-ew-amber"], todo: ["Not started", "text-ew-muted"], optional: ["Optional", "text-ew-muted"] };
   return (
     <ol className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-0" aria-label="Review steps">
       {STEPS.map(([key, title, hint], i) => {
