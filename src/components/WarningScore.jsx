@@ -48,7 +48,7 @@ export default function WarningScore({ borrower, signals }) {
   const band = BAND[ws.band] || BAND.green;
 
   return (
-    <section aria-labelledby="warning-score-heading" className="border-t border-ew-rule px-5 py-3">
+    <section data-demo="score" aria-labelledby="warning-score-heading" className="border-t border-ew-rule px-5 py-3">
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <h2 id="warning-score-heading" className="whitespace-nowrap text-xs font-semibold text-ew-muted">

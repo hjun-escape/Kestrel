@@ -43,24 +43,26 @@ export default function CompanyHeader({ borrower, signals = [], sourceStates, ru
               Made-up company and signals, shown so the screens have something in them. It is not checked live.
             </p>
           )}
-          <div data-demo="status-why" className="mt-3 flex flex-col items-start gap-2 sm:flex-row sm:gap-3">
-            <div className="flex shrink-0 items-center gap-1.5">
-              <StatusBadge status={borrower.status} lastRefreshed={borrower.last_refreshed} size="lg" />
-              <StatusLegendPopover iconOnly />
+          <div data-demo="status-why" className="mt-3">
+            <div className="flex flex-col items-start gap-2 sm:flex-row sm:gap-3">
+              <div className="flex shrink-0 items-center gap-1.5">
+                <StatusBadge status={borrower.status} lastRefreshed={borrower.last_refreshed} size="lg" />
+                <StatusLegendPopover iconOnly />
+              </div>
+              <p className="max-w-[68ch] pt-0.5 text-[15px] leading-snug text-ew-ink-soft">
+                {borrower.last_refreshed
+                  ? reasonText(borrower.why) || "No warning signs in the last 90 days."
+                  : running
+                    ? "First check in progress. Status is set when it finishes."
+                    : "Not checked yet. Refresh to run the first check."}
+              </p>
             </div>
-            <p className="max-w-[68ch] pt-0.5 text-[15px] leading-snug text-ew-ink-soft">
-              {borrower.last_refreshed
-                ? reasonText(borrower.why) || "No warning signs in the last 90 days."
-                : running
-                  ? "First check in progress. Status is set when it finishes."
-                  : "Not checked yet. Refresh to run the first check."}
-            </p>
+            {rule && (
+              <p className="mt-1.5 text-xs font-medium tabular-nums text-ew-ink-soft">
+                Rule: {rule}
+              </p>
+            )}
           </div>
-          {rule && (
-            <p className="mt-1.5 text-xs font-medium tabular-nums text-ew-ink-soft">
-              Rule: {rule}
-            </p>
-          )}
           {coverage && (
             <p className="mt-1.5 text-xs text-ew-muted">{coverage}</p>
           )}

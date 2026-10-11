@@ -28,7 +28,7 @@ export default function SourceStatusRow({ borrower, states, recentSignals, runni
   const elapsed = useElapsed(startedAt, running);
   const pct = Math.round((answered / SOURCES.length) * 100);
   return (
-    <section aria-labelledby="sources-heading">
+    <section data-demo="sources" aria-labelledby="sources-heading">
       <div className="flex items-baseline justify-between px-5 pb-2 pt-4">
         <h2 id="sources-heading" className="text-xs font-semibold text-ew-muted">
           Sources
