@@ -70,5 +70,6 @@
     },
     "summary": { "type": "string" }
   },
-  "required": ["borrower_id", "created_at", "file_url", "lender_count", "summary"]
+  "required": ["borrower_id", "created_at", "file_url", "lender_count", "summary"],
+  "rls": { "create": false, "read": false, "update": false, "delete": false }
 }

@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { canAccessCompany } from './access.ts';
 import { findCompanyPages, hostOf, type FetchLike, type FindResult } from './logic.ts';
+import { checkInternalToken, INTERNAL_TOKEN_ENV } from './internalToken.ts';
 
 // findCompanyPages(borrower_id). Fills in a company's LinkedIn company page and Glassdoor reviews
 // page when they are missing, so the Jobs and Reviews checks can run (see logic.ts for how pages are
@@ -28,6 +29,8 @@ export default async function (req: Request): Promise<Response> {
   } catch {
     return Response.json({ error: 'findCompanyPages: request body must be JSON' }, { status: 400 });
   }
+  const gate = checkInternalToken(body, Deno.env.get(INTERNAL_TOKEN_ENV));
+  if (!gate.ok) return Response.json({ error: gate.error }, { status: gate.status });
   const borrowerId = body?.borrower_id;
   if (typeof borrowerId !== 'string' || !borrowerId) {
     return Response.json({ error: 'findCompanyPages: borrower_id is required' }, { status: 400 });

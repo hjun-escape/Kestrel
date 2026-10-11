@@ -120,11 +120,12 @@ test("no employee count is a failure, not 'no signal'", () => {
   assert.throws(() => hiringSignalFromData(B, 3, { industries: "Insurance" }, TODAY), /^Error: Jobs: LinkedIn company page has no employee count/);
 });
 
-test("Base44 handler: missing borrower is 400, missing key fails as Jobs", async () => {
-  (globalThis as any).Deno = { env: { get: () => undefined } };
+test("Base44 handler: no internal token is 401; missing borrower 400; missing key fails as Jobs", async () => {
+  (globalThis as any).Deno = { env: { get: (k: string) => (k === "INTERNAL_FUNCTION_TOKEN" ? "test-internal-secret-0123" : undefined) } };
   const call = (body: unknown) => handler(new Request("http://x", { method: "POST", body: JSON.stringify(body) }));
-  assert.equal((await call({})).status, 400);
-  const res = await call({ borrower: B });
+  assert.equal((await call({ borrower: B })).status, 401);
+  assert.equal((await call({ internal_token: "test-internal-secret-0123" })).status, 400);
+  const res = await call({ borrower: B, internal_token: "test-internal-secret-0123" });
   assert.equal(res.status, 502);
   assert.match((await res.json()).error, /^Jobs: BRIGHTDATA_API_KEY/);
   delete (globalThis as any).Deno;

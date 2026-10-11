@@ -51,5 +51,6 @@
     "decision",
     "decided_by",
     "created_at"
-  ]
+  ],
+  "rls": { "create": false, "read": false, "update": false, "delete": false }
 }

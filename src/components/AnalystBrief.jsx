@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { format, formatDistanceToNow } from "date-fns";
 import { ChevronDown, ExternalLink, FileSearch, Loader2 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
+import { listRecords } from "@/api/data";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -158,11 +159,7 @@ export default function AnalystBrief({ borrower }) {
   const loadLatest = useCallback(async () => {
     if (!borrowerId) return;
     try {
-      const res = await base44.entities.Analysis.filter(
-        { borrower_id: borrowerId },
-        { limit: 1, sort: "-created_at" }
-      );
-      const items = Array.isArray(res) ? res : res?.items || [];
+      const items = await listRecords("Analysis", { borrower_id: borrowerId }, "-created_at", 1);
       setAnalysis(items[0] || null);
     } catch {
       setAnalysis(null);

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useId, useRef, useState } from "react";
 import { format } from "date-fns";
 import { ChevronRight, FileUp, Loader2, ShieldCheck } from "lucide-react";
 import { base44 } from "@/api/base44Client";
+import { listRecords } from "@/api/data";
 import { Button } from "@/components/ui/button";
 
 // Cash-flow document check. The officer uploads a bank or cash-flow statement;
@@ -53,7 +54,7 @@ export default function CashflowReview({ borrower, onReviewChange }) {
   const loadLatest = useCallback(async () => {
     if (!borrowerId) return;
     try {
-      const reviews = await base44.entities.CashflowReview.filter({ borrower_id: borrowerId }, { limit: 1, sort: "-created_at" });
+      const reviews = await listRecords("CashflowReview", { borrower_id: borrowerId }, "-created_at", 1);
       setReview(itemsOf(reviews)[0] || null);
     } catch {
       setReview(null);

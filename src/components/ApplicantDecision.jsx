@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { format, formatDistanceToNow } from "date-fns";
 import { Check, ChevronDown, Copy, ExternalLink, Landmark, Loader2 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
+import { listRecords } from "@/api/data";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -304,9 +305,9 @@ function useApplicantRecords(borrowerId) {
     setDecisions([]);
     const q = { borrower_id: borrowerId };
     Promise.allSettled([
-      base44.entities.LenderCheck.filter(q, "-created_at", 1),
-      base44.entities.Analysis.filter(q, "-created_at", 1),
-      base44.entities.Decision.filter(q, "-created_at", 50),
+      listRecords("LenderCheck", q, "-created_at", 1),
+      listRecords("Analysis", q, "-created_at", 1),
+      listRecords("Decision", q, "-created_at", 50),
     ]).then(([c, a, d]) => {
       if (!active) return;
       setCheck(c.status === "fulfilled" ? asList(c.value)[0] || null : null);
@@ -371,17 +372,15 @@ export default function ApplicantDecision({ borrower, signals, parts = { documen
         setError("Sign in to record a decision. It is logged under your name.");
         return false;
       }
-      const record = {
+      const res = await base44.functions.invoke("recordDecision", {
         borrower_id: borrowerId,
         decision,
         note,
         documents_requested: decision === "request_documents" ? documents : [],
-        decided_by: decidedBy,
-        created_at: new Date().toISOString(),
         ...(follow_up_date ? { follow_up_date } : {}),
-      };
-      const saved = await base44.entities.Decision.create(record);
-      setDecisions((prev) => [saved || record, ...prev]);
+      });
+      const saved = res?.data?.decision || { borrower_id: borrowerId, decision, note, decided_by: decidedBy, created_at: new Date().toISOString(), ...(follow_up_date ? { follow_up_date } : {}) };
+      setDecisions((prev) => [saved, ...prev]);
       return true;
     } catch (e) {
       setError(errorText(e, "The decision could not be saved. Please try again."));

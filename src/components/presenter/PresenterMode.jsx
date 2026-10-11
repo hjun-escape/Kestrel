@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
-import { base44 } from "@/api/base44Client";
+import { listRecords } from "@/api/data";
 import { useAuth } from "@/lib/AuthContext";
 import { normalizeEmail, visibleCompanies } from "@/lib/ownership";
 import { DEMO_PINS, DEMO_STEPS } from "@/lib/demoScript";
@@ -210,7 +210,7 @@ export default function PresenterMode() {
     if (!on || isLoadingAuth) return undefined;
     let active = true;
     const me = isAuthenticated ? normalizeEmail(email) : "";
-    base44.entities.Borrower.filter(me ? { owner_email: me } : {}, { limit: 500, sort: "-created_date" })
+    listRecords("Borrower", {}, "-created_date", 500)
       .then((res) => {
         const items = Array.isArray(res) ? res : res?.items || [];
         const next = resolvePicks(visibleCompanies(items, me), DEMO_PINS);

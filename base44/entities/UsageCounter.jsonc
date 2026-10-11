@@ -1,0 +1,13 @@
+// UsageCounter (P1): a soft daily cap on functions that spend credits while staying callable without
+// login (suggestCompany). One record per key+day, written only by that function; races are acceptable.
+{
+  "name": "UsageCounter",
+  "type": "object",
+  "properties": {
+    "key": { "type": "string" },
+    "day": { "type": "string" },
+    "count": { "type": "number" }
+  },
+  "required": ["key", "day", "count"],
+  "rls": { "create": false, "read": false, "update": false, "delete": false }
+}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import { base44 } from "@/api/base44Client";
+import { getRecord, listRecords } from "@/api/data";
 import AppHeader from "@/components/AppHeader";
 import CompanyReport from "@/components/CompanyReport";
 import AuditTrail from "@/components/AuditTrail";
@@ -19,10 +19,10 @@ import { AUTO_RESUME_DELAY_MS, AUTO_RESUME_MAX, pendingSources, shouldAutoResume
 
 async function fetchCompany(id) {
   const [borrower, sigRes, runRes] = await Promise.all([
-    base44.entities.Borrower.get(id),
-    base44.entities.Signal.filter({ borrower_id: id }, "-date", 200),
+    getRecord("Borrower", id),
+    listRecords("Signal", { borrower_id: id }, "-date", 200),
     // Latest news check, for "How News and Legal were checked". Optional: never blocks the page.
-    base44.entities.CheckRun.filter({ borrower_id: id }, "-started_at", 1).catch(() => []),
+    listRecords("CheckRun", { borrower_id: id }, "-started_at", 1).catch(() => []),
   ]);
   return { borrower, signals: sigRes || [], checkRun: runRes?.[0] || null };
 }

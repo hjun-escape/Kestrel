@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { getRecord, listRecords } from "@/api/data";
 import { POLL_INTERVAL_MS } from "@/lib/borrowerUtils";
 import { useAuth } from "@/lib/AuthContext";
 import { canSeeCompany, normalizeEmail } from "@/lib/ownership";
@@ -7,7 +7,7 @@ import { asList } from "./assistantData";
 
 async function latest(entity, borrowerId) {
   try {
-    const res = await base44.entities[entity].filter({ borrower_id: borrowerId }, { limit: 1, sort: "-created_at" });
+    const res = await listRecords(entity, { borrower_id: borrowerId }, "-created_at", 1);
     return asList(res)[0] || null;
   } catch {
     return null;
@@ -16,16 +16,15 @@ async function latest(entity, borrowerId) {
 
 // Per-user companies (src/lib/ownership.js): only companies the viewer may see.
 async function findByDomain(domain, me) {
-  const query = me ? { website_domain: domain, owner_email: me } : { website_domain: domain };
-  const res = await base44.entities.Borrower.filter(query, { limit: 5, sort: "-created_date" });
+  const res = await listRecords("Borrower", { website_domain: domain }, "-created_date", 5);
   return asList(res).find((b) => canSeeCompany(b, me)) || null;
 }
 
 async function fetchCompany(id, domain, withExtras, me) {
-  const found = id ? await base44.entities.Borrower.get(id) : domain ? await findByDomain(domain, me) : null;
+  const found = id ? await getRecord("Borrower", id) : domain ? await findByDomain(domain, me) : null;
   const borrower = canSeeCompany(found, me) ? found : null;
   if (!borrower) return { borrower: null, signals: [] };
-  const sigRes = await base44.entities.Signal.filter({ borrower_id: borrower.id }, { limit: 200, sort: "-date" });
+  const sigRes = await listRecords("Signal", { borrower_id: borrower.id }, "-date", 200);
   const out = { borrower, signals: asList(sigRes) };
   if (!withExtras) return out;
   const [analysis, lenderCheck, cashflow] = await Promise.all([

@@ -15,5 +15,6 @@
   "required": [
     "scope",
     "ran_at"
-  ]
+  ],
+  "rls": { "create": false, "read": false, "update": false, "delete": false }
 }

@@ -17,16 +17,16 @@ Target borrowers are mid-size PRIVATE companies: no analyst coverage, quarterly 
 - Sense AI (MCP): user testing. Only the Research owner launches checks.
 
 ## This repo and the Base44 app
-- Repo: github.com/hjun-escape/early-warning (private). It replaced natephunt/TalkToUsersHackathonGroup17 at about 1:15 PM.
+- Repo: github.com/hjun-escape/early-warning (public). It replaced natephunt/TalkToUsersHackathonGroup17 at about 1:15 PM.
 - Base44 app "Kestrel" (formerly Early Warning): id `6aca96c9744d6ba75bc4fabd`, live at https://kestrel-app.base44.app. The old early-warning-5bc4fabd.base44.app address stopped working when the slug changed (Base44 does not redirect old slugs); share only the kestrel-app link.
   - It opens without login for Sense testers. Anyone with the link can browse, press Refresh or "Screen new applicant", and once sources are on, each press spends Bright Data credits.
   - Signing in is optional. It unlocks Ask, the analyst brief, the lender check, the cash-flow check and recording decisions; those backend functions return 401 to signed-out visitors. `refreshAll` is admin-only.
+  - Entities are closed to clients (rls false on every entity except Conversation). Screens read through the readData function and write through manageCompany / recordDecision / refreshBorrower; each applies the per-user rule in access.ts.
 - Layout:
   - entities: `base44/entities/*.jsonc`
   - backend functions: `base44/functions/<name>/entry.ts` (Deno, `export default async function(req)`). Import the SDK pinned like the existing functions: `npm:@base44/sdk@0.8.52`.
   - screens: `src/pages/`
   - signal type table: `src/lib/signalTypes.js`
-  - placeholder data: `src/lib/seedData.js`
 - Base44 tooling (CLI, local dev, SDK): see `AGENTS.md` and `README.md`.
 
 ## Team ownership (stay in your lane to avoid merge conflicts)
@@ -115,6 +115,7 @@ Screens read stored data only. Only the Refresh button and "Screen new applicant
 ## Secrets
 - Never commit API keys or the Sense AI token. Use `.env` (it's in .gitignore) locally.
 - Store the Bright Data key as a Base44 secret for backend functions.
+- INTERNAL_FUNCTION_TOKEN (any random string of 16+ characters, e.g. `openssl rand -hex 24`) is a Base44 secret shared by refreshBorrower and the functions it calls (newsSignals, hiringSignal, reviewSignals, tagItem, findCompanyPages); without it every refresh answers 503.
 
 ## Sense AI
 NEVER launch a Sense check without an explicit "launch" from P4 in chat. Each launch uses 1 of our team's 3 checks.

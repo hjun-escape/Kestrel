@@ -115,10 +115,34 @@ export const RESET_CHECK = {
 
 export interface Db {
   [entity: string]: {
+    create?: (data: Patch) => Promise<unknown>;
     update?: (id: string, data: Patch) => Promise<unknown>;
     delete?: (id: string) => Promise<unknown>;
     deleteMany?: (query: Patch) => Promise<unknown>;
   };
+}
+
+// "Screen new applicant" / "Add a company": a new Borrower whose owner is the caller (shared demo
+// book when signed out). Status, why and sources start empty and are never taken from the client.
+export async function createCompany(db: Db, fields: unknown, ownerEmail: string | undefined) {
+  const cleaned = cleanFields(fields);
+  if ("error" in cleaned) return { status: 400, body: { error: cleaned.error } };
+  const patch = cleaned.patch;
+  if (!patch.name) return { status: 400, body: { error: "Enter the company name." } };
+  if (!patch.website_domain) {
+    return { status: 400, body: { error: "Enter a website domain such as harbortool.com." } };
+  }
+  // last_refreshed omitted: the company shows "Not checked" until the first check lands.
+  const record = {
+    ...patch,
+    stage: patch.stage || "borrower",
+    status: "green",
+    why: "",
+    sources_unavailable: [],
+    ...(ownerEmail ? { owner_email: ownerEmail } : {}),
+  };
+  const created = await db.Borrower.create!(record);
+  return { status: 200, body: { borrower: created } };
 }
 
 export async function updateCompany(db: Db, borrower: Patch & { id: string }, fields: unknown) {
