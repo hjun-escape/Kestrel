@@ -1,7 +1,7 @@
 // Run: node --test tests/*.test.ts   (Node 22+, runs .ts via type stripping)
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import handler, { eventName, scoreBorrower, type Signal } from "../base44/functions/scoreBorrower/entry.ts";
+import handler, { eventName, scoreBorrower, shortTitle, type Signal } from "../base44/functions/scoreBorrower/entry.ts";
 
 const TODAY = "2026-10-10";
 
@@ -156,7 +156,7 @@ test("why line names closures, shutdowns and WARN Act cases; unnamed headlines a
     "Yellow: WARN Act investigation (Sep 10).",
   );
   const other = scoreBorrower([sig("strong", "2026-10-01", "Something entirely different happened at the company headquarters this week")], TODAY).why;
-  assert.match(other, /^Yellow: Something entirely different happened at the… \(Oct 1\)\.$/);
+  assert.match(other, /^Yellow: Something entirely different happened at the company… \(Oct 1\)\.$/);
 });
 
 test("eventName recognizes common layoff headline phrasings without overriding closures", () => {
@@ -229,4 +229,21 @@ test("no shared place or count: same type within 14 days is not merged", () => {
   const a = sig("strong", "2026-09-19", "Acme announces layoffs");
   const b = sig("strong", "2026-09-22", "Acme shuts down Texas unit");
   assert.equal(scoreBorrower([a, b], TODAY).status, "red");
+});
+
+test("unnamed headline: a clean clause break is kept whole, no ellipsis", () => {
+  assert.equal(shortTitle("Major U.S. distributor cuts 1,278 jobs amid liquidation risk"), "Major U.S. distributor cuts 1,278 jobs amid liquidation risk");
+  assert.equal(
+    shortTitle("Major U.S. distributor cuts 1,278 jobs amid liquidation risk and a search for buyers"),
+    "Major U.S. distributor cuts 1,278 jobs",
+  );
+});
+
+test("unnamed headline: no clause boundary falls back to a word cut under 64 chars with ellipsis", () => {
+  const t = "Regional freight carrier reports mounting losses and declining shipments across its network";
+  assert.equal(t.length > 64, true);
+  assert.equal(
+    shortTitle(t),
+    "Regional freight carrier reports mounting losses and declining…",
+  );
 });

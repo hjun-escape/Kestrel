@@ -278,9 +278,8 @@ export default function CompanyReport({
             onSignoffChange={setSignoff}
           />
         </ReportSection>
-
+        {auditTrail}
       </div>
-      {auditTrail && <div className="max-w-3xl">{auditTrail}</div>}
     </>
   );
 }
