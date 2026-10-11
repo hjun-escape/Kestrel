@@ -116,6 +116,7 @@ test("delete removes every linked record, then the company", async () => {
     'Decision.deleteMany {"borrower_id":"b1"}',
     'CashflowReview.deleteMany {"borrower_id":"b1"}',
     'CheckRun.deleteMany {"borrower_id":"b1"}',
+    'AuditRun.deleteMany {"borrower_id":"b1"}',
     "Borrower.delete b1",
   ]);
 });

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { ChevronRight, ExternalLink } from "lucide-react";
 import CompanyHeader from "@/components/CompanyHeader";
 import SourceStatusRow from "@/components/SourceStatusRow";
@@ -9,9 +9,17 @@ import AnalystBrief from "@/components/AnalystBrief";
 import CheckTrace from "@/components/CheckTrace";
 import AutoResumeNote from "@/components/AutoResumeNote";
 import WarningScore from "@/components/WarningScore";
+import ReportAudit from "@/components/ReportAudit";
+import { useAuth } from "@/lib/AuthContext";
+import { createSessionAudit } from "@/lib/sessionAudit";
+import { Dialog, DialogContent as SharedDialogContent, DialogTitle as SharedDialogTitle, DialogDescription as SharedDialogDescription } from "@/components/ui/dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { formatTimeToFlag, timeToFirstFlag } from "@/lib/timeToFlag.ts";
 import { filterRecentSignals } from "@/lib/borrowerUtils";
+
+const DialogContent = /** @type {React.ComponentType<any>} */ (SharedDialogContent);
+const DialogTitle = /** @type {React.ComponentType<any>} */ (SharedDialogTitle);
+const DialogDescription = /** @type {React.ComponentType<any>} */ (SharedDialogDescription);
 
 // The company report: everything shown for one company once it has been checked (status, sources,
 // warning score, how it was checked, evidence, cash flow, decision, analyst brief, profiles).
@@ -35,6 +43,16 @@ export default function CompanyReport({
   onStopAutoResume,
 }) {
   const [cashflowReview, setCashflowReview] = useState(null);
+  const [reviewView, setReviewView] = useState('report');
+  const { isAuthenticated } = useAuth();
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const [runRequest, setRunRequest] = useState(0);
+  const [confidence, setConfidence] = useState(null);
+  const sessionRequest = useMemo(() => createSessionAudit(borrower, signals, checkRun), [borrower.id, borrower.last_refreshed, signals, checkRun]);
+  function openReview(view) {
+    setReviewView(view);
+  }
+  function startAudit() { setActionsOpen(false); setReviewView('summary'); setRunRequest(n => n + 1); }
   const recentSignals = filterRecentSignals(signals);
   const olderCount = signals.length - recentSignals.length;
   const isApplicant = borrower.stage === "applicant";
@@ -50,12 +68,18 @@ export default function CompanyReport({
           onRefresh={onRefresh}
           onEdit={onEdit}
           onDelete={onDelete}
+          onRunActions={() => setActionsOpen(true)}
+          confidence={confidence}
         />
         {notice && (
           <p role="status" className="border-t border-ew-rule-soft px-5 py-2 text-xs text-ew-ink-soft">
             {notice}
           </p>
         )}
+        <nav aria-label="Company report sections" className="flex flex-wrap gap-1 border-t border-ew-rule-soft px-5">
+          {[['report', 'Company report'], ['summary', 'Audit report']].map(([view, label]) => <button key={view} type="button" aria-current={reviewView === view ? 'page' : undefined} onClick={() => openReview(view)} className={`border-b-2 px-3 py-3 text-sm font-medium focus-visible:outline-ew-focus ${reviewView === view ? 'border-ew-ink text-ew-ink' : 'border-transparent text-ew-muted hover:text-ew-ink'}`}>{label}</button>)}
+        </nav>
+        <div hidden={reviewView !== 'report'}>
         <SourceStatusRow borrower={borrower} states={sourceStates} recentSignals={recentSignals} running={running} startedAt={startedAt} />
         <AutoResumeNote state={autoResume} onStop={onStopAutoResume} />
         <WarningScore borrower={borrower} signals={signals} />
@@ -63,11 +87,25 @@ export default function CompanyReport({
         {flagLine && (
           <p className="border-t border-ew-rule-soft px-5 py-2 text-xs text-ew-ink-soft">{flagLine}</p>
         )}
+        </div>
       </div>
+
+      <Dialog open={actionsOpen} onOpenChange={setActionsOpen}>
+        <DialogContent className="rounded-sm border-ew-rule bg-ew-surface text-ew-ink sm:rounded-sm">
+          <DialogTitle>Run checks for {borrower.name}</DialogTitle>
+          <DialogDescription>Choose how to update or review this report. The original report stays intact when auditing.</DialogDescription>
+          <div className="space-y-2">
+            <button type="button" disabled={running} onClick={() => { setActionsOpen(false); setReviewView('report'); onRefresh(); }} className="w-full rounded-sm border border-ew-rule p-4 text-left hover:bg-ew-hover disabled:opacity-50"><span className="block text-sm font-semibold">Refresh source data</span><span className="mt-1 block text-xs text-ew-muted">Collect current signals and update the company report.</span></button>
+            <button type="button" disabled={running} onClick={startAudit} className="w-full rounded-sm border border-ew-rule p-4 text-left hover:bg-ew-hover disabled:opacity-50"><span className="block text-sm font-semibold">Audit this report</span><span className="mt-1 block text-xs text-ew-muted">Run evidence checks, then view progression and activity logs.</span></button>
+            <button type="button" disabled={running} onClick={() => { setActionsOpen(false); setReviewView('considerations'); }} className="w-full rounded-sm border border-ew-rule p-4 text-left hover:bg-ew-hover disabled:opacity-50"><span className="block text-sm font-semibold">Rerun with considerations</span><span className="mt-1 block text-xs text-ew-muted">Apply or skip instructions and choose evidence to test.</span></button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <div hidden={reviewView === 'report'}><ReportAudit borrower={borrower} currentSignals={signals} refreshing={running} view={reviewView} onViewChange={openReview} request={isAuthenticated ? undefined : sessionRequest} sessionOnly={!isAuthenticated} runRequest={runRequest} onConfidenceChange={setConfidence} /></div>
 
       {/* Evidence first: the signals behind the status, each with its source and
           what to ask. Next steps (decision, other lenders, analyst) sit beside it. */}
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_400px]">
+      <div hidden={reviewView !== 'report'}><div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_400px]">
         <section data-demo="evidence" aria-labelledby="evidence-heading" className="min-w-0">
           <div className="mb-3 flex items-baseline justify-between gap-4">
             <h2 id="evidence-heading" className="font-heading text-xl font-bold tracking-tight text-ew-ink">
@@ -105,7 +143,7 @@ export default function CompanyReport({
           <AnalystBrief borrower={borrower} />
           <CompanyLinks borrower={borrower} />
         </aside>
-      </div>
+      </div></div>
     </>
   );
 }
