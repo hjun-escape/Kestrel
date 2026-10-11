@@ -11,6 +11,21 @@
 
 <p align="center"><a href="https://kestrel-app.base44.app"><b>kestrel-app.base44.app</b></a> · no account needed</p>
 
+<p align="center">
+  <a href="https://kestrel-app.base44.app"><img alt="Live app" src="https://img.shields.io/badge/live-kestrel--app.base44.app-14202e?style=flat-square"></a>
+  <a href="https://github.com/hjun-escape/early-warning/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/hjun-escape/early-warning/actions/workflows/ci.yml/badge.svg?branch=main"></a>
+  <img alt="Talk to Users Hackathon, Group 17" src="https://img.shields.io/badge/Talk%20to%20Users%20Hackathon-Group%2017-2d5bd7?style=flat-square">
+</p>
+<p align="center">
+  <a href="https://base44.com"><img alt="Built on Base44" src="https://img.shields.io/badge/built%20on-Base44-ff6b35?style=flat-square"></a>
+  <a href="https://brightdata.com"><img alt="Data by Bright Data" src="https://img.shields.io/badge/data-Bright%20Data-3d7ff9?style=flat-square"></a>
+  <a href="https://testwithsenseai.com"><img alt="Tested with Sense AI" src="https://img.shields.io/badge/user%20tested-Sense%20AI-7e22ce?style=flat-square"></a>
+  <img alt="React 18" src="https://img.shields.io/badge/React-18-61dafb?style=flat-square&logo=react&logoColor=white">
+  <img alt="Tailwind CSS 3" src="https://img.shields.io/badge/Tailwind%20CSS-3-38bdf8?style=flat-square&logo=tailwindcss&logoColor=white">
+  <img alt="Vite 8" src="https://img.shields.io/badge/Vite-8-646cff?style=flat-square&logo=vite&logoColor=white">
+  <img alt="Deno functions" src="https://img.shields.io/badge/functions-Deno-000000?style=flat-square&logo=deno&logoColor=white">
+</p>
+
 **Catch a borrower's trouble before the quarterly financials do.** Kestrel (formerly Early Warning) watches the public signs that a mid-size
 private company is in trouble (executive exits, lawsuits and layoffs, hiring freezes, employee reviews about missed pay)
 and flags them for a bank's credit officer: before the bank lends, and every day after.
