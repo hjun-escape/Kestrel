@@ -21,6 +21,13 @@ export default async function(req: Request): Promise<Response> {
     },
     now: () => new Date().toISOString(),
     save: (record: any) => db.AuditRun.create(record),
+    extractText: async (file_url: string) => {
+      const res: any = await base44.asServiceRole.integrations.Core.ExtractDataFromUploadedFile({
+        file_url,
+        json_schema: { type: 'object', properties: { text: { type: 'string', description: 'The full text of the document, word for word.' } } },
+      });
+      return res?.status === 'success' ? res.output?.text || '' : '';
+    },
   });
   return Response.json(result.data, { status: result.status });
 }
