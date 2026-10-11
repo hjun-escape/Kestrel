@@ -24,6 +24,27 @@ const borrower = {
 };
 
 describe('buildAuditTrail', () => {
+  test('reads Base44 timestamps without a zone as UTC, so they sort with the others', () => {
+    const entries = buildAuditTrail({
+      borrower: { ...borrower, last_refreshed: '2026-10-10T23:30:00Z' },
+      // Base44 created_date: UTC, no zone. Two minutes before the status was set.
+      signals: [{ type: 'hiring_drop', severity: 'strong', date: '2026-10-10', title: 'Job postings 81% below normal', snippet: 's', source_url: 'https://jobs.example/a', created_date: '2026-10-10T23:28:00.000000' }],
+    });
+    assert.deepEqual(entries.map((e) => e.kind), ['status', 'signal']);
+    assert.equal(entries[1].at, '2026-10-10T23:28:00.000000Z');
+    assert.equal(new Date(entries[1].at).toISOString(), '2026-10-10T23:28:00.000Z');
+  });
+
+  test('leaves times that already have a zone, and date-only values, unchanged', () => {
+    const entries = buildAuditTrail({
+      signals: [
+        { type: 'legal_layoffs', severity: 'weak', date: '2026-09-10', title: 'a', snippet: 's', created_date: '2026-10-10T16:28:00-07:00' },
+        { type: 'legal_layoffs', severity: 'weak', date: '2026-09-11', title: 'b', snippet: 's' },
+      ],
+    });
+    assert.deepEqual(entries.map((e) => e.at), ['2026-10-10T16:28:00-07:00', '2026-09-11']);
+  });
+
   test('merges every record type newest first with the right actors', () => {
     const entries = buildAuditTrail({
       borrower,
