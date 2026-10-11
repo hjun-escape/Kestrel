@@ -90,11 +90,58 @@ Every signal comes from Bright Data, and every signal on screen links to its sou
 
 Base44 app (React + Tailwind screens, entities, Deno backend functions), synced two ways with this repo.
 
+```mermaid
+flowchart LR
+    A([Screen applicant / Refresh]) --> R[refreshBorrower]
+    R --> N[newsSignals<br/>Google News via SERP API]
+    R --> P[findCompanyPages<br/>LinkedIn + Glassdoor pages]
+    N --> T1[tagItem<br/>LLM tags one article]
+    N --> L[LinkedIn exec check]
+    P --> H[hiringSignal<br/>open postings vs expected]
+    P --> V[reviewSignals<br/>Glassdoor, last 90 days]
+    V --> T2[tagItem<br/>LLM tags one review]
+    T1 & L & H & T2 --> S[(Signals<br/>exact quote + source link)]
+    S --> SC[scoreBorrower<br/>plain code, no LLM]
+    SC --> ST{{Status + why line}}
+    classDef llm fill:#f3e8ff,stroke:#7e22ce,color:#3b0764
+    classDef rule fill:#e7f3eb,stroke:#1d6b43,color:#14301f
+    class T1,T2 llm
+    class SC,ST rule
 ```
-Screen / Refresh ─▶ refreshBorrower ─┬─▶ newsSignals ─▶ tagItem (LLM tags only)
-                                     ├─▶ findCompanyPages ─▶ hiringSignal
-                                     │                    └▶ reviewSignals ─▶ tagItem
-                                     └─▶ scoreBorrower (plain code) ─▶ status + why
+
+How the status is set, the same for every company (only the last 90 days count):
+
+```mermaid
+flowchart TD
+    S[Signals from the last 90 days] --> Q1{2+ strong, or<br/>1 strong + 2 weak?}
+    Q1 -- yes --> RED[Red]
+    Q1 -- no --> Q2{1 strong, or<br/>2+ weak?}
+    Q2 -- yes --> YEL[Yellow]
+    Q2 -- no --> GRN[Green]
+    style RED fill:#fdecea,stroke:#b42318,color:#b42318
+    style YEL fill:#fdf3e1,stroke:#965006,color:#965006
+    style GRN fill:#e7f3eb,stroke:#1d6b43,color:#1d6b43
+```
+
+After the check, the officer reviews the company. The double-check, the document exchange and the sign-off are recorded, and never change the status the rules set:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Officer as Credit officer
+    participant K as Kestrel
+    actor Co as Company (upload link, no login)
+    Officer->>K: Double-check the report
+    K-->>Officer: Tests per flag + check-based confidence
+    Officer->>K: Request documents for a flag (prove / disprove)
+    K-->>Co: Private upload link with the requests
+    Co->>K: Upload documents (text or PDF)
+    Officer->>K: Review: accept or reject, and what it shows
+    Officer->>K: Double-check again with the accepted documents
+    K-->>Officer: Claim support resolved, review preview rescored
+    Officer->>K: Final check: Confirm / Incorrect / Uncertain per flag
+    Officer->>K: Sign off: proceed, conditions, request documents or decline
+    K-->>Officer: Saved with who and when, shown in the loan book
 ```
 
 - Sources run in parallel and are saved one by one, so the page fills in while the check runs. A slow Bright Data
