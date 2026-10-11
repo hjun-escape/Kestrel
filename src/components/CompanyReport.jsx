@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { Check, ChevronRight, ExternalLink } from "lucide-react";
+import { Check, ExternalLink } from "lucide-react";
 import VerdictCard from "@/components/company/VerdictCard";
 import ReportSection from "@/components/company/ReportSection";
 import SourceStatusRow from "@/components/SourceStatusRow";
@@ -184,7 +184,7 @@ export default function CompanyReport({
           step={step}
           onStep={setStep}
           done={{
-            report: !!borrower.last_refreshed && (step !== "report" || !!confidence?.total),
+            report: !!borrower.last_refreshed,
             check: !!confidence && confidence.total > 0,
             documents: docItems.some((d) => d.status === "accepted" || d.status === "rejected"),
             final: !!signoff,
@@ -196,7 +196,7 @@ export default function CompanyReport({
             final: false,
           }}
           notes={{
-            extra: "Lenders, cash flow, AI summary · not used for the status",
+            extra: "Lenders, cash flow, AI summary",
             report: borrower.last_refreshed ? `${recentSignals.length} warning sign${recentSignals.length === 1 ? "" : "s"} · sources · status` : "Not checked yet",
             check: confidence?.total ? `${confidence.percent}% confidence · ${confidence.passed}/${confidence.total} passed` : "Not run yet",
             documents: docItems.length ? `${docItems.filter((d) => d.status === "submitted").length} to review · ${docItems.filter((d) => d.status === "accepted").length} accepted` : "Optional",
@@ -309,14 +309,6 @@ export default function CompanyReport({
           </div>
         </ReportSection>
       </div>
-      {step !== "final" && (
-        <div className="mt-4 flex justify-end">
-          <button type="button" onClick={() => setStep(NEXT[step][0])} className="inline-flex h-9 items-center gap-1.5 rounded-sm bg-ew-ink px-4 text-sm font-semibold text-white hover:bg-ew-ink-soft">
-            Next: {NEXT[step][1]}
-            <ChevronRight aria-hidden="true" className="h-4 w-4" />
-          </button>
-        </div>
-      )}
 
     </>
   );
@@ -393,7 +385,6 @@ function SignoffBanner({ signoff, onOpen }) {
   );
 }
 
-const NEXT = { report: ["check", "double-check"], check: ["documents", "document exchange"], documents: ["extra", "additional AI checks (optional)"], extra: ["final", "final check"] };
 const OPTIONAL = new Set(["extra"]);
 const STEPS = [
   ["report", "Review report", "Warning signs, sources, how the status was counted"],
@@ -404,53 +395,47 @@ const STEPS = [
 ];
 
 /**
- * The three review steps as a workflow diagram: green = done, yellow = in progress, blank = not started.
- * The state is always written out too (Done / In progress / Not started), never colour alone.
+ * The review as a checklist, in any order (the double-check is not required to move on). Click an item to
+ * open it below. Green tick = done, yellow = started, empty = not done, dashed = optional. Always with a label.
  */
 function ReviewSteps({ step, onStep, done, started, notes }) {
-  const stateOf = (key) => (done[key] ? "done" : step === key || started[key] ? "progress" : OPTIONAL.has(key) ? "optional" : "todo");
-  const NODE = {
+  const stateOf = (key) => (done[key] ? "done" : started[key] ? "progress" : OPTIONAL.has(key) ? "optional" : "todo");
+  const BOX = {
     done: "border-ew-green bg-ew-green text-white",
     progress: "border-[#d68a1c] bg-[#fdf3e1] text-ew-amber",
-    todo: "border-ew-rule bg-ew-surface text-ew-muted",
-    optional: "border-dashed border-ew-rule bg-ew-surface text-ew-muted",
+    todo: "border-ew-rule bg-ew-surface",
+    optional: "border-dashed border-ew-rule bg-ew-surface",
   };
-  const LABEL = { done: ["Done", "text-ew-green"], progress: ["In progress", "text-ew-amber"], todo: ["Not started", "text-ew-muted"], optional: ["Optional", "text-ew-muted"] };
+  const LABEL = { done: ["Done", "text-ew-green"], progress: ["Started", "text-ew-amber"], todo: ["Not done", "text-ew-muted"], optional: ["Optional", "text-ew-muted"] };
   return (
-    <ol className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-0" aria-label="Review steps">
-      {STEPS.map(([key, title, hint], i) => {
+    <ul role="tablist" aria-label="Review checklist" className="grid gap-2 sm:grid-cols-5">
+      {STEPS.map(([key, title, hint]) => {
         const state = stateOf(key);
         const current = step === key;
         const [label, labelTone] = LABEL[state];
         return (
-          <li key={key} className="relative flex flex-1 sm:flex-col sm:items-center">
-            {/* connector to the next step: green once this step is done */}
-            {i < STEPS.length - 1 && (
-              <span aria-hidden="true" className="absolute left-[calc(50%+26px)] right-[calc(-50%+26px)] top-[22px] hidden h-[3px] rounded-full bg-ew-rule sm:block">
-                <span className="block h-full rounded-full bg-ew-green transition-[width] duration-700 ease-out" style={{ width: state === "done" ? "100%" : "0%" }} />
-              </span>
-            )}
+          <li key={key} className="flex">
             <button
               type="button"
+              role="tab"
+              aria-selected={current}
               onClick={() => onStep(key)}
               data-demo={`step-${key}`}
-              aria-current={current ? "step" : undefined}
-              className="group flex items-start gap-3 rounded-sm p-1 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-ew-focus sm:flex-col sm:items-center sm:text-center"
+              className={`flex w-full items-start gap-2.5 rounded-sm border p-3 text-left transition-colors duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ew-focus ${current ? "border-ew-ink bg-ew-surface shadow-[inset_0_-3px_0_0_#14202e]" : "border-ew-rule bg-ew-paper hover:bg-ew-hover"}`}
             >
-              <span className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-[3px] text-sm font-bold transition-colors duration-500 ${NODE[state]} ${current ? "ring-4 ring-[#14202e]/10" : ""}`}>
-                {state === "done" ? <Check aria-hidden="true" className="h-5 w-5" /> : i + 1}
-                {state === "progress" && <span aria-hidden="true" className="absolute -right-0.5 -top-0.5 h-3 w-3 animate-pulse rounded-full bg-[#d68a1c] motion-reduce:animate-none" />}
+              <span aria-hidden="true" className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-[4px] border-2 transition-colors duration-500 ${BOX[state]}`}>
+                {state === "done" ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : state === "progress" ? <span className="h-2 w-2 rounded-[2px] bg-[#d68a1c]" /> : null}
               </span>
-              <span className="min-w-0 sm:mt-1">
-                <span className={`block text-sm font-semibold ${current ? "text-ew-ink underline decoration-2 underline-offset-4" : "text-ew-ink"}`}>{title}</span>
-                <span className={`block text-[11px] font-semibold uppercase tracking-wider ${labelTone}`}>{label}</span>
-                <span className="block text-xs text-ew-muted">{notes[key] || hint}</span>
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold leading-tight text-ew-ink">{title}</span>
+                <span className={`mt-0.5 block text-[11px] font-semibold uppercase tracking-wider ${labelTone}`}>{label}</span>
+                <span className="block text-xs leading-snug text-ew-muted">{notes[key] || hint}</span>
               </span>
             </button>
           </li>
         );
       })}
-    </ol>
+    </ul>
   );
 }
 
