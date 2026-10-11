@@ -49,6 +49,11 @@
       "type": "string",
       "format": "date-time"
     },
+    "last_attempted": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Written only by refreshBorrower when a check starts, successful or not. The refresh cooldown counts from it so failed or overlapping checks are not repeated. Not shown on screens."
+    },
     "sources_unavailable": {
       "type": "array",
       "items": {
