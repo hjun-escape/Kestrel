@@ -1,11 +1,15 @@
 <p align="center">
+  <a href="https://kestrel-app.base44.app">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="public/brand/kestrel-mark-white.svg">
     <img src="public/brand/kestrel-mark.svg" alt="Kestrel logo" width="72" height="72">
   </picture>
+  </a>
 </p>
 
 <h1 align="center">Kestrel</h1>
+
+<p align="center"><a href="https://kestrel-app.base44.app"><b>kestrel-app.base44.app</b></a> · no account needed</p>
 
 **Catch a borrower's trouble before the quarterly financials do.** Kestrel (formerly Early Warning) watches the public signs that a mid-size
 private company is in trouble (executive exits, lawsuits and layoffs, hiring freezes, employee reviews about missed pay)
