@@ -101,7 +101,7 @@ test("50-75% below is weak; under 50% below or above normal is nothing; 0 open i
   assert.equal(hiringSignalFromData(B, 7, MFG, TODAY)[0].severity, "weak");
   assert.deepEqual(hiringSignalFromData(B, 8, MFG, TODAY), []);
   assert.deepEqual(hiringSignalFromData(B, 30, MFG, TODAY), []);
-  assert.equal(hiringSignalFromData(B, 0, MFG, TODAY)[0].title, "Job postings 100% below normal for company size");
+  assert.equal(hiringSignalFromData(B, 0, MFG, TODAY)[0].title, "No open job postings (about 14 expected for company size)");
 });
 
 test("real companies: Gravie and Rivian are hiring above normal, so no signal", () => {

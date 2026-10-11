@@ -81,8 +81,8 @@ function BookCard({ borrower: b, topSignal }) {
             <TopSignalSummary topSignal={topSignal} />
           </div>
           <div className="shrink-0 text-right">
-            <div className="font-medium tabular-nums text-ew-ink">{formatUsd(b.loan_amount_usd)}</div>
-            <div className="mt-0.5 text-xs text-ew-muted">
+            <div className="font-mono font-medium text-ew-ink">{formatUsd(b.loan_amount_usd)}</div>
+            <div className="mt-0.5 font-mono text-xs text-ew-muted">
               <LastChecked value={b.last_refreshed} />
             </div>
           </div>

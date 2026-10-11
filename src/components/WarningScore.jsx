@@ -59,11 +59,11 @@ export default function WarningScore({ borrower, signals }) {
     <section data-demo="score" aria-labelledby="warning-score-heading" className="border-t border-ew-rule px-5 py-3">
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <h2 id="warning-score-heading" className="whitespace-nowrap text-xs font-semibold text-ew-muted">
+          <h2 id="warning-score-heading" className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.06em] text-ew-muted">
             Warning score
           </h2>
           <span className="whitespace-nowrap">
-            <span className="font-heading text-2xl font-bold text-ew-ink">{ws.score}</span>
+            <span className="font-mono text-2xl font-semibold text-ew-ink">{ws.score}</span>
             <span className="ml-1 text-sm text-ew-muted">/ 100</span>
           </span>
           <span className={`ml-1 rounded-sm px-1.5 py-0.5 text-xs font-semibold ${band.cell} ${band.text}`}>{band.label}</span>

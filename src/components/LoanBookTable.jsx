@@ -1,10 +1,10 @@
 import React, { useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { format, formatDistanceToNowStrict } from "date-fns";
+import { format } from "date-fns";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import StatusBadge, { STATUS_STYLES } from "@/components/StatusBadge";
 import { SIGNAL_TYPES } from "@/lib/signalTypes";
-import { formatRelative, formatUsd, isSampleCompany, parseSignalDate, reasonText, statusKey } from "@/lib/borrowerUtils";
+import { formatAgoShort, formatRelative, formatUsd, isSampleCompany, parseSignalDate, reasonText, statusKey } from "@/lib/borrowerUtils";
 
 const COLUMNS = [
   { key: "status", label: "Status", className: "w-[120px]" },
@@ -69,7 +69,7 @@ function HeaderCell({ col, sort, onSort }) {
   const alignRight = col.align === "right";
   if (!col.key) {
     return (
-      <th scope="col" className={`px-3 py-2 text-xs font-semibold text-ew-muted ${col.className}`}>
+      <th scope="col" className={`px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-ew-muted ${col.className}`}>
         {col.label}
       </th>
     );
@@ -82,7 +82,7 @@ function HeaderCell({ col, sort, onSort }) {
       <button
         type="button"
         onClick={() => onSort(col.key)}
-        className={`flex w-full items-center gap-1 whitespace-nowrap px-3 py-2 text-xs font-semibold focus-visible:-outline-offset-2 ${
+        className={`flex w-full items-center gap-1 whitespace-nowrap px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.06em] focus-visible:-outline-offset-2 ${
           alignRight ? "justify-end" : ""
         } ${active ? "text-ew-ink" : "text-ew-muted hover:text-ew-ink"}`}
       >
@@ -131,10 +131,10 @@ function BookRow({ borrower: b, topSignal, onOpen }) {
       <td className="px-3 py-2.5">
         <TopSignalSummary topSignal={topSignal} />
       </td>
-      <td className="px-3 py-2.5 text-right font-medium tabular-nums text-ew-ink">
+      <td className="px-3 py-2.5 text-right font-mono font-medium text-ew-ink">
         {formatUsd(b.loan_amount_usd)}
       </td>
-      <td className="px-3 py-2.5 text-xs text-ew-muted">
+      <td className="px-3 py-2.5 font-mono text-xs text-ew-muted">
         <LastChecked value={b.last_refreshed} />
       </td>
     </tr>
@@ -159,7 +159,7 @@ export function TopSignalSummary({ topSignal }) {
         <time
           dateTime={topSignal.date}
           title={topSignal.date_approx ? "Approximate date" : undefined}
-          className="tabular-nums"
+          className="font-mono text-xs"
         >
           {topSignal.date_approx && "~"}
           {format(parseSignalDate(topSignal.date), "d MMM yyyy")}
@@ -169,12 +169,12 @@ export function TopSignalSummary({ topSignal }) {
   );
 }
 
-// "3 minutes ago" with the full timestamp on hover, or "Never". Shared with the phone cards.
+// "57 min ago" with the full timestamp on hover, or "Never". Shared with the phone cards.
 export function LastChecked({ value }) {
   if (!value) return "Never";
   return (
     <time dateTime={value} title={formatRelative(value)}>
-      {formatDistanceToNowStrict(new Date(value), { addSuffix: true })}
+      {formatAgoShort(value)}
     </time>
   );
 }

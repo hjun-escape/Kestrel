@@ -44,9 +44,9 @@ export default function SignalTimeline({ signals, neverRefreshed, checking, newI
 function MonthGroups({ signals, dimmed = false, newIds }) {
   return groupSignalsByMonth(signals).map((group) => (
     <section key={group.key} aria-label={group.label} className="mb-5 last:mb-0">
-      <h3 className={`mb-1.5 flex items-baseline gap-2 text-xs font-semibold ${dimmed ? "text-ew-muted" : "text-ew-ink-soft"}`}>
+      <h3 className={`mb-1.5 flex items-baseline gap-2 text-[11px] font-semibold uppercase tracking-[0.06em] ${dimmed ? "text-ew-muted" : "text-ew-ink-soft"}`}>
         {group.label}
-        <span className="font-normal tabular-nums text-ew-muted">{group.items.length}</span>
+        <span className="font-mono font-normal text-ew-muted">{group.items.length}</span>
       </h3>
       <ol className={`border ${dimmed ? "border-dashed border-ew-rule bg-ew-hover" : "border-ew-rule bg-ew-surface"}`}>
         {group.items.map((s, i) => (
@@ -78,10 +78,10 @@ function SignalItem({ signal: s, dimmed, isNew }) {
       <time
         dateTime={s.date}
         title={s.date_approx ? `About ${format(date, "d MMMM yyyy")}` : format(date, "d MMMM yyyy")}
-        className="block border-r border-ew-rule-soft px-3 py-3 text-right leading-tight tabular-nums"
+        className="block border-r border-ew-rule-soft px-3 py-3 text-right leading-tight"
       >
-        <span className={`block text-[15px] font-semibold ${dimmed ? "text-ew-muted" : "text-ew-ink"}`}>{format(date, "d")}</span>
-        <span className="block text-[11px] text-ew-muted">{format(date, "MMM")}</span>
+        <span className={`block font-mono text-[15px] font-semibold ${dimmed ? "text-ew-muted" : "text-ew-ink"}`}>{format(date, "d")}</span>
+        <span className="block text-[11px] uppercase tracking-[0.06em] text-ew-muted">{format(date, "MMM")}</span>
         {s.date_approx && <span className="block text-[11px] text-ew-muted">approx.</span>}
       </time>
       <article className="min-w-0 px-4 py-3">
@@ -125,7 +125,7 @@ function SignalItem({ signal: s, dimmed, isNew }) {
             </span>
           )}
           {type.whatToAsk && !dimmed && (
-            <p className="min-w-0 flex-1 text-xs leading-relaxed text-ew-muted">
+            <p className="min-w-0 basis-full text-xs leading-relaxed text-ew-muted sm:basis-0 sm:flex-1">
               <span className="font-semibold text-ew-ink-soft">Ask: </span>
               {type.whatToAsk}
             </p>

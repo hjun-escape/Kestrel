@@ -1,4 +1,4 @@
-import { format, parseISO } from "date-fns";
+import { differenceInDays, differenceInHours, differenceInMinutes, format, parseISO } from "date-fns";
 import { base44 } from "@/api/base44Client";
 import { SIGNAL_TYPES, SOURCES } from "@/lib/signalTypes";
 import { recentSignals, WINDOW_DAYS } from "../../base44/functions/scoreBorrower/entry.ts";
@@ -76,6 +76,21 @@ export function formatRelative(dateStr) {
   } catch {
     return null;
   }
+}
+
+// Compact age for the loan book's mono "Last checked" column ("57 min ago", "3 d ago").
+export function formatAgoShort(dateStr) {
+  const d = dateStr ? new Date(dateStr) : null;
+  if (!d || Number.isNaN(d.getTime())) return null;
+  const now = new Date();
+  const mins = differenceInMinutes(now, d);
+  if (mins < 1) return "<1 min ago";
+  if (mins < 60) return `${mins} min ago`;
+  const hours = differenceInHours(now, d);
+  if (hours < 24) return `${hours} h ago`;
+  const days = differenceInDays(now, d);
+  if (days < 60) return `${days} d ago`;
+  return `${Math.round(days / 30)} mo ago`;
 }
 // ---------------------------------------------------------------------------
 // UI helpers (loan book + detail).
