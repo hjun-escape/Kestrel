@@ -18,12 +18,24 @@ screening an applicant, and keeps monitoring the same company after funding (see
 ## What a credit officer sees
 
 - **Loan book**: every applicant and borrower, worst first, with the reason in one line
-  ("Red: CFO departure (Sep 12) + job postings down 62% in 30 days.").
+  ("Red: CFO departure (Sep 12) + job postings down 62% in 30 days."), and the officer's latest sign-off with a link
+  to edit the review.
 - **Screen new applicant**: type a name (the form can fill in the rest), and the checks run live. News comes back in
   seconds; jobs and reviews fill in as Bright Data collects them, and the page keeps checking until they are in.
-- **Company page**: evidence first. Every signal quotes its source, links to it, and says what to ask the company next;
-  then the documents to request, the decision log, an "other lenders" check, a cash-flow statement check and an
-  AI analyst brief whose every claim is checked against fetched text.
+- **Company page**: a verdict card first (status, check-based confidence, warning-score points, the key evidence and
+  the next step), then a review checklist the officer can work through in any order:
+  - **Review report**: every warning sign with its quote and source link, the sources searched, and how the status
+    was counted.
+  - **Double-check**: re-tests each quote, date and company match and recounts the status with the fixed rules,
+    with an independent Devin review when signed in. Gives a check-based confidence (tests passed / all tests).
+  - **Document exchange**: request documents that prove or disprove a flag (recommended ones are built from the
+    evidence), share a private upload link with the company (no login), and review each document that comes back
+    (accept or reject, and what it shows). Accepted documents feed the next double-check.
+  - **Additional AI checks** (optional, never used for the status): other lenders, a bank-statement cash-flow check
+    and an AI news summary whose every claim is checked against fetched text.
+  - **Final check and sign-off**: Confirm / Incorrect / Uncertain on every flag with a reason (and the score without
+    the flags marked incorrect), then sign off: proceed, proceed with conditions, request documents, or decline.
+    Each sign-off is saved with who and when, and the audit trail exports for the credit file.
 
 ## Where the data comes from (Bright Data)
 
@@ -43,6 +55,8 @@ Every signal comes from Bright Data, and every signal on screen links to its sou
   (RED = 2+ strong, or 1 strong + 2 weak; YELLOW = 1 strong, or 2+ weak; only the last 90 days count).
 - **Quotes are real.** A snippet is kept only if it appears in the source text; the model never writes evidence.
 - **Same company or nothing.** Matches are checked against the company's website domain and city; if unsure, dropped.
+- **People decide.** Double-checks, documents and sign-offs inform the officer and are recorded; they never change
+  the status the rules set.
 - **Honest gaps.** A source that fails or is still collecting is shown as such ("Collecting", "No LinkedIn page found
   that lists …"), never silently treated as clean. Sample companies are labeled and never checked live.
 
@@ -61,7 +75,8 @@ Screen / Refresh ─▶ refreshBorrower ─┬─▶ newsSignals ─▶ tagItem 
   snapshot is resumed on the next check instead of being paid for twice.
 - Functions: `refreshBorrower`, `refreshAll`, `newsSignals`, `tagItem`, `hiringSignal`, `reviewSignals`,
   `scoreBorrower`, `findCompanyPages`, `suggestCompany`, `lenderCheck`, `analyzeBorrower`, `analyzeCashflow` (statements
-  parsed in a Daytona sandbox), `askPortfolio` + `confirmAction` (assistant), `manageCompany`, `loadDemo`.
+  parsed in a Daytona sandbox), `askPortfolio` + `confirmAction` (assistant), `manageCompany`, `loadDemo`,
+  `auditReport` (double-check, versions and sign-off), `documentExchange` (bank and company document exchange).
 - Data contract and team rules: `CLAUDE.md`. Build plan: `docs/PLAN.md`. Tester evidence: `docs/USER_FEEDBACK.md`.
 - Sample JSON for every demo company: `data/cache/` (refresh with `node scripts/export-cache.mjs`).
 
