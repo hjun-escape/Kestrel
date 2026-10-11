@@ -406,12 +406,12 @@ function PipelineRun({ company, onProgress }) {
         <canvas ref={canvasRef} aria-hidden="true" className="absolute inset-0 h-full w-full cursor-crosshair" {...handlers} />
         <ol className="pointer-events-none absolute left-0 top-0 grid grid-cols-4" style={{ width: `${EXIT * 100}%`, height: HEADER }}>
           {STAGES.map((s, i) => (
-            <li key={s.title} className="flex flex-col justify-end border-l border-white/10 px-4 pb-2 first:border-l-0">
+            <li key={s.title} className="flex flex-col justify-end border-l border-white/10 px-2 pb-2 first:border-l-0 sm:px-4">
               <p className="text-[11px] font-semibold tracking-[0.14em] text-white/45">0{i + 1}</p>
-              <p key={pulse[i]} className="font-heading text-[17px] font-bold leading-tight text-white motion-safe:animate-[kestrelPulse_700ms_ease-out]">
+              <p key={pulse[i]} className="hidden font-heading text-[17px] font-bold leading-tight text-white motion-safe:animate-[kestrelPulse_700ms_ease-out] sm:block">
                 {s.title}
               </p>
-              <p className="text-[12px] text-white/55">{s.body}</p>
+              <p className="hidden text-[12px] text-white/55 sm:block">{s.body}</p>
             </li>
           ))}
         </ol>
