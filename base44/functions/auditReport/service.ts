@@ -16,6 +16,18 @@ async function independentReviewer(deps: any, borrowerId: string) {
 export async function handleAudit(body: any, deps: any) {
   const reply = (status: number, data: any) => ({ status, data });
   try {
+    // Loan book: the latest sign-off on each of the caller's companies (signed out: none; session only).
+    if (body?.action === 'signoffs') {
+      const user = await deps.user();
+      if (!user?.email || !deps.signoffRuns) return reply(200, { signoffs: {} });
+      const signoffs: Record<string, any> = {};
+      for (const r of await deps.signoffRuns(user.email)) {
+        if (signoffs[r.borrower_id]) continue;
+        const payload = typeof r.payload === 'string' ? JSON.parse(r.payload) : r.payload;
+        if (payload?.signoff) signoffs[r.borrower_id] = { outcome: payload.signoff.outcome, by: payload.signoff.by, at: payload.signoff.at };
+      }
+      return reply(200, { signoffs });
+    }
     if (!body || typeof body.borrower_id !== 'string' || !body.borrower_id.trim() || !['list', 'run', 'review', 'read_document'].includes(body.action)) return reply(400, { error: 'Provide borrower_id and action: list, run, review or read_document.' });
     const user = await deps.user();
     if (!user?.email) return reply(401, { error: 'Sign in to audit your company reports.' });

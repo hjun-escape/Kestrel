@@ -91,3 +91,16 @@ test('accepted exchange documents resolve claim support and leave contradicted f
   assert.match(payload.document_context[0].passages[0].quote, /chief financial officer resigned/);
   assert.equal(JSON.stringify(payload.accepted_documents).includes('board confirmed'), false);
 });
+
+test('signoffs: the latest sign-off per company for the caller; signed out gets none', async () => {
+  const runs = [
+    { borrower_id: 'b1', created_at: '2026-10-10T19:00:00Z', payload: JSON.stringify({ signoff: { outcome: 'decline', note: 'x', by: 'a@x.com', at: '2026-10-10T19:00:00Z' } }) },
+    { borrower_id: 'b1', created_at: '2026-10-10T18:00:00Z', payload: JSON.stringify({ signoff: { outcome: 'proceed', note: '', by: 'a@x.com', at: '2026-10-10T18:00:00Z' } }) },
+    { borrower_id: 'b2', created_at: '2026-10-10T17:00:00Z', payload: JSON.stringify({}) },
+  ];
+  const deps: any = { user: async () => ({ email: 'a@x.com' }), signoffRuns: async () => runs };
+  const r = await handleAudit({ action: 'signoffs' }, deps);
+  assert.deepEqual(r.data.signoffs, { b1: { outcome: 'decline', by: 'a@x.com', at: '2026-10-10T19:00:00Z' } });
+  deps.user = async () => null;
+  assert.deepEqual((await handleAudit({ action: 'signoffs' }, deps)).data, { signoffs: {} });
+});

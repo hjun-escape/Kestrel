@@ -17,7 +17,7 @@ const SKELETON_ROWS = 6;
 
 // Dense, sortable loan book table. Rows open the detail page on click; the
 // company link is the keyboard target and Arrow Up / Down moves between rows.
-export default function LoanBookTable({ rows, sort, onSort, loading }) {
+export default function LoanBookTable({ rows, sort, onSort, loading, signoffs = {} }) {
   const navigate = useNavigate();
   const bodyRef = useRef(null);
 
@@ -52,6 +52,7 @@ export default function LoanBookTable({ rows, sort, onSort, loading }) {
               <BookRow
                 key={b.id}
                 borrower={b}
+                signoff={signoffs[b.id]}
                 onOpen={() => navigate(`/borrower/${b.id}`)}
               />
             ))}
@@ -89,7 +90,7 @@ function HeaderCell({ col, sort, onSort }) {
   );
 }
 
-function BookRow({ borrower: b, onOpen }) {
+function BookRow({ borrower: b, signoff, onOpen }) {
   const key = statusKey(b);
   return (
     <tr
@@ -115,6 +116,7 @@ function BookRow({ borrower: b, onOpen }) {
       <td className="px-3 py-3">
         <StatusBadge status={b.status} lastRefreshed={b.last_refreshed} />
         <SourcesNote borrower={b} />
+        {signoff && <SignoffNote borrowerId={b.id} signoff={signoff} />}
       </td>
       <td className="px-3 py-3 text-sm leading-snug text-ew-ink-soft">
         {reasonText(b.why) || <span className="text-ew-muted">{b.last_refreshed ? "No reason recorded" : "Awaiting first check"}</span>}
@@ -155,5 +157,27 @@ function SkeletonRow() {
         </td>
       ))}
     </tr>
+  );
+}
+
+const SIGNOFF = {
+  proceed: ["Proceed", "border-ew-green-rule bg-ew-green-bg text-ew-green"],
+  proceed_with_conditions: ["Proceed with conditions", "border-ew-amber-rule bg-ew-amber-bg text-ew-amber"],
+  request_documents: ["Request documents first", "border-ew-amber-rule bg-ew-amber-bg text-ew-amber"],
+  decline: ["Decline", "border-ew-red-rule bg-ew-red-bg text-ew-red"],
+};
+
+/** The latest final-review sign-off, with a link back to the review to change it. */
+function SignoffNote({ borrowerId, signoff }) {
+  const [label, tone] = SIGNOFF[signoff.outcome] || [signoff.outcome, "border-ew-rule text-ew-ink-soft"];
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+      <span title={`${signoff.by} · ${new Date(signoff.at).toLocaleString()}`} className={`rounded-sm border px-1.5 font-semibold leading-[18px] ${tone}`}>
+        Signed off: {label}
+      </span>
+      <Link to={`/borrower/${borrowerId}#final-review`} onClick={(e) => e.stopPropagation()} className="text-ew-ink-soft underline underline-offset-2 hover:text-ew-ink">
+        Edit review
+      </Link>
+    </div>
   );
 }

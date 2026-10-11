@@ -97,6 +97,12 @@ export default function CompanyReport({
     }, ANCHOR_POLL_MS);
     return () => window.clearInterval(timer);
   }, [hash]);
+  // From the loan book's "Edit review": open the final check and sign-off.
+  useEffect(() => {
+    if (hash !== "#final-review") return;
+    setStep("final");
+    revealLater("doublecheck");
+  }, [hash]);
   const toggle = (key) => setOpen((prev) => ({ ...prev, [key]: !prev[key] }));
   // Open a section of the report (step 1) and scroll to it.
   const reveal = (key, targetId) => {
