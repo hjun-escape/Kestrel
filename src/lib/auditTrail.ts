@@ -61,9 +61,17 @@ const join = (parts: string[]) => parts.filter(Boolean).join(" ");
 const sentence = (s: string) => (s && !/[.!?]$/.test(s) ? `${s}.` : s);
 const safeUrl = (v: unknown) => (/^https?:\/\//i.test(text(v)) ? text(v) : "");
 
+// Base44's created_date / updated_date are UTC but carry no zone
+// ("2026-10-10T23:28:00.000000"), and a browser reads such a string as local
+// time: 7 hours late in California. Mark those as UTC; date-only values and
+// values that already have a zone are left alone.
+function asUtc(s: string): string {
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(s) ? `${s}Z` : s;
+}
+
 function when(...candidates: unknown[]): string {
   for (const c of candidates) {
-    const s = text(c);
+    const s = asUtc(text(c));
     if (s && !Number.isNaN(Date.parse(s))) return s;
   }
   return "";
