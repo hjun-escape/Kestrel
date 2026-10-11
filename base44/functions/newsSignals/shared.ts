@@ -8,6 +8,7 @@ export interface NewsResult {
   source: string;
   date: string;
   snippet: string;
+  date_approx?: boolean;
 }
 
 export interface LLMParams {
@@ -153,4 +154,3 @@ export function htmlToText(html: string, cap: number = PAGE_TEXT_CAP): string {
     .replace(/<[^>]+>/g, ' ');
   return decodeEntities(text).replace(/ /g, ' ').replace(/\s+/g, ' ').trim().slice(0, cap);
 }
-

@@ -44,7 +44,13 @@ function Signals({ signals }) {
           <li key={s.id || `${s.type}-${s.date}`} className="text-[13px] leading-snug">
             <div className="flex items-baseline justify-between gap-2">
               <span className="font-semibold text-ew-ink">{SIGNAL_TYPES[s.type]?.label || s.type}</span>
-              <span className="shrink-0 font-mono text-[11px] text-ew-muted">{s.date}</span>
+              <span
+                className="shrink-0 font-mono text-[11px] text-ew-muted"
+                title={s.date_approx ? "Approximate date" : undefined}
+              >
+                {s.date_approx && "~"}
+                {s.date}
+              </span>
             </div>
             <p className="text-ew-ink-soft">
               {s.title}

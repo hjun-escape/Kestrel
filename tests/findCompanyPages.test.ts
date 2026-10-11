@@ -316,3 +316,18 @@ test("a bad snapshot id from Bright Data is refused before it reaches a URL", as
   assert.equal(r.linkedin, "error");
   assert.ok(r.notes.some((n) => n.includes("invalid snapshot_id")));
 });
+
+test("no company page in the first LinkedIn search: a second site:linkedin.com/company search finds it", async () => {
+  const calls: Call[] = [];
+  const serp = (q: string) => {
+    if (/glassdoor/i.test(q)) return SERP_GLASSDOOR;
+    if (q.startsWith("site:linkedin.com/company")) return SERP_LINKEDIN;
+    return { organic: [] }; // first search: nothing useful (as seen live for "Amy's Kitchen")
+  };
+  const r = await findCompanyPages(GRAVIE, { fetch: fakeFetch({ serp, calls }), apiKey: "k" });
+  assert.equal(r.linkedin, "found");
+  assert.equal(r.linkedin_url, "https://www.linkedin.com/company/gravie");
+  assert.equal(r.glassdoor, "found");
+  const queries = calls.filter((c) => c.url === "https://api.brightdata.com/request").map((c) => new URL(c.body.url).searchParams.get("q"));
+  assert.ok(queries.includes('site:linkedin.com/company "Gravie"'), JSON.stringify(queries));
+});

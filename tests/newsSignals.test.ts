@@ -10,7 +10,9 @@ import {
   buildNewsQueries,
   buildNewsSearchUrl,
   buildTagPrompt,
+  isApproximateDate,
   parseNewsDate,
+  dateFromUrl,
   judge,
   parseTag,
   runNewsSignals,
@@ -241,6 +243,24 @@ describe('parseNewsDate', () => {
   }
 });
 
+describe('isApproximateDate', () => {
+  const cases: Array<[string, boolean]> = [
+    ['2 weeks ago', true],
+    ['1 month ago', true],
+    ['a year ago', true],
+    ['3 days ago', false],
+    ['5 hours ago', false],
+    ['yesterday', false],
+    ['Jun 18, 2026', false],
+    ['', false],
+  ];
+  for (const [input, expected] of cases) {
+    test(`${JSON.stringify(input)} -> ${expected}`, () => {
+      assert.equal(isApproximateDate(input), expected);
+    });
+  }
+});
+
 // ---------- tag parsing ----------
 
 describe('parseTag and prompt', () => {
@@ -310,6 +330,42 @@ describe('runNewsSignals', () => {
     assert.equal(suit.type, 'legal_layoffs');
     assert.equal(suit.severity, 'weak');
     assert.equal(suit.date, '2026-09-26');
+  });
+
+  test('flags a coarse relative date as approximate unless the URL provides an exact date', async () => {
+    const exactSnippet = 'Acme Widgets chief financial officer Jane Roe resigned from the company';
+    const tag = {
+      relevant: true,
+      same_company: true,
+      signal_type: 'exec_departure',
+      severity: 'strong',
+      snippet: exactSnippet,
+    };
+    const signalForUrl = async (url: string) => {
+      const f = fakeFetch({
+        exec: {
+          body: JSON.stringify({
+            news: [{
+              title: 'Acme Widgets CFO resigns',
+              link: url,
+              source: 'Dayton Daily',
+              description: exactSnippet,
+              date: '1 month ago',
+            }],
+          }),
+        },
+        legal: { body: JSON.stringify({ news: [] }) },
+      });
+      const llm = fakeLLM({ [url]: tag });
+      return (await run({ fetch: f.fn, invokeLLM: llm.fn }).result)[0];
+    };
+
+    const approximate = await signalForUrl('https://news.example.com/acme-relative-date');
+    assert.equal(approximate.date_approx, true);
+
+    const exact = await signalForUrl('https://news.example.com/2026/08/21/acme-relative-date');
+    assert.equal(exact.date, '2026-08-21');
+    assert.equal('date_approx' in exact, false);
   });
 
   test('returns exactly the expected four signals and never a status', async () => {
@@ -498,4 +554,22 @@ test('an empty search reply is retried once before the search counts as failed',
   });
   assert.deepEqual(signals, []);
   assert.equal(legalCalls, 2);
+});
+
+describe('dateFromUrl', () => {
+  const cases: Array<[string, string | null]> = [
+    ['https://nypost.com/2026/08/22/business/stone-brewing-layoffs/', '2026-08-22'],
+    ['https://www.sandiegouniontribune.com/2026/08/21/stone-brewing/', '2026-08-21'],
+    ['https://example.com/news/2026/10/10', '2026-10-10'],
+    ['https://example.com/2026/10/11/tomorrow/', null],
+    ['https://example.com/2026/02/30/bad-day/', null],
+    ['https://example.com/2026/08/stone-brewing/', null],
+    ['https://example.com/id/20260822/story', null],
+    ['', null],
+  ];
+  for (const [input, expected] of cases) {
+    test(`${JSON.stringify(input)} -> ${expected}`, () => {
+      assert.equal(dateFromUrl(input, TODAY), expected);
+    });
+  }
 });

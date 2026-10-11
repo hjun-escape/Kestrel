@@ -23,7 +23,7 @@ export default function LandingFooter() {
             <BrandMark className="h-4 w-4 text-white/80" />
             Kestrel, for bank credit and risk teams
           </span>
-          <span>Hackathon prototype. The demo uses sample companies.</span>
+          <span>Hackathon prototype. Demo companies are real; loan amounts are fictional.</span>
         </div>
       </div>
     </footer>

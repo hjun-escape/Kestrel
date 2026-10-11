@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { canAccessCompany } from './access.ts';
+import { cooldownLeft } from './cooldown.ts';
 
 // refreshBorrower(borrower_id). Owner: P1. See docs/PLAN.md §2 and CLAUDE.md "Refresh flow".
 //
@@ -46,9 +47,6 @@ const SCORING_ENABLED = true;
 // should give up and answer 503 with their snapshot_id well before it
 // (about 150 s at most), so the id reaches us and the next refresh can resume.
 const SOURCE_TIMEOUT_MS = 200_000;
-
-// A company checked more recently than this is not checked again (see the cooldown below).
-const COOLDOWN_MS = 2 * 60_000;
 
 // findCompanyPages usually answers in 5-10 s; its own budget is 55 s.
 const PROFILE_TIMEOUT_MS = 60_000;
@@ -109,14 +107,14 @@ export default async function(req: Request): Promise<Response> {
     }
 
     // Cooldown: every check spends Bright Data credits and the app is open
-    // without login, so a company checked in the last two minutes is not checked
-    // again. A refresh that only resumes a still-building snapshot is allowed,
-    // and so are app admins.
-    const lastChecked = borrower.last_refreshed ? Date.parse(borrower.last_refreshed) : NaN;
+    // without login, so failed and in-flight checks count too. A refresh that
+    // only resumes a still-building snapshot is allowed, and so are app admins.
     const resuming = Object.values(borrower.pending_snapshots || {}).some((id) => typeof id === 'string' && id !== '');
-    if (Date.now() - lastChecked < COOLDOWN_MS && !resuming && caller?.role !== 'admin') {
-      return Response.json({ error: 'Checked less than two minutes ago. Try again shortly.' }, { status: 429 });
+    if (cooldownLeft(borrower, Date.now()) > 0 && !resuming && caller?.role !== 'admin') {
+      return Response.json({ error: 'A check started less than two minutes ago. Try again shortly.' }, { status: 429 });
     }
+
+    await db.Borrower.update(borrowerId, { last_attempted: new Date().toISOString() });
 
     const enabled = SIGNAL_FUNCTIONS.filter((f) => f.enabled);
     if (enabled.length === 0) {

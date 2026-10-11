@@ -7,6 +7,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AppHeader from "@/components/AppHeader";
 import AddCompanyDialog from "@/components/AddCompanyDialog";
 import SummaryStrip from "@/components/SummaryStrip";
+import { StatusLegendPopover } from "@/components/StatusLegend";
 import LoanBookTable from "@/components/LoanBookTable";
 import LoanBookCards from "@/components/LoanBookCards";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -203,6 +204,14 @@ export default function LoanBook() {
           <DemoEmptyPanel running={demo.running} onLoad={demo.start} />
         )}
 
+        <div data-demo="status-legend" className="mb-2 flex flex-wrap items-center justify-end gap-x-4 gap-y-1">
+          <p className="hidden text-xs text-ew-muted xl:block">
+            <span className="font-semibold text-ew-red">Red</span> 2+ strong signs, or 1 strong + 2 weak ·{" "}
+            <span className="font-semibold text-ew-amber">Yellow</span> 1 strong, or 2+ weak ·{" "}
+            <span className="font-semibold text-ew-green">Green</span> none that count · set by fixed rules, not AI
+          </p>
+          <StatusLegendPopover align="end" />
+        </div>
         <SummaryStrip
           borrowers={inTab}
           loading={loading}

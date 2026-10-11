@@ -25,6 +25,10 @@
       "type": "string",
       "format": "date"
     },
+    "date_approx": {
+      "type": "boolean",
+      "description": "Written by newsSignals: the date came from Google's relative \"N weeks/months/years ago\", so it is approximate."
+    },
     "title": {
       "type": "string"
     },

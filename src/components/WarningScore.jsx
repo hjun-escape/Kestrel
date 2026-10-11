@@ -26,7 +26,15 @@ function Line({ line }) {
       <span className="min-w-0 flex-1 text-sm">
         <span className="font-medium text-ew-ink">{type}</span>
         <span className="text-ew-ink-soft">: {s.title}</span>
-        <span className="text-ew-muted"> · {shortDate(s.date)} · {line.note}</span>
+        <span className="text-ew-muted">
+          {" · "}
+          <span title={s.date_approx ? "Approximate date" : undefined}>
+            {s.date_approx && "~"}
+            {shortDate(s.date)}
+          </span>
+          {" · "}
+          {line.note}
+        </span>
         {s.source_url && (
           <>
             {" · "}
@@ -48,15 +56,19 @@ export default function WarningScore({ borrower, signals }) {
   const band = BAND[ws.band] || BAND.green;
 
   return (
-    <section aria-labelledby="warning-score-heading" className="border-t border-ew-rule px-5 py-3">
+    <section data-demo="score" aria-labelledby="warning-score-heading" className="border-t border-ew-rule px-5 py-3">
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-        <div className="flex items-baseline gap-2">
-          <h2 id="warning-score-heading" className="text-xs font-semibold text-ew-muted">
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+          <h2 id="warning-score-heading" className="whitespace-nowrap text-xs font-semibold text-ew-muted">
             Warning score
           </h2>
-          <span className="font-heading text-2xl font-bold text-ew-ink">{ws.score}</span>
-          <span className="text-sm text-ew-muted">/ 100</span>
+          <span className="whitespace-nowrap">
+            <span className="font-heading text-2xl font-bold text-ew-ink">{ws.score}</span>
+            <span className="ml-1 text-sm text-ew-muted">/ 100</span>
+          </span>
           <span className={`ml-1 rounded-sm px-1.5 py-0.5 text-xs font-semibold ${band.cell} ${band.text}`}>{band.label}</span>
+          {/* Say up front that the score cannot disagree with the status: its bands are the status rules. */}
+          <span className="w-full text-xs text-ew-muted sm:w-auto">Same rules as the status, counted in points</span>
         </div>
 
         <div className="min-w-[220px] flex-1">

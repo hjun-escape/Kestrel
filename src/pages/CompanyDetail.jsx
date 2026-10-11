@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import AppHeader from "@/components/AppHeader";
 import CompanyReport from "@/components/CompanyReport";
+import AuditTrail from "@/components/AuditTrail";
 import EditCompanyDialog from "@/components/EditCompanyDialog";
 import DeleteCompanyDialog from "@/components/DeleteCompanyDialog";
 import { useAuth } from "@/lib/AuthContext";
@@ -246,6 +247,7 @@ export default function CompanyDetail() {
         autoResume={running ? null : autoResume}
         onStopAutoResume={stopAutoResume}
       />
+      <AuditTrail key={`audit-${borrower.id}`} borrower={borrower} signals={signals} />
       <EditCompanyDialog
         borrower={borrower}
         open={editOpen}

@@ -48,7 +48,7 @@ function valueOf(field, picks) {
 }
 
 /**
- * A step with its route, press and target worked out for these picks.
+ * A step with its caption, route, press and target worked out for these picks.
  * `missingCompany` is true when the step needs a company the loan book does
  * not have (its route function returned nothing).
  */
@@ -56,7 +56,7 @@ export function resolveStep(step, picks) {
   const route = valueOf(step?.route, picks);
   return {
     id: step?.id ?? "",
-    caption: step?.caption ?? "",
+    caption: valueOf(step?.caption, picks) ?? "",
     route,
     press: valueOf(step?.press, picks),
     target: valueOf(step?.target, picks),

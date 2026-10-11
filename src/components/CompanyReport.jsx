@@ -63,8 +63,10 @@ export default function CompanyReport({
       <div className="border border-ew-rule bg-ew-surface">
         <CompanyHeader
           borrower={borrower}
+          signals={signals}
           sourceStates={sourceStates}
-          running={running}          refreshError={refreshError}
+          running={running}
+          refreshError={refreshError}
           onRefresh={onRefresh}
           onEdit={onEdit}
           onDelete={onDelete}
@@ -106,21 +108,23 @@ export default function CompanyReport({
       {/* Evidence first: the signals behind the status, each with its source and
           what to ask. Next steps (decision, other lenders, analyst) sit beside it. */}
       <div hidden={reviewView !== 'report'}><div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_400px]">
-        <section data-demo="evidence" aria-labelledby="evidence-heading" className="min-w-0">
-          <div className="mb-3 flex items-baseline justify-between gap-4">
-            <h2 id="evidence-heading" className="font-heading text-xl font-bold tracking-tight text-ew-ink">
-              Evidence
-            </h2>
-            <p className="text-xs tabular-nums text-ew-muted">
-              {recentSignals.length} in the last 90 days{olderCount > 0 ? `, ${olderCount} older` : ""}
-            </p>
+        <section aria-labelledby="evidence-heading" className="min-w-0">
+          <div data-demo="evidence">
+            <div className="mb-3 flex items-baseline justify-between gap-4">
+              <h2 id="evidence-heading" className="font-heading text-xl font-bold tracking-tight text-ew-ink">
+                Evidence
+              </h2>
+              <p className="text-xs tabular-nums text-ew-muted">
+                {recentSignals.length} in the last 90 days{olderCount > 0 ? `, ${olderCount} older` : ""}
+              </p>
+            </div>
+            <SignalTimeline
+              signals={signals}
+              neverRefreshed={!borrower.last_refreshed}
+              checking={running}
+              newIds={newIds}
+            />
           </div>
-          <SignalTimeline
-            signals={signals}
-            neverRefreshed={!borrower.last_refreshed}
-            checking={running}
-            newIds={newIds}
-          />
           {isApplicant ? (
             <div className="mt-6">
               <CashflowReview borrower={borrower} onReviewChange={setCashflowReview} />

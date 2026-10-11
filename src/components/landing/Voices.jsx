@@ -23,12 +23,12 @@ export const VOICES = [
   {
     who: "b",
     quote: "I don't think it defines what yet red, yellow, and green are…",
-    change: "Each status shows the rule behind it, plus a 0 to 100 warning score.",
+    change: "A status legend spells out each rule, and every company gets a 0 to 100 warning score.",
   },
   {
     who: "b",
     quote: "It cannot be used to fully rely on at this point in my opinion.",
-    change: "AI only tags. Fixed rules set the status, and every flag shows its source, date and exact quote.",
+    change: "AI only tags and fixed rules set the status. Each company has an audit trail you can export, with every flag's source and exact quote.",
   },
 ];
 
