@@ -1,0 +1,34 @@
+{
+  "name": "DevinRun",
+  "type": "object",
+  "properties": {
+    "borrower_id": { "type": "string" },
+    "kind": { "type": "string", "enum": ["independent_audit", "investigation"] },
+    "question": { "type": "string", "description": "Optional user question (max 300 chars). Sent to Devin quoted and labelled as untrusted." },
+    "status": { "type": "string", "enum": ["queued", "running", "finished", "failed", "blocked"] },
+    "devin_session_id": { "type": "string" },
+    "devin_url": { "type": "string" },
+    "started_at": { "type": "string", "format": "date-time" },
+    "finished_at": { "type": "string", "format": "date-time" },
+    "structured_output": { "type": "object", "description": "Raw structured output returned by Devin, kept for audit." },
+    "summary": { "type": "string" },
+    "findings": {
+      "type": "array",
+      "description": "Findings after in-code verification: a source_url not among the company's stored Signals is cleared and the verdict set to unresolved.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "claim": { "type": "string" },
+          "verdict": { "type": "string", "enum": ["supported", "contradicted", "unresolved"] },
+          "reason": { "type": "string" },
+          "evidence_quote": { "type": "string" },
+          "source_url": { "type": "string" }
+        }
+      }
+    },
+    "requested_by": { "type": "string" },
+    "error": { "type": "string" }
+  },
+  "required": ["borrower_id", "kind", "status", "started_at", "requested_by"],
+  "rls": { "create": false, "read": false, "update": false, "delete": false }
+}

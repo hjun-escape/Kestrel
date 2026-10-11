@@ -4,7 +4,7 @@ import type { ConfirmDeps } from './logic.ts';
 
 // confirmAction({ action }). Runs one pending action from Ask Kestrel
 // after the user clicks Confirm. The action is re-validated in logic.ts;
-// only screen, refresh and deep_check are allowed.
+// only screen, refresh, deep_check and devin_investigation are allowed.
 export default async function(req: Request): Promise<Response> {
   try {
     const body = await req.json().catch(() => null);
