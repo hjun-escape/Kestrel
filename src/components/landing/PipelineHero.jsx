@@ -18,7 +18,7 @@ const SOURCE_LABELS = ["News", "Court filings", "Job posts", "Reviews", "LinkedI
 const STAGES = [
   { title: "Search", body: "Find every mention" },
   { title: "Read", body: "Pull the full text" },
-  { title: "Tag", body: "AI marks what matters" },
+  { title: "Select", body: "AI picks the relevant articles" },
   { title: "Verify", body: "Same company, exact quote" },
 ];
 const GUTTER = 210; // sources column: example items sliding into their lanes
@@ -29,7 +29,7 @@ const MS_PER_COLUMN = (2 * 1000) / FPS; // the conveyor moves one column every o
 const css = ([r, g, b], a = 1) => `rgba(${r},${g},${b},${a})`;
 
 function shorten(text, max = 40) {
-  const t = String(text).replace(/\s*·.*$/, "");
+  const t = String(text).replace(/\s*·.*$/, "").replace(/[“”"]/g, "").trim();
   return t.length > max ? `${t.slice(0, max - 1)}…` : t;
 }
 
@@ -198,7 +198,7 @@ function ApplicantForm({ company, onSelect, progress, runKey }) {
     <div className="flex h-full flex-col rounded-sm border border-white/10 bg-white text-ew-ink shadow-[0_18px_50px_rgba(0,0,0,0.4)]">
       <div className="border-b border-ew-rule px-4 py-3">
         <p className="font-heading text-[16px] font-bold leading-tight">Screen new applicant</p>
-        <p className="text-[12px] text-ew-muted">Sample companies, fictional</p>
+        <p className="text-[12px] text-ew-muted">Sample applicants, fictional</p>
       </div>
       <div className="flex flex-1 flex-col gap-3 px-4 py-4">
         <label htmlFor="sample-applicant" className="block">
@@ -281,11 +281,11 @@ function PipelineRun({ company, onProgress }) {
         verifyPass: company.verifyPass,
         onMark: ({ lane, id }) => {
           bump(2);
-          addLog(lane, "Tag", `${SOURCE_LABELS[lane]}: ${shorten(itemFor(lane, id))} marked relevant`);
+          addLog(lane, "Select", `${SOURCE_LABELS[lane]}: ${shorten(itemFor(lane, id))} picked as relevant`);
         },
         onDrop: ({ lane, id }) => {
           bump(3);
-          addLog(lane, "Verify", `${SOURCE_LABELS[lane]}: not confirmed, dropped ${shorten(itemFor(lane, id), 26)}`);
+          addLog(lane, "Verify", `${SOURCE_LABELS[lane]}: not confirmed, set aside ${shorten(itemFor(lane, id), 26)}`);
         },
         onSignal: ({ lane }) => {
           bump(3);
@@ -355,14 +355,14 @@ function PipelineRun({ company, onProgress }) {
       if (p.empty) return { kicker: `${stage} · ${source} lane`, title: "Nothing here", body: "Filtered out at this stage." };
       const item = itemFor(p.lane, p.id);
       if (p.stage === 0) return { kicker: `Search · ${source}`, title: item, body: "Matched the company name in the last 180 days." };
-      if (p.stage === 1) return { kicker: `Read · ${source}`, title: item, body: "Full text pulled through Bright Data." };
+      if (p.stage === 1) return { kicker: `Read · ${source}`, title: item, body: "Full text pulled from the page." };
       if (p.stage === 2)
         return p.state === 2
-          ? { kicker: `Tag · ${source}`, title: item, body: "Marked relevant: a warning sign about this company." }
-          : { kicker: `Tag · ${source}`, title: item, body: "Not marked: not a warning sign, will be dropped." };
+          ? { kicker: `Select · ${source}`, title: item, body: "Picked as relevant: a warning sign about this company." }
+          : { kicker: `Select · ${source}`, title: item, body: "Not picked: not a warning sign, will be set aside." };
       return p.state === 2
         ? { kicker: `Verify · ${source}`, title: item, body: "Same company and the quote is word for word in the source. Heading to the report." }
-        : { kicker: `Verify · ${source}`, title: item, body: "Failed the check: dropped." };
+        : { kicker: `Verify · ${source}`, title: item, body: "Failed the check: set aside." };
     },
     [itemFor]
   );
@@ -438,7 +438,7 @@ function PipelineRun({ company, onProgress }) {
         <ul className="min-h-[86px] px-4 py-2">
           {progress.flags.length === 0 && (
             <li className="py-1 text-[12.5px] text-ew-muted">
-              {company.flags.length ? "Waiting for a verified signal…" : "Nothing verified: every item is dropped before the report."}
+              {company.flags.length ? "Waiting for a confirmed warning sign…" : "Nothing confirmed: every item is set aside before the report."}
             </li>
           )}
           {progress.flags.map((f) => (

@@ -8,10 +8,10 @@ const DialogContent = /** @type {React.ComponentType<any>} */ (SharedDialogConte
 const DialogTitle = /** @type {React.ComponentType<any>} */ (SharedDialogTitle);
 const DialogDescription = /** @type {React.ComponentType<any>} */ (SharedDialogDescription);
 
-// Audit progression in three sub tabs: Progression (steps and the six checks), Activity log (each entry opens
+// Audit steps in three sub tabs: Steps (steps and the six checks), Activity log (each entry opens
 // in a modal with the results behind it) and Report. Colour always comes with a text label.
 
-const STEPS = ['Capture report', 'Run evidence checks', 'Compare risk result', 'Prepare audit report'];
+const STEPS = ['Collect report', 'Check each quote', 'Recount status', 'Write summary'];
 const TONE = {
   green: { card: 'border-ew-green-rule bg-ew-green-bg', text: 'text-ew-green', tag: 'border-ew-green-rule bg-ew-green-bg text-ew-green', label: 'All passed' },
   amber: { card: 'border-ew-amber-rule bg-ew-amber-bg', text: 'text-ew-amber', tag: 'border-ew-amber-rule bg-ew-amber-bg text-ew-amber', label: 'Needs review' },
@@ -26,7 +26,7 @@ const counts = results => ({ pass: results.filter(t => t.verdict === 'pass').len
 
 function Counts({ results }) {
   const c = counts(results);
-  return <p className="flex flex-wrap gap-x-2 text-[11px] font-medium tabular-nums"><span className="text-ew-green">{c.pass} passed</span><span className="text-ew-muted">·</span><span className={c.fail ? 'text-ew-red' : 'text-ew-muted'}>{c.fail} failed</span><span className="text-ew-muted">·</span><span className={c.review ? 'text-ew-amber' : 'text-ew-muted'}>{c.review} unresolved</span></p>;
+  return <p className="flex flex-wrap gap-x-2 text-[11px] font-medium tabular-nums"><span className="text-ew-green">{c.pass} passed</span><span className="text-ew-muted">·</span><span className={c.fail ? 'text-ew-red' : 'text-ew-muted'}>{c.fail} failed</span><span className="text-ew-muted">·</span><span className={c.review ? 'text-ew-amber' : 'text-ew-muted'}>{c.review} could not confirm</span></p>;
 }
 
 /** What a log entry is about, for its colour and label. */
@@ -35,30 +35,37 @@ function entryInfo(log, tests) {
     const check = AUDIT_CHECKS.find(c => c.key === log.check);
     return { tone: checkTone(tests.filter(t => t.check === log.check)), label: check?.title || 'Check', check };
   }
-  if (log.kind === 'result') return { tone: STATUS_TONE[log.status] || 'blue', label: 'Risk result' };
+  if (log.kind === 'result') return { tone: STATUS_TONE[log.status] || 'blue', label: 'Status result' };
   if (log.kind === 'error') return { tone: 'red', label: 'Stopped' };
   if (log.kind === 'done') return { tone: 'green', label: 'Saved' };
   return { tone: 'blue', label: 'Step' };
 }
 
-export default function AuditRunProgress({ phase, logs, failed, running, tests = [], revealed = 0, report = null }) {
+export default function AuditRunProgress({ phase, logs, failed, running, tests = [], revealed = 0, report = null, onRun = null, canRun = true }) {
   const [tab, setTab] = useState(report ? 'report' : 'progress');
   const [openLog, setOpenLog] = useState(null);
   // Watch the progression while a run is going; land on the report when it finishes.
   useEffect(() => { if (running) setTab('progress'); else if (report && phase >= 4) setTab('report'); }, [running, phase, report]);
   useEffect(() => { if (!report && tab === 'report') setTab('progress'); }, [report, tab]);
-  if (phase < 0 && !tests.length && !report) return null;
+  // Nothing has run yet: say so once, instead of green steps above cards that all say "Waiting".
+  if (phase < 0 && !tests.length) {
+    return <section className="border-b border-ew-rule bg-ew-paper px-5 py-5" aria-label="Audit status">
+      <h3 className="flex items-center gap-2 text-sm font-semibold"><span className={`rounded-sm border px-1.5 text-[11px] font-semibold leading-[18px] ${TONE.none.tag}`}>Not run yet</span>No audit has been run for this report</h3>
+      <p className="mt-2 max-w-[70ch] text-sm text-ew-ink-soft">The audit confirms each quote, date and company match, and recounts the status with fixed rules. It takes about 20 seconds.</p>
+      {onRun && <button type="button" onClick={onRun} disabled={!canRun} className="mt-3 inline-flex h-9 items-center rounded-sm bg-ew-ink px-3.5 text-sm font-medium text-white hover:bg-ew-ink-soft disabled:opacity-50">Run audit</button>}
+    </section>;
+  }
 
-  const tabs = [['progress', 'Progression'], ['log', `Activity log (${logs.length})`], ...(report ? [['report', 'Report']] : [])];
+  const tabs = [['progress', 'Steps'], ['log', `Activity log (${logs.length})`], ...(report ? [['report', 'Report']] : [])];
   const headTone = failed ? 'red' : running ? 'blue' : phase >= 0 ? 'green' : 'none';
   const opened = openLog == null ? null : logs[openLog];
   const openedInfo = opened && entryInfo(opened, tests);
   const openedTests = opened?.kind === 'check' ? tests.filter(t => t.check === opened.check) : [];
 
-  return <section className="border-b border-ew-rule bg-ew-paper" aria-label="Audit progression">
+  return <section className="border-b border-ew-rule bg-ew-paper" aria-label="Audit steps">
     <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-4">
       <h3 className="flex items-center gap-2 text-sm font-semibold"><span className={`rounded-sm border px-1.5 text-[11px] font-semibold leading-[18px] ${TONE[headTone].tag}`}>{failed ? 'Stopped' : running ? 'Running' : phase >= 0 ? 'Complete' : 'Saved'}</span>{failed ? 'Audit stopped' : running ? 'Audit in progress' : phase >= 0 ? 'Audit complete' : 'Latest saved audit'}</h3>
-      <span className="text-xs text-ew-muted">Deterministic checks · Devin not connected</span>
+      <span className="text-xs text-ew-muted">Checks run by fixed rules</span>
     </div>
     <div role="tablist" aria-label="Audit report sections" className="mt-2 flex gap-5 border-b border-ew-rule px-5">
       {tabs.map(([value, label]) => <button key={value} id={`audit-sub-${value}`} type="button" role="tab" aria-selected={tab === value} aria-controls={`audit-subpanel-${value}`} onClick={() => setTab(value)} className={`border-b-2 py-2.5 text-[13px] font-medium ${tab === value ? 'border-ew-ink text-ew-ink' : 'border-transparent text-ew-muted hover:text-ew-ink'}`}>{label}</button>)}
@@ -70,7 +77,7 @@ export default function AuditRunProgress({ phase, logs, failed, running, tests =
           const done = phase < 0 || i < phase;
           return <li key={name} className="flex items-center gap-2 text-xs"><span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition-colors duration-300 motion-reduce:transition-none ${done ? 'border-ew-green-rule bg-ew-green-bg text-ew-green' : failed && i === phase ? 'border-ew-red-rule bg-ew-red-bg text-ew-red' : i === phase ? 'border-ew-focus text-ew-focus' : 'border-ew-rule text-ew-muted'}`}>{done ? <Check className="h-3.5 w-3.5" /> : failed && i === phase ? <X className="h-3.5 w-3.5" /> : running && i === phase ? <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" /> : i + 1}</span>{name}</li>;
         })}</ol>
-        <div className="mt-5 flex items-center justify-between text-xs"><p className="font-semibold">Tests &amp; why they run</p><span className="text-ew-muted">{tests.length ? running ? 'Checks returned · revealing results' : 'Results ready' : failed ? 'No results returned' : 'Waiting for check results'}</span></div>
+        <div className="mt-5 flex items-center justify-between text-xs"><p className="font-semibold">What we double-check</p><span className="text-ew-muted">{tests.length ? running ? 'Checks returned · revealing results' : 'Results ready' : failed ? 'No results returned' : 'Waiting for results'}</span></div>
         <div role="progressbar" aria-label="Check results displayed" aria-valuemin={0} aria-valuemax={AUDIT_CHECKS.length} aria-valuenow={revealed} className="mt-2 h-1 overflow-hidden rounded-full bg-ew-rule"><div className="h-full bg-ew-focus transition-[width] duration-500 ease-out motion-reduce:transition-none" style={{ width: `${revealed / AUDIT_CHECKS.length * 100}%` }} /></div>
         <ol className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{AUDIT_CHECKS.map((check, i) => {
           const done = i < revealed;
@@ -101,7 +108,7 @@ export default function AuditRunProgress({ phase, logs, failed, running, tests =
     <Dialog open={!!opened} onOpenChange={o => { if (!o) setOpenLog(null); }}>
       {opened && <DialogContent className="max-h-[85vh] overflow-y-auto rounded-sm border-ew-rule bg-ew-surface text-ew-ink sm:max-w-xl sm:rounded-sm">
         <div className="flex items-center gap-2 pr-6"><span className={`rounded-sm border px-1.5 text-[11px] font-semibold leading-[18px] ${TONE[openedInfo.tone].tag}`}>{openedInfo.label}</span><time className="font-mono text-xs text-ew-muted">{opened.time}</time></div>
-        <DialogTitle className="font-heading text-lg font-bold leading-snug">{opened.kind === 'check' ? openedInfo.check?.title : opened.kind === 'result' ? `Review risk: ${opened.status}` : opened.message.split('. ')[0]}</DialogTitle>
+        <DialogTitle className="font-heading text-lg font-bold leading-snug">{opened.kind === 'check' ? openedInfo.check?.title : opened.kind === 'result' ? `Status after double-check: ${opened.status}` : opened.message.split('. ')[0]}</DialogTitle>
         <DialogDescription className="text-sm text-ew-ink-soft">{opened.kind === 'check' ? openedInfo.check?.why : opened.message}</DialogDescription>
         {opened.kind === 'check' && <>
           <div className={`rounded-sm border px-3 py-2 ${TONE[openedInfo.tone].card}`}><Counts results={openedTests} /></div>

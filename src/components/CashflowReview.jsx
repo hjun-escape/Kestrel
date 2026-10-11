@@ -18,8 +18,8 @@ const SAMPLES = {
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
 
 const SEVERITY = {
-  strong: { label: "Strong", className: "border-ew-red-rule bg-ew-red-bg text-ew-red", glyph: "bg-ew-red" },
-  weak: { label: "Weak", className: "border-ew-amber-rule bg-ew-amber-bg text-ew-amber", glyph: "rotate-45 bg-ew-amber" },
+  strong: { label: "Serious", className: "border-ew-red-rule bg-ew-red-bg text-ew-red", glyph: "bg-ew-red" },
+  weak: { label: "Minor", className: "border-ew-amber-rule bg-ew-amber-bg text-ew-amber", glyph: "rotate-45 bg-ew-amber" },
 };
 
 const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
@@ -115,11 +115,11 @@ export default function CashflowReview({ borrower, onReviewChange }) {
       <header className="flex flex-wrap items-start justify-between gap-3 border-b border-ew-rule-soft px-5 py-4">
         <div className="min-w-0">
           <h2 id="cashflow-heading" className="font-heading text-base font-bold tracking-tight text-ew-ink">
-            Cash-flow documents
+            Bank statement check
           </h2>
           <p className="mt-0.5 max-w-xl text-xs text-ew-muted">
-            Ask for the cash-flow statement early. Lenders, late payments and NSF items are found by fixed
-            rules; every evidence row is a line from the statement.
+            Upload the applicant's bank statement. We list who they pay each month, late payments and bounced
+            payments. Each row is a line copied from the statement.
           </p>
         </div>
       </header>
@@ -130,7 +130,7 @@ export default function CashflowReview({ borrower, onReviewChange }) {
         {phase && (
           <p className="flex items-center gap-2 text-sm text-ew-ink-soft" role="status" aria-live="polite">
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-            {phase === "uploading" ? "Uploading statement…" : "Analyzing… reading transactions and checking each lender."}
+            {phase === "uploading" ? "Uploading statement…" : "Reading the statement and checking each lender…"}
           </p>
         )}
 
@@ -143,7 +143,7 @@ export default function CashflowReview({ borrower, onReviewChange }) {
         {loading && <p className="text-sm text-ew-muted">Loading…</p>}
 
         {!loading && !review && !phase && (
-          <p className="text-sm text-ew-muted">No statement checked yet for this company.</p>
+          <p className="text-sm text-ew-muted">No bank statement checked yet for this company.</p>
         )}
 
         {review && <ReviewBody review={review} />}
@@ -201,10 +201,10 @@ function Dropzone({ busy, onFile, onSample }) {
       </div>
       <div className="flex flex-col justify-center gap-1.5">
         <Button type="button" variant="outline" size="sm" onClick={() => onSample("csv")} disabled={busy}>
-          Use sample statement
+          Try a sample statement
         </Button>
         <Button type="button" variant="outline" size="sm" onClick={() => onSample("pdf")} disabled={busy}>
-          Use sample PDF
+          Try a sample PDF
         </Button>
       </div>
     </div>
@@ -229,7 +229,7 @@ function ReviewBody({ review }) {
       </div>
 
       {flags.length > 0 && (
-        <ul className="space-y-1.5" aria-label="Flags">
+        <ul className="space-y-1.5" aria-label="Warning signs from the statement">
           {flags.map((f, i) => {
             const s = SEVERITY[f.severity] || SEVERITY.weak;
             return (
@@ -256,10 +256,10 @@ function SandboxBadge() {
   return (
     <span
       className="inline-flex items-center gap-1 border border-ew-rule px-1.5 py-0.5 text-[11px] font-medium text-ew-ink-soft"
-      title="The file was opened only inside a throwaway sandbox and read by a fixed parser; every line below is copied from the statement."
+      title="The file was opened only in a temporary, isolated environment and read by fixed rules. Every line below is copied from the statement."
     >
       <ShieldCheck className="h-3 w-3" aria-hidden="true" />
-      Parsed in an isolated sandbox
+      Read in a secure, isolated environment
     </span>
   );
 }
@@ -269,21 +269,21 @@ function Metrics({ review }) {
   const items = [
     { label: "Lenders", value: review.lender_count ?? 0, alert: (review.lender_count ?? 0) >= 4 },
     {
-      label: "Debt service / inflows",
+      label: "Share of incoming cash going to loan payments",
       value: typeof ratio === "number" ? `${Math.round(ratio * 100)}%` : "—",
       alert: typeof ratio === "number" && ratio >= 0.35,
     },
-    { label: "Debt service / month", value: money(review.monthly_debt_service) },
-    { label: "Inflows / month", value: money(review.monthly_inflows) },
-    { label: "Negative months", value: review.negative_months ?? 0, alert: (review.negative_months ?? 0) > 0 },
+    { label: "Loan payments per month", value: money(review.monthly_debt_service) },
+    { label: "Incoming cash per month", value: money(review.monthly_inflows) },
+    { label: "Months ending below zero", value: review.negative_months ?? 0, alert: (review.negative_months ?? 0) > 0 },
     { label: "Lowest balance", value: money(review.lowest_balance) },
-    { label: "NSF / returned", value: review.nsf_count ?? 0, alert: (review.nsf_count ?? 0) >= 2 },
+    { label: "Bounced payments", value: review.nsf_count ?? 0, alert: (review.nsf_count ?? 0) >= 2 },
   ];
   return (
-    <dl className="grid grid-cols-2 border-y border-ew-rule sm:grid-cols-4 lg:grid-cols-7">
+    <dl className="grid grid-cols-2 border-y border-ew-rule sm:grid-cols-4">
       {items.map((m) => (
         <div key={m.label} className="border-ew-rule-soft px-3 py-2 [&:not(:first-child)]:border-l">
-          <dt className="text-[11px] text-ew-muted">{m.label}</dt>
+          <dt className="text-[11px] leading-tight text-ew-muted">{m.label}</dt>
           <dd className={`mt-0.5 font-mono text-sm font-semibold ${m.alert ? "text-ew-red" : "text-ew-ink"}`}>
             {m.value}
             {m.alert && <span className="sr-only"> (flagged)</span>}
@@ -296,12 +296,12 @@ function Metrics({ review }) {
 
 function LendersTable({ lenders }) {
   if (lenders.length === 0) {
-    return <p className="text-sm text-ew-muted">No recurring lender payments found.</p>;
+    return <p className="text-sm text-ew-muted">No regular loan payments found.</p>;
   }
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[560px] border-collapse text-sm">
-        <caption className="mb-1.5 text-left text-xs font-semibold text-ew-muted">Lenders paid from this account</caption>
+        <caption className="mb-1.5 text-left text-xs font-semibold text-ew-muted">Lenders paid from this account (monthly payments)</caption>
         <thead>
           <tr className="border-b border-ew-rule text-left text-xs text-ew-muted">
             <th scope="col" className="py-1.5 pr-3 font-semibold">Lender</th>
@@ -405,14 +405,14 @@ function EvidenceTable({ rows }) {
 function Exceptions({ lines }) {
   return (
     <div>
-      <h3 className="text-xs font-semibold text-ew-muted">NSF, returned and late-fee lines</h3>
+      <h3 className="text-xs font-semibold text-ew-muted">Bounced payments and late fees</h3>
       <ul className="mt-1.5 divide-y divide-ew-rule-soft border-y border-ew-rule-soft">
         {lines.map((l, i) => (
           <li key={i} className="flex flex-wrap items-baseline gap-x-3 py-1 font-mono text-xs">
             <span className="text-ew-ink-soft">{l.date}</span>
             <span className="flex-1 text-ew-ink">{l.description}</span>
             <span className="text-ew-ink">{money(l.amount, true)}</span>
-            <span className="font-sans text-[11px] font-semibold text-ew-red">{l.kind === "nsf" ? "NSF" : "Late fee"}</span>
+            <span className="font-sans text-[11px] font-semibold text-ew-red">{l.kind === "nsf" ? "Bounced" : "Late fee"}</span>
           </li>
         ))}
       </ul>

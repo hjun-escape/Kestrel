@@ -134,7 +134,7 @@ function Steps({ steps, dropped }) {
             </li>
           ))}
           {(!steps || steps.length === 0) && (
-            <li className="text-xs text-ew-muted">No web lookups; brief based on stored signals.</li>
+            <li className="text-xs text-ew-muted">No web lookups; summary based on the warning signs already found.</li>
           )}
         </ol>
         {dropped > 0 && (
@@ -204,7 +204,7 @@ export default function AnalystBrief({ borrower }) {
       ) : (
         <FileSearch className="mr-1.5 h-4 w-4" aria-hidden="true" />
       )}
-      {running ? "Investigating…" : analysis ? "Run again" : "Run analyst"}
+      {running ? "Writing…" : analysis ? "Run again" : "Write AI news summary"}
     </Button>
   );
 
@@ -214,7 +214,7 @@ export default function AnalystBrief({ borrower }) {
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <h2 id="analyst-brief-heading" className="font-heading text-sm font-bold text-ew-ink">
-              Analyst brief
+              AI news summary (optional)
             </h2>
             <p className="mt-0.5 text-xs text-ew-muted">
               {loading
@@ -241,12 +241,12 @@ export default function AnalystBrief({ borrower }) {
       <header className="flex flex-wrap items-start justify-between gap-3 border-b border-ew-rule-soft px-4 py-3">
         <div className="min-w-0">
           <h2 id="analyst-brief-heading" className="font-heading text-sm font-bold text-ew-ink">
-            Analyst brief
+            AI news summary (optional)
           </h2>
           <p className="mt-0.5 text-xs text-ew-muted">
             {analysis?.created_at
               ? `Written ${formatDistanceToNow(new Date(analysis.created_at), { addSuffix: true })} · ${format(new Date(analysis.created_at), "MMM d, yyyy HH:mm")}`
-              : "AI investigation of public news. Quotes are checked against their sources."}
+              : "AI summary of public news. It does not change the status. Each quote is checked against its source."}
           </p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1.5">
