@@ -3,6 +3,7 @@ import { runNewsSignals } from './logic.ts';
 import type { LLMParams, Signal } from './logic.ts';
 import { crawlLinkedIn, linkedInSignals } from './linkedin.ts';
 import { createTracker, newCheckRun } from './trace.ts';
+import { checkInternalToken, INTERNAL_TOKEN_ENV } from './internalToken.ts';
 
 // newsSignals (P2): Google News via Bright Data -> exec_departure (News) and legal_layoffs (Legal) signals.
 //
@@ -27,6 +28,8 @@ export default async function(req: Request): Promise<Response> {
     } catch {
       return Response.json({ error: 'News: request body must be JSON' }, { status: 400 });
     }
+    const gate = checkInternalToken(body, Deno.env.get(INTERNAL_TOKEN_ENV));
+    if (!gate.ok) return Response.json({ error: gate.error }, { status: gate.status });
     const borrower = body?.borrower;
     if (!borrower || typeof borrower.name !== 'string' || !borrower.name.trim()) {
       return Response.json({ error: 'News: borrower is required' }, { status: 400 });

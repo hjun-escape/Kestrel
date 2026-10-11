@@ -156,11 +156,12 @@ test("tagger can veto a match; the stored snippet is always the source text", as
   assert.equal(exact[0].snippet, "Layoffs coming, I heard. Management is weak.");
 });
 
-test("Base44 handler: missing borrower is 400, missing key fails as Reviews", async () => {
-  (globalThis as any).Deno = { env: { get: () => undefined } };
+test("Base44 handler: no internal token is 401; missing borrower 400; missing key fails as Reviews", async () => {
+  (globalThis as any).Deno = { env: { get: (k: string) => (k === "INTERNAL_FUNCTION_TOKEN" ? "test-internal-secret-0123" : undefined) } };
   const call = (body: unknown) => handler(new Request("http://x", { method: "POST", body: JSON.stringify(body) }));
-  assert.equal((await call({})).status, 400);
-  const res = await call({ borrower: B });
+  assert.equal((await call({ borrower: B })).status, 401);
+  assert.equal((await call({ internal_token: "test-internal-secret-0123" })).status, 400);
+  const res = await call({ borrower: B, internal_token: "test-internal-secret-0123" });
   assert.equal(res.status, 502);
   assert.match((await res.json()).error, /^Reviews: BRIGHTDATA_API_KEY/);
   delete (globalThis as any).Deno;
@@ -289,7 +290,7 @@ test("refreshBorrower contract: still-building Glassdoor answers 503 + snapshot_
   let clock = realNow();
   Date.now = () => (clock += 5_000); // every look at the clock moves 5 s, so the poll budget runs out fast
   (globalThis as any).setTimeout = ((f: () => void) => (f(), 0)) as any;
-  (globalThis as any).Deno = { env: { get: (k: string) => (k === "BRIGHTDATA_API_KEY" ? "k" : undefined) } };
+  (globalThis as any).Deno = { env: { get: (k: string) => (k === "BRIGHTDATA_API_KEY" ? "k" : k === "INTERNAL_FUNCTION_TOKEN" ? "test-internal-secret-0123" : undefined) } };
   const call = async (body: unknown) => {
     const res = await handler(new Request("http://x", { method: "POST", body: JSON.stringify(body) }));
     return { status: res.status, body: await res.json() };
@@ -297,13 +298,13 @@ test("refreshBorrower contract: still-building Glassdoor answers 503 + snapshot_
   try {
     // First refresh: Bright Data hands back a snapshot that never finishes in time.
     fakeFetch({ "/scrape": [[202, { snapshot_id: "sd_glass123" }]], "/progress/": [[200, { status: "running" }]] });
-    const first = await call({ borrower: B, today: TODAY });
+    const first = await call({ borrower: B, today: TODAY, internal_token: "test-internal-secret-0123" });
     assert.equal(first.status, 503); // refreshBorrower stores pending_snapshots.reviewSignals
     assert.equal(first.body.snapshot_id, "sd_glass123");
 
     // Next refresh passes it back: no new scrape, the ready snapshot is scored.
     const calls = fakeFetch({ "/progress/": [[200, { status: "ready" }]], "/snapshot/": [[200, [rev(5, 1, "Layoffs again.")]]] });
-    const second = await call({ borrower: B, today: TODAY, snapshot_id: "sd_glass123" });
+    const second = await call({ borrower: B, today: TODAY, snapshot_id: "sd_glass123", internal_token: "test-internal-secret-0123" });
     assert.equal(second.status, 200);
     assert.equal(second.body[0].title, "Employee review mentions layoffs");
     assert.ok(calls.every((u) => !u.includes("/scrape")));

@@ -20,6 +20,8 @@
 // Known limits: a company that posts jobs only on its own site or Indeed looks like it is not hiring, and
 // employees_in_linkedin undercounts staff who are not on LinkedIn.
 
+import { checkInternalToken, INTERNAL_TOKEN_ENV } from "./internalToken.ts";
+
 export interface Borrower {
   id?: string;
   name: string;
@@ -272,6 +274,8 @@ export function localToday(now: Date = new Date(), timeZone = "America/Los_Angel
 export default async function (req: Request): Promise<Response> {
   try {
     const body = await req.json();
+    const gate = checkInternalToken(body, Deno.env.get(INTERNAL_TOKEN_ENV));
+    if (!gate.ok) return Response.json({ error: gate.error }, { status: gate.status });
     if (!body?.borrower?.name) return Response.json({ error: "Jobs: borrower is required" }, { status: 400 });
     const apiKey = Deno.env.get("BRIGHTDATA_API_KEY");
     if (!apiKey) throw new Error("Jobs: BRIGHTDATA_API_KEY secret not set");

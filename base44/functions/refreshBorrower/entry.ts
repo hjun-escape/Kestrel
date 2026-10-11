@@ -2,6 +2,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { canAccessCompany } from './access.ts';
 import { cooldownLeft } from './cooldown.ts';
 import { BANK_TIME_ZONE, todayIn } from './today.ts';
+import { checkInternalToken, INTERNAL_TOKEN_ENV } from './internalToken.ts';
 
 // refreshBorrower(borrower_id). Owner: P1. See docs/PLAN.md §2 and CLAUDE.md "Refresh flow".
 //
@@ -18,7 +19,8 @@ import { BANK_TIME_ZONE, todayIn } from './today.ts';
 //
 // The Bright Data key is a Base44 secret named BRIGHTDATA_API_KEY. Only the
 // signal functions read it, with Deno.env.get('BRIGHTDATA_API_KEY'). Never put
-// a key in code.
+// a key in code. A second secret, INTERNAL_FUNCTION_TOKEN, is sent with every
+// call to a signal function or findCompanyPages so only this function can start them.
 
 // Signal functions: each takes { borrower, snapshot_id? } and returns Signal[]
 // (or { signals }), and returns a non-2xx status on failure. It never writes
@@ -115,6 +117,13 @@ export default async function(req: Request): Promise<Response> {
       return Response.json({ error: 'A check started less than two minutes ago. Try again shortly.' }, { status: 429 });
     }
 
+    // The signal functions only take calls carrying this token, so a missing secret refuses the
+    // refresh before last_attempted is stamped (no cooldown burned on a misconfigured deploy).
+    const internalToken = Deno.env.get(INTERNAL_TOKEN_ENV);
+    if (!checkInternalToken({ internal_token: internalToken }, internalToken).ok) {
+      return Response.json({ error: 'INTERNAL_FUNCTION_TOKEN secret is not set. Add it in Base44 → Settings → Secrets.' }, { status: 503 });
+    }
+
     await db.Borrower.update(borrowerId, { last_attempted: new Date().toISOString() });
 
     const enabled = SIGNAL_FUNCTIONS.filter((f) => f.enabled);
@@ -154,7 +163,7 @@ export default async function(req: Request): Promise<Response> {
       (!borrower.linkedin_url || !borrower.glassdoor_url);
     const profiled: Promise<typeof borrower> = needsProfiles
       ? withTimeout<any>(
-          base44.functions.invoke('findCompanyPages', { borrower_id: borrowerId }),
+          base44.functions.invoke('findCompanyPages', { borrower_id: borrowerId, internal_token: internalToken }),
           PROFILE_TIMEOUT_MS,
           'findCompanyPages',
         )
@@ -175,7 +184,7 @@ export default async function(req: Request): Promise<Response> {
         const res = await withTimeout<any>(
           base44.asServiceRole.functions.invoke(
             fn.name,
-            snapshotId ? { borrower: target, snapshot_id: snapshotId, today } : { borrower: target, today },
+            snapshotId ? { borrower: target, snapshot_id: snapshotId, today, internal_token: internalToken } : { borrower: target, today, internal_token: internalToken },
           ),
           SOURCE_TIMEOUT_MS,
           fn.name,

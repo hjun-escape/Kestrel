@@ -146,8 +146,8 @@ export default function AddCompanyDialog({ open, onOpenChange, onCreated, initia
           ? "Nothing could be confirmed from public results. Fill the fields in by hand."
           : "Filled from public search results. Check each suggested field before saving."
       );
-    } catch {
-      setLookupNote("Could not look the company up. Fill the fields in by hand.");
+    } catch (e) {
+      setLookupNote(e?.response?.data?.error || e?.data?.error || "Could not look the company up. Fill the fields in by hand.");
     } finally {
       setLooking(false);
     }

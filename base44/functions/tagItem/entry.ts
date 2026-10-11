@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { tagText } from './shared.ts';
+import { checkInternalToken, INTERNAL_TOKEN_ENV } from './internalToken.ts';
 import type { LLMParams } from './shared.ts';
 
 // tagItem (P2): tags ONE article or review (CLAUDE.md "LLM use: tagging only").
@@ -16,6 +17,8 @@ export default async function(req: Request): Promise<Response> {
     } catch {
       return Response.json({ error: 'request body must be JSON' }, { status: 400 });
     }
+    const gate = checkInternalToken(body, Deno.env.get(INTERNAL_TOKEN_ENV));
+    if (!gate.ok) return Response.json({ error: gate.error }, { status: gate.status });
     if (typeof body?.text !== 'string' || !body.text.trim()) return Response.json({ error: 'text is required' }, { status: 400 });
     if (!body.borrower || typeof body.borrower.name !== 'string') return Response.json({ error: 'borrower is required' }, { status: 400 });
 

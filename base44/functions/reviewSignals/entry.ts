@@ -432,11 +432,15 @@ export async function fetchOverallRating(b: Borrower, apiKey: string): Promise<n
 // A snapshot that is still building returns 503 with its snapshot_id. refreshBorrower saves it in
 // Borrower.pending_snapshots and passes it back on the next refresh. Glassdoor takes ~6 min, so the first
 // refresh of a company shows Reviews as unavailable and a refresh a few minutes later collects the result.
+import { checkInternalToken, INTERNAL_TOKEN_ENV } from "./internalToken.ts";
+
 declare const Deno: { env: { get(k: string): string | undefined } };
 
 export default async function (req: Request): Promise<Response> {
   try {
     const body = await req.json();
+    const gate = checkInternalToken(body, Deno.env.get(INTERNAL_TOKEN_ENV));
+    if (!gate.ok) return Response.json({ error: gate.error }, { status: gate.status });
     const borrower: Borrower | undefined = body?.borrower;
     if (!borrower?.name) return Response.json({ error: "Reviews: borrower is required" }, { status: 400 });
     const apiKey = Deno.env.get("BRIGHTDATA_API_KEY");
@@ -450,7 +454,7 @@ export default async function (req: Request): Promise<Response> {
       tag = async (text) => {
         const { createClientFromRequest } = await import("npm:@base44/sdk@0.8.52");
         const base44 = createClientFromRequest(req);
-        return (await base44.asServiceRole.functions.invoke("tagItem", { text, borrower, kind: "employee review" }))?.data ?? null;
+        return (await base44.asServiceRole.functions.invoke("tagItem", { text, borrower, kind: "employee review", internal_token: Deno.env.get(INTERNAL_TOKEN_ENV) }))?.data ?? null;
       };
     }
 
