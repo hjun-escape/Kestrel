@@ -28,7 +28,7 @@ function Verdict({ value }) {
   return <span className={`inline-flex rounded-sm border px-2 py-0.5 text-xs font-medium ${tone}`}>{LABELS[value] || value}</span>;
 }
 
-export default function ReportAudit({ borrower, currentSignals = [], refreshing = false, request = requestAudit, preview = false, sessionOnly = false, view = null, onViewChange = null, runRequest = 0, onConfidenceChange = null }) {
+export default function ReportAudit({ borrower, currentSignals = [], refreshing = false, request = requestAudit, preview = false, sessionOnly = false, view = null, onViewChange = null, runRequest = 0, onConfidenceChange = null, onSignoffChange = null }) {
   const { isAuthenticated } = useAuth();
   const allowed = preview || sessionOnly || isAuthenticated;
   const handledRequest = useRef(0);
@@ -59,6 +59,7 @@ export default function ReportAudit({ borrower, currentSignals = [], refreshing 
   const historical = selected && selected.id !== runs[0]?.id;
   const stale = payload && (payload.snapshot.refreshed_at !== (borrower.last_refreshed || '') || payload.identity !== [borrower.name, borrower.website_domain, borrower.hq_city, borrower.hq_state].map(s => String(s ?? '').replace(/\s+/g, ' ').trim().toLowerCase()).join('|'));
 
+  useEffect(() => { onSignoffChange?.(runs.find(r => r.payload.signoff)?.payload.signoff || null); }, [runs, onSignoffChange]);
   useEffect(() => { onConfidenceChange?.(stale ? null : checkConfidence(runs[0]?.payload.tests || [])); }, [runs, stale, onConfidenceChange]);
   useEffect(() => {
     if (!runRequest || runRequest === handledRequest.current || loading || busy || refreshing) return;

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { CircleAlert, CircleCheck, Circle, ExternalLink, Loader2, ShieldCheck } from 'lucide-react';
-import { checkConfidence, confidenceTone } from '@/lib/auditMetrics';
+import { ChevronRight, CircleAlert, CircleCheck, Circle, ExternalLink, Loader2, ShieldCheck } from 'lucide-react';
+import { warningScore } from '@/lib/warningScore.ts';
+import { Dialog, DialogContent as SharedDialogContent, DialogTitle as SharedDialogTitle, DialogDescription as SharedDialogDescription } from '@/components/ui/dialog';
+import { checkConfidence } from '@/lib/auditMetrics';
 import { DocumentPassages } from '@/components/ContextDocuments';
 
 // Final review: the officer's manual confirmation, after the audit. A checklist built from the stored records,
@@ -16,6 +18,12 @@ export const OUTCOMES = [
 const OUTCOME_LABEL = Object.fromEntries(OUTCOMES.map(([k, l]) => [k, l]));
 const OUTCOME_TONE = { proceed: 'border-ew-green-rule bg-ew-green-bg text-ew-green', proceed_with_conditions: 'border-ew-amber-rule bg-ew-amber-bg text-ew-amber', request_documents: 'border-ew-amber-rule bg-ew-amber-bg text-ew-amber', decline: 'border-ew-red-rule bg-ew-red-bg text-ew-red' };
 const CALLS = [['confirmed', 'Confirm', 'border-ew-green-rule bg-ew-green-bg text-ew-green'], ['incorrect', 'Incorrect', 'border-ew-red-rule bg-ew-red-bg text-ew-red'], ['uncertain', 'Uncertain', 'border-ew-amber-rule bg-ew-amber-bg text-ew-amber']];
+const DialogContent = /** @type {React.ComponentType<any>} */ (SharedDialogContent);
+const DialogTitle = /** @type {React.ComponentType<any>} */ (SharedDialogTitle);
+const DialogDescription = /** @type {React.ComponentType<any>} */ (SharedDialogDescription);
+const CALL_CHIP = { confirmed: ['Confirmed', 'border-ew-green-rule bg-ew-green-bg text-ew-green'], incorrect: ['Incorrect', 'border-ew-red-rule bg-ew-red-bg text-ew-red'], uncertain: ['Uncertain', 'border-ew-amber-rule bg-ew-amber-bg text-ew-amber'], none: ['Not reviewed', 'border-ew-rule bg-ew-none-bg text-ew-none'] };
+const BAND = { red: 'Red', yellow: 'Yellow', green: 'Green' };
+const BAND_TONE = { red: 'text-ew-red', yellow: 'text-ew-amber', green: 'text-ew-green' };
 const field = 'w-full rounded-sm border border-ew-rule bg-ew-surface px-3 py-2 text-sm focus-visible:outline-ew-focus';
 
 function Item({ state, title, detail }) {
@@ -38,6 +46,7 @@ export default function FinalReview({ borrower, signals, payload, stale, histori
   const [outcome, setOutcome] = useState('');
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
+  const [openId, setOpenId] = useState(null);
 
   if (!payload) {
     return (
@@ -55,6 +64,9 @@ export default function FinalReview({ borrower, signals, payload, stale, histori
   const docs = payload.documents || [];
   const passagesOf = id => (payload.document_context || []).find(c => c.signal_id === id)?.passages || [];
   const allAssessed = assessed === signals.length;
+  const incorrectIds = signals.filter(s => callOf(s.id)?.decision === 'incorrect').map(s => s.id);
+  const scoreNow = warningScore(signals);
+  const scoreAfter = warningScore(signals.filter(s => !incorrectIds.includes(s.id)));
   const ready = !stale && !historical && allAssessed && !!outcome && (outcome === 'proceed' || note.trim());
 
   function submit() {
@@ -86,53 +98,53 @@ export default function FinalReview({ borrower, signals, payload, stale, histori
       </section>
 
       <section aria-labelledby="final-flags">
-        <div className="flex items-baseline justify-between">
-          <h3 id="final-flags" className="text-sm font-semibold">Flags</h3>
-          <span className={`rounded-sm border px-1.5 text-xs font-semibold tabular-nums ${confidenceTone(confidence.percent)}`}>{confidence.percent ?? 0}% confidence</span>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h3 id="final-flags" className="text-sm font-semibold">Flags · {assessed} of {signals.length} called</h3>
+          <p className="text-xs">
+            Warning score <span className={`font-semibold ${BAND_TONE[scoreNow.band]}`}>{scoreNow.score} {BAND[scoreNow.band]}</span>
+            {incorrectIds.length > 0 && (
+              <>
+                {' '}→ <span className={`font-semibold ${BAND_TONE[scoreAfter.band]}`}>{scoreAfter.score} {BAND[scoreAfter.band]}</span> without the {incorrectIds.length} flag{incorrectIds.length === 1 ? '' : 's'} you marked incorrect
+              </>
+            )}
+          </p>
         </div>
         {signals.length === 0 && <p className="mt-2 text-sm text-ew-muted">No flags in this report. A clean check does not prove there is no risk.</p>}
-        <ul className="mt-2 space-y-3">
+        <ul className="mt-2 divide-y divide-ew-rule-soft border border-ew-rule">
           {signals.map(s => {
+            const c = callOf(s.id);
+            const [label, tone] = CALL_CHIP[c?.decision] || CALL_CHIP.none;
             const tests = payload.tests.filter(t => t.signal_id === s.id);
             const fails = tests.filter(t => t.verdict === 'fail').length;
             const reviews = tests.filter(t => t.verdict === 'needs_review').length;
-            const call = callOf(s.id);
             return (
-              <li key={s.id} className="border border-ew-rule p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold">{s.title}</p>
-                    <p className="mt-0.5 text-xs text-ew-muted">
-                      {s.date} · {s.severity}
-                      {s.source_url && (
-                        <>
-                          {' · '}
-                          <a href={s.source_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 underline underline-offset-2">{s.source_name || 'Source'}<ExternalLink aria-hidden="true" className="h-3 w-3" /><span className="sr-only"> (opens in a new tab)</span></a>
-                        </>
-                      )}
-                    </p>
-                  </div>
-                  <p className="flex shrink-0 gap-2 text-xs font-medium">
-                    <span className="text-ew-green">{tests.length - fails - reviews} passed</span>
+              <li key={s.id}>
+                <button type="button" onClick={() => setOpenId(s.id)} className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-ew-hover">
+                  <span className={`shrink-0 rounded-sm border px-1.5 text-[11px] font-semibold leading-[18px] ${tone}`}>{label}</span>
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium">{s.title}</span>
+                  <span className="hidden shrink-0 gap-2 text-xs sm:flex">
                     <span className={fails ? 'text-ew-red' : 'text-ew-muted'}>{fails} failed</span>
                     <span className={reviews ? 'text-ew-amber' : 'text-ew-muted'}>{reviews} to review</span>
-                  </p>
-                </div>
-                {s.snippet && <blockquote className="mt-2 border-l-2 border-ew-rule pl-3 text-sm text-ew-ink-soft">“{s.snippet}”</blockquote>}
-                <DocumentPassages passages={passagesOf(s.id)} />
-                <div className="mt-3 flex flex-wrap items-center gap-2" role="group" aria-label={`Your call on ${s.title}`}>
-                  {CALLS.map(([value, label, on]) => (
-                    <button key={value} type="button" aria-pressed={call?.decision === value} disabled={busy || stale || historical} onClick={() => onDecision(s.id, { decision: value })} className={`rounded-sm border px-3 py-1 text-xs font-semibold disabled:opacity-50 ${call?.decision === value ? on : 'border-ew-rule text-ew-ink-soft hover:bg-ew-hover'}`}>
-                      {label}
-                    </button>
-                  ))}
-                  <input aria-label={`Note on ${s.title}`} value={call?.note || ''} maxLength={1000} disabled={busy || stale || historical} onChange={e => onDecision(s.id, { note: e.target.value })} placeholder="What did you verify?" className={`${field} h-8 min-w-[200px] flex-1 py-1 text-xs`} />
-                </div>
+                  </span>
+                  <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-ew-muted" />
+                </button>
               </li>
             );
           })}
         </ul>
       </section>
+
+      <FlagModal
+        signal={signals.find(s => s.id === openId) || null}
+        payload={payload}
+        call={callOf(openId)}
+        passages={passagesOf(openId)}
+        signals={signals}
+        incorrectIds={incorrectIds}
+        disabled={busy || stale || historical}
+        onDecision={onDecision}
+        onClose={() => setOpenId(null)}
+      />
 
       <section aria-labelledby="final-signoff" className="border-t border-ew-rule pt-4">
         <h3 id="final-signoff" className="text-sm font-semibold">Sign off</h3>
@@ -159,5 +171,60 @@ export default function FinalReview({ borrower, signals, payload, stale, histori
         </div>
       </section>
     </div>
+  );
+}
+
+/** One flag's call: the evidence, then Confirm / Incorrect / Uncertain with a reason, and the score without it. */
+function FlagModal({ signal: s, payload, call, passages, signals, incorrectIds, disabled, onDecision, onClose }) {
+  if (!s) return null;
+  const tests = payload.tests.filter(t => t.signal_id === s.id);
+  const withThis = incorrectIds.filter(id => id !== s.id);
+  const before = warningScore(signals.filter(x => !withThis.includes(x.id)));
+  const after = warningScore(signals.filter(x => !withThis.includes(x.id) && x.id !== s.id));
+  return (
+    <Dialog open onOpenChange={o => { if (!o) onClose(); }}>
+      <DialogContent className="max-h-[88vh] overflow-y-auto rounded-sm border-ew-rule bg-ew-surface text-ew-ink sm:max-w-2xl sm:rounded-sm">
+        <DialogTitle className="font-heading text-lg font-bold leading-snug">{s.title}</DialogTitle>
+        <DialogDescription className="text-xs text-ew-muted">
+          {s.date} · {s.severity}
+          {s.source_url && (
+            <>
+              {' · '}
+              <a href={s.source_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 underline underline-offset-2">{s.source_name || 'Source'}<ExternalLink aria-hidden="true" className="h-3 w-3" /><span className="sr-only"> (opens in a new tab)</span></a>
+            </>
+          )}
+        </DialogDescription>
+        {s.snippet && <blockquote className="border-l-2 border-ew-rule pl-3 text-sm text-ew-ink-soft">“{s.snippet}”</blockquote>}
+        <DocumentPassages passages={passages} />
+        <details className="text-sm">
+          <summary className="cursor-pointer text-xs font-semibold">Audit checks ({tests.length})</summary>
+          <ul className="mt-2 space-y-1">
+            {tests.map(t => (
+              <li key={t.id} className="flex items-start justify-between gap-3 text-xs">
+                <span><span className="font-medium">{t.title}: </span><span className="text-ew-muted">{t.actual}</span></span>
+                <span className={`shrink-0 font-semibold ${t.verdict === 'pass' ? 'text-ew-green' : t.verdict === 'fail' ? 'text-ew-red' : 'text-ew-amber'}`}>{t.verdict === 'pass' ? 'Pass' : t.verdict === 'fail' ? 'Fail' : 'Review'}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+        <div>
+          <p className="text-sm font-semibold">Your call</p>
+          <div className="mt-2 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Your call on this flag">
+            {CALLS.map(([value, label, on]) => (
+              <button key={value} type="button" role="radio" aria-checked={call?.decision === value} disabled={disabled} onClick={() => onDecision(s.id, { decision: value })} className={`rounded-sm border px-3 py-2 text-sm font-semibold disabled:opacity-50 ${call?.decision === value ? on : 'border-ew-rule hover:bg-ew-hover'}`}>{label}</button>
+            ))}
+          </div>
+          {call?.decision === 'incorrect' && (
+            <p className="mt-2 text-sm">
+              Warning score <span className={`font-semibold ${BAND_TONE[before.band]}`}>{before.score} {BAND[before.band]}</span> → <span className={`font-semibold ${BAND_TONE[after.band]}`}>{after.score} {BAND[after.band]}</span> without this flag. Signing off records it; the company's status itself does not change.
+            </p>
+          )}
+        </div>
+        <label className="block text-sm font-semibold">Reason
+          <textarea rows={2} maxLength={1000} value={call?.note || ''} disabled={disabled} onChange={e => onDecision(s.id, { note: e.target.value })} placeholder="What you checked, and why" className={`${field} mt-1 font-normal`} />
+        </label>
+        <button type="button" onClick={onClose} className="h-9 rounded-sm bg-ew-ink px-4 text-sm font-semibold text-white">Done</button>
+      </DialogContent>
+    </Dialog>
   );
 }

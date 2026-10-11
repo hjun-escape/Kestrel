@@ -11,6 +11,7 @@ import AutoResumeNote from "@/components/AutoResumeNote";
 import WarningScore from "@/components/WarningScore";
 import ReportAudit from "@/components/ReportAudit";
 import DocumentExchange from "@/components/DocumentExchange";
+import { OUTCOMES } from "@/components/FinalReview";
 import { base44 } from "@/api/base44Client";
 import { useAuth } from "@/lib/AuthContext";
 import { createSessionAudit } from "@/lib/sessionAudit";
@@ -58,6 +59,7 @@ export default function CompanyReport({
   const [actionsOpen, setActionsOpen] = useState(false);
   const [runRequest, setRunRequest] = useState(0);
   const [confidence, setConfidence] = useState(null);
+  const [signoff, setSignoff] = useState(null);
   // Signed out (shared demo book): audits run in the page, and still use documents accepted in the exchange.
   const sessionRequest = useMemo(() => createSessionAudit(borrower, signals, checkRun, async () => (await base44.functions.invoke('documentExchange', { action: 'accepted', borrower_id: borrower.id })).data?.items || []), [borrower.id, borrower.last_refreshed, signals, checkRun]);
   function openReview(view) {
@@ -84,6 +86,7 @@ export default function CompanyReport({
           onRunActions={() => setActionsOpen(true)}
           confidence={confidence}
         />
+        {signoff && <SignoffBanner signoff={signoff} onOpen={() => openReview('final')} />}
         {notice && (
           <p role="status" className="border-t border-ew-rule-soft px-5 py-2 text-xs text-ew-ink-soft">
             {notice}
@@ -114,8 +117,8 @@ export default function CompanyReport({
           </div>
         </DialogContent>
       </Dialog>
-      {reviewView === 'documents' && <div className="mt-6"><DocumentExchange borrower={borrower} signals={signals} /></div>}
-      <div hidden={reviewView === 'report' || reviewView === 'documents'}><ReportAudit borrower={borrower} currentSignals={signals} refreshing={running} view={reviewView === 'documents' ? 'summary' : reviewView} onViewChange={openReview} request={isAuthenticated ? undefined : sessionRequest} sessionOnly={!isAuthenticated} runRequest={runRequest} onConfidenceChange={setConfidence} /></div>
+      {reviewView === 'documents' && <div className="mt-6"><DocumentExchange borrower={borrower} signals={signals} onRerunAudit={startAudit} /></div>}
+      <div hidden={reviewView === 'report' || reviewView === 'documents'}><ReportAudit borrower={borrower} currentSignals={signals} refreshing={running} view={reviewView === 'documents' ? 'summary' : reviewView} onViewChange={openReview} request={isAuthenticated ? undefined : sessionRequest} sessionOnly={!isAuthenticated} runRequest={runRequest} onConfidenceChange={setConfidence} onSignoffChange={setSignoff} /></div>
 
       {/* Below the header, one section at a time: evidence first (the signals behind the status, each with its
           source and what to ask), then cash flow, other lenders and the decision, and the analyst brief.
@@ -230,5 +233,20 @@ function CompanyLinks({ borrower }) {
         </p>
       )}
     </section>
+  );
+}
+
+const SIGNOFF_TONE = { proceed: "border-ew-green-rule bg-ew-green-bg text-ew-green", proceed_with_conditions: "border-ew-amber-rule bg-ew-amber-bg text-ew-amber", request_documents: "border-ew-amber-rule bg-ew-amber-bg text-ew-amber", decline: "border-ew-red-rule bg-ew-red-bg text-ew-red" };
+
+/** The latest final review sign-off, shown under the header on every tab. */
+function SignoffBanner({ signoff, onOpen }) {
+  const label = OUTCOMES.find(([k]) => k === signoff.outcome)?.[1] || signoff.outcome;
+  return (
+    <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 border-t px-5 py-2.5 text-sm ${SIGNOFF_TONE[signoff.outcome] || "border-ew-rule"}`}>
+      <span className="font-semibold">Signed off: {label}</span>
+      <span className="text-xs">{signoff.by} · {new Date(signoff.at).toLocaleString()}</span>
+      {signoff.note && <span className="min-w-0 flex-1 truncate text-ew-ink">{signoff.note}</span>}
+      <button type="button" onClick={onOpen} className="text-xs font-semibold underline underline-offset-2">Final review</button>
+    </div>
   );
 }
