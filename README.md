@@ -165,8 +165,12 @@ CI runs the same checks on every pull request to `main`.
 
 ## Contributors
 
+<p align="center">
+  <img src="public/brand/talk-to-users-hackathon.jpg" alt="Talk to Users Hackathon poster, SF Tech Week" width="360">
+</p>
+
 <p>
-  <b>Group 17 · Talk to Users Hackathon</b><br>
+  <b>Group 17 · Talk to Users Hackathon, SF Tech Week</b><br>
   <a href="https://testwithsenseai.com"><img src="public/brand/sense-mark.png" alt="Sense AI" height="18" align="center"></a>
   User tested with <a href="https://testwithsenseai.com">Sense AI</a>
 </p>
