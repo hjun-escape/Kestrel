@@ -79,12 +79,20 @@ const LEGAL_EVENTS: [RegExp, string][] = [
   [/contract dispute|breach of contract/i, "Contract dispute"],
   [new RegExp(`\\b${SUED}\\b`, "i"), "Lawsuit"],
 ];
-const MAX_TITLE = 48;
+const MAX_TITLE = 64;
+
+// Clause boundaries: a comma, colon, dash, or a conjunction that starts a trailing clause.
+const CLAUSE_BOUNDARY = /[,;:]\s|\s[–—-]\s|\s(?:amid|as|after|while)\s/gi;
 
 // A headline no rule names: keep its first words (at a word boundary) rather than a generic label, so two
-// different events never read the same.
-function shortTitle(title: string): string {
+// different events never read the same. A clean clause break reads complete, so it gets no ellipsis.
+export function shortTitle(title: string): string {
   if (title.length <= MAX_TITLE) return title;
+  let clauseEnd: number | null = null;
+  for (const m of title.matchAll(CLAUSE_BOUNDARY)) {
+    if (m.index >= 24 && m.index <= MAX_TITLE) clauseEnd = m.index;
+  }
+  if (clauseEnd !== null) return title.slice(0, clauseEnd);
   const cut = title.slice(0, MAX_TITLE + 1);
   const words = cut.slice(0, Math.max(cut.lastIndexOf(" "), 20)).replace(/[\s,;:.-]+$/, "");
   return `${words}…`;

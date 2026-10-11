@@ -122,6 +122,25 @@ export default function VerdictCard({
                 </a>
               </>
             )}
+            {[
+              ["LinkedIn", borrower.linkedin_url],
+              ["Glassdoor", borrower.glassdoor_url],
+            ]
+              .filter(([, url]) => url && /^https?:\/\//.test(url))
+              .map(([label, url]) => (
+                <React.Fragment key={label}>
+                  {" · "}
+                  <a
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`${label} (opens in a new tab)`}
+                    className="rounded-sm text-xs text-ew-muted underline-offset-2 hover:text-ew-ink hover:underline"
+                  >
+                    {label}
+                  </a>
+                </React.Fragment>
+              ))}
           </p>
           {sample && (
             <p className="mt-2 flex items-center gap-2 text-xs text-ew-muted">

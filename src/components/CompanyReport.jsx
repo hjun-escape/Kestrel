@@ -247,6 +247,7 @@ export default function CompanyReport({
           </div>
         </ReportSection>
 
+        {auditTrail}
       </div>
 
       <div className="mt-4" hidden={step !== "documents"}>
@@ -317,7 +318,6 @@ export default function CompanyReport({
         </div>
       )}
 
-      {auditTrail && <div className="max-w-3xl">{auditTrail}</div>}
     </>
   );
 }

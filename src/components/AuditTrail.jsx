@@ -105,7 +105,7 @@ export default function AuditTrail({ borrower, signals }) {
   const intro = `Newest first. Generated ${generated}. ${NOT_AI_TEXT}`;
 
   return (
-    <section data-demo="audit-trail" aria-labelledby="audit-heading" className="mt-6 border border-ew-rule bg-ew-surface">
+    <section data-demo="audit-trail" aria-labelledby="audit-heading" className="border-b border-ew-rule">
       <style>{PRINT_CSS}</style>
       {printing &&
         createPortal(
@@ -118,17 +118,19 @@ export default function AuditTrail({ borrower, signals }) {
           document.body
         )}
       <Collapsible open={open} onOpenChange={setOpen}>
-        <h2 id="audit-heading" className="font-heading text-sm font-bold text-ew-ink">
-          <CollapsibleTrigger data-demo="audit-open" className="group flex w-full items-center gap-2 px-4 py-3 text-left focus-visible:-outline-offset-2">
-            <ChevronRight aria-hidden="true" className="h-4 w-4 transition-transform group-data-[state=open]:rotate-90" />
-            Audit trail
-            <span className="font-normal text-ew-muted">
-              {open ? `· ${borrower.name}` : "· every check, finding and decision, with who and when"}
+        <h2 id="audit-heading" className="font-heading">
+          <CollapsibleTrigger data-demo="audit-open" className="group flex w-full items-baseline gap-3 py-4 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ew-focus">
+            <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 translate-y-0.5 text-ew-muted transition-transform motion-reduce:transition-none group-data-[state=open]:rotate-90" />
+            <span className="text-lg font-bold tracking-tight text-ew-ink group-hover:underline group-hover:decoration-ew-rule group-hover:underline-offset-4">
+              Audit trail
+            </span>
+            <span className="ml-auto hidden pl-3 text-right font-sans text-xs font-normal text-ew-muted sm:inline">
+              {open ? borrower.name : "every check, finding and decision, with who and when"}
             </span>
           </CollapsibleTrigger>
         </h2>
         <CollapsibleContent>
-          <div className="border-t border-ew-rule-soft px-4 py-3">
+          <div className="border-t border-ew-rule-soft pb-4 pt-3">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <p className="max-w-[80ch] text-xs leading-snug text-ew-muted">
                 {intro}
