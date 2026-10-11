@@ -28,7 +28,7 @@ const DialogDescription = /** @type {React.ComponentType<any>} */ (SharedDialogD
 // then one scrolling report with a heading per section. Detail-heavy sections start collapsed.
 // CompanyDetail renders it with live data; /dev/progression renders it for its example company.
 // Mount with key={borrower.id} so per-company state resets when the company changes.
-const DEFAULT_OPEN = { evidence: false, review: true, sources: false, score: false, brief: false, documents: false, doublecheck: false, cashflow: false };
+const DEFAULT_OPEN = { evidence: false, review: true, sources: false, score: false, brief: false, documents: false, doublecheck: false, cashflow: false, lenders: false };
 
 function prefersReducedMotion() {
   return typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -72,7 +72,7 @@ export default function CompanyReport({
   const [runRequest, setRunRequest] = useState(0);
   const [signoff, setSignoff] = useState(null);
   // Review and sign-off, in order: 1 double-check, 2 document exchange, 3 final check and sign-off.
-  const [step, setStep] = useState("check");
+  const [step, setStep] = useState("report");
   const [confidence, setConfidence] = useState(null);
   const [docItems, setDocItems] = useState([]);
   const { isAuthenticated } = useAuth();
@@ -98,7 +98,9 @@ export default function CompanyReport({
     return () => window.clearInterval(timer);
   }, [hash]);
   const toggle = (key) => setOpen((prev) => ({ ...prev, [key]: !prev[key] }));
+  // Open a section of the report (step 1) and scroll to it.
   const reveal = (key, targetId) => {
+    setStep("report");
     setOpen((prev) => ({ ...prev, [key]: true }));
     revealLater(targetId);
   };
@@ -114,11 +116,11 @@ export default function CompanyReport({
     setAuditView("summary");
     setStep("check");
     setRunRequest((n) => n + 1);
-    reveal("doublecheck", "doublecheck");
+    revealLater("doublecheck");
   }
   function openFinalReview() {
     setStep("final");
-    reveal("doublecheck", "doublecheck");
+    revealLater("doublecheck");
   }
 
   return (
@@ -136,8 +138,8 @@ export default function CompanyReport({
         evidenceCount={recentSignals.length}
         onShowAllEvidence={() => reveal("evidence", "evidence")}
         confidence={confidence}
-        onConfidence={() => { setStep("check"); reveal("doublecheck", "doublecheck"); }}
-        onNextStep={(kind) => (kind === "documents" ? reveal("review", "applicant-documents") : reveal("review", "review"))}
+        onConfidence={() => { setStep("check"); revealLater("doublecheck"); }}
+        onNextStep={(kind) => { if (kind === "documents") { setStep("documents"); revealLater("doublecheck"); } else reveal("evidence", "evidence"); }}
       />
       {signoff && <SignoffBanner signoff={signoff} onOpen={openFinalReview} />}
       <SignoffStamp signoff={signoff} />
@@ -169,14 +171,40 @@ export default function CompanyReport({
               disabled={running}
               title="Double-check with your notes"
               detail="Choose which evidence to test and add instructions before double-checking."
-              onClick={() => { setActionsOpen(false); setStep("check"); setAuditView("considerations"); reveal("doublecheck", "doublecheck"); }}
+              onClick={() => { setActionsOpen(false); setStep("check"); setAuditView("considerations"); revealLater("doublecheck"); }}
             />
           </div>
         </DialogContent>
       </Dialog>
 
-      <p className="mt-8 text-[11px] font-semibold uppercase tracking-[0.14em] text-ew-muted">The report</p>
-      <div className="mt-2 border-t border-ew-rule">
+      {/* The workflow, right under the card: 1 review the report, 2 double-check it, 3 exchange documents,
+          4 final check and sign-off. The selected step's content shows below it. */}
+      <div id="doublecheck" className="mt-6 scroll-mt-4 border border-ew-rule bg-ew-surface px-5 py-4">
+        <ReviewSteps
+          step={step}
+          onStep={setStep}
+          done={{
+            report: !!borrower.last_refreshed && (step !== "report" || !!confidence?.total),
+            check: !!confidence && confidence.total > 0,
+            documents: docItems.some((d) => d.status === "accepted" || d.status === "rejected"),
+            final: !!signoff,
+          }}
+          started={{
+            report: false,
+            check: false,
+            documents: docItems.length > 0,
+            final: false,
+          }}
+          notes={{
+            report: borrower.last_refreshed ? `${recentSignals.length} warning sign${recentSignals.length === 1 ? "" : "s"} · sources · status` : "Not checked yet",
+            check: confidence?.total ? `${confidence.percent}% confidence · ${confidence.passed}/${confidence.total} passed` : "Not run yet",
+            documents: docItems.length ? `${docItems.filter((d) => d.status === "submitted").length} to review · ${docItems.filter((d) => d.status === "accepted").length} accepted` : "Optional",
+            final: signoff ? "Signed off" : "Confirm each flag, then sign off",
+          }}
+        />
+      </div>
+
+      <div className="mt-4 border-t border-ew-rule" hidden={step !== "report"}>
         <ReportSection
           id="evidence"
           demoId="tab-evidence"
@@ -218,84 +246,51 @@ export default function CompanyReport({
           </div>
         </ReportSection>
 
-        <ReportSection
-          id="review"
-          demoId="tab-decision"
-          title={isApplicant ? "Applicant review" : "Borrower review"}
-          summary="Documents to request, other lenders, decision"
-          open={open.review}
-          onToggle={() => toggle("review")}
-        >
-          <div className="grid max-w-3xl gap-4">
-            <div id="applicant-documents" tabIndex={-1} className="scroll-mt-4 outline-none">
-              <ApplicantDecision key={borrower.id} borrower={borrower} signals={signals} />
-            </div>
-          </div>
-        </ReportSection>
-
       </div>
 
-      <p className="mt-10 text-[11px] font-semibold uppercase tracking-[0.14em] text-ew-muted">Review and sign-off</p>
-      <div className="mt-2 border-t border-ew-rule">
-        <ReportSection
-          id="doublecheck"
-          title="Check, collect documents, sign off"
-          summary={signoff ? "Signed off" : step === "final" ? "Step 3 of 3: final check" : step === "documents" ? "Step 2 of 3: documents" : "Step 1 of 3: double-check"}
-          open={open.doublecheck}
-          onToggle={() => toggle("doublecheck")}
-        >
-          <ReviewSteps
-            step={step}
-            onStep={setStep}
-            done={{
-              check: !!confidence && confidence.total > 0,
-              documents: docItems.some((d) => d.status === "accepted" || d.status === "rejected"),
-              final: !!signoff,
-            }}
-            started={{
-              check: false,
-              documents: docItems.length > 0,
-              final: false,
-            }}
-            notes={{
-              check: confidence?.total ? `${confidence.percent}% confidence · ${confidence.passed}/${confidence.total} passed` : "Not run yet",
-              documents: docItems.length ? `${docItems.filter((d) => d.status === "submitted").length} to review · ${docItems.filter((d) => d.status === "accepted").length} accepted` : "Optional",
-              final: signoff ? "Signed off" : "Confirm each flag, then sign off",
-            }}
-          />
-          <div className="mt-4" hidden={step !== "documents"}>
-            <DocumentExchange borrower={borrower} signals={signals} onRerunAudit={startAudit} onItemsChange={setDocItems} />
-          </div>
-          {/* Stays mounted on every step so a running double-check and your calls are never lost. */}
-          <div className="mt-4" hidden={step === "documents"}>
-            <ReportAudit
-              borrower={borrower}
-              currentSignals={signals}
-              refreshing={running}
-              view={step === "final" ? "final" : auditView}
-              onViewChange={changeAuditView}
-              request={isAuthenticated ? undefined : sessionRequest}
-              sessionOnly={!isAuthenticated}
-              runRequest={runRequest}
-              onSignoffChange={setSignoff}
-              onConfidenceChange={setConfidence}
-            />
-          </div>
-          {step === "check" && confidence?.total > 0 && (
-            <div className="mt-4 flex justify-end">
-              <button type="button" onClick={() => setStep("documents")} className="inline-flex h-9 items-center gap-1.5 rounded-sm bg-ew-ink px-4 text-sm font-semibold text-white hover:bg-ew-ink-soft">Next: documents<ChevronRight aria-hidden="true" className="h-4 w-4" /></button>
-            </div>
-          )}
-          {step === "documents" && (
-            <div className="mt-4 flex justify-end">
-              <button type="button" onClick={() => setStep("final")} className="inline-flex h-9 items-center gap-1.5 rounded-sm bg-ew-ink px-4 text-sm font-semibold text-white hover:bg-ew-ink-soft">Next: final check<ChevronRight aria-hidden="true" className="h-4 w-4" /></button>
-            </div>
-          )}
-        </ReportSection>
+      <div className="mt-4" hidden={step !== "documents"}>
+        <DocumentExchange borrower={borrower} signals={signals} onRerunAudit={startAudit} onItemsChange={setDocItems} />
       </div>
+      {/* Stays mounted on every step so a running double-check and your calls are never lost. */}
+      <div className="mt-4" hidden={step !== "check" && step !== "final"}>
+        <ReportAudit
+          borrower={borrower}
+          currentSignals={signals}
+          refreshing={running}
+          view={step === "final" ? "final" : auditView}
+          onViewChange={changeAuditView}
+          request={isAuthenticated ? undefined : sessionRequest}
+          sessionOnly={!isAuthenticated}
+          runRequest={runRequest}
+          onSignoffChange={setSignoff}
+          onConfidenceChange={setConfidence}
+        />
+      </div>
+      {step !== "final" && (
+        <div className="mt-4 flex justify-end">
+          <button type="button" onClick={() => setStep(NEXT[step][0])} className="inline-flex h-9 items-center gap-1.5 rounded-sm bg-ew-ink px-4 text-sm font-semibold text-white hover:bg-ew-ink-soft">
+            Next: {NEXT[step][1]}
+            <ChevronRight aria-hidden="true" className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       <p className="mt-10 text-[11px] font-semibold uppercase tracking-[0.14em] text-ew-muted">Additional AI checks</p>
       <p className="mt-0.5 text-xs text-ew-muted">Optional. Not used for the status.</p>
       <div className="mt-2 border-t border-ew-rule">
+        <ReportSection
+          id="lenders"
+          demoId="tab-decision"
+          title="Other lenders"
+          summary="Public liens, lender lawsuits and loan news"
+          open={open.lenders}
+          onToggle={() => toggle("lenders")}
+        >
+          <div className="max-w-3xl">
+            <ApplicantDecision key={borrower.id} borrower={borrower} signals={signals} parts={{ documents: false, lenders: true, decision: false }} />
+          </div>
+        </ReportSection>
+
         <ReportSection
           id="cashflow"
           demoId="tab-cashflow"
@@ -398,7 +393,9 @@ function SignoffBanner({ signoff, onOpen }) {
   );
 }
 
+const NEXT = { report: ["check", "double-check"], check: ["documents", "document exchange"], documents: ["final", "final check"] };
 const STEPS = [
+  ["report", "Review report", "Warning signs, sources, how the status was counted"],
   ["check", "Double-check", "Each quote, date and company match"],
   ["documents", "Document exchange", "Ask the company, review what comes back"],
   ["final", "Final check and sign-off", "Your call on every flag"],
@@ -433,6 +430,7 @@ function ReviewSteps({ step, onStep, done, started, notes }) {
             <button
               type="button"
               onClick={() => onStep(key)}
+              data-demo={`step-${key}`}
               aria-current={current ? "step" : undefined}
               className="group flex items-start gap-3 rounded-sm p-1 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-ew-focus sm:flex-col sm:items-center sm:text-center"
             >

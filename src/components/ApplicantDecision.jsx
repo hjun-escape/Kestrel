@@ -322,7 +322,9 @@ function useApplicantRecords(borrowerId) {
   return { check, setCheck, analysis, decisions, setDecisions, loading };
 }
 
-export default function ApplicantDecision({ borrower, signals }) {
+// parts: which blocks to show (the company page shows only the lender check; documents live in the
+// document exchange and the decision is the final sign-off).
+export default function ApplicantDecision({ borrower, signals, parts = { documents: true, lenders: true, decision: true } }) {
   const borrowerId = borrower?.id;
   const { email } = useAuth();
   const { check, setCheck, analysis, decisions, setDecisions, loading } = useApplicantRecords(borrowerId);
@@ -408,7 +410,7 @@ export default function ApplicantDecision({ borrower, signals }) {
         </p>
       )}
 
-      <section data-demo="documents" aria-labelledby="documents-heading" className="border border-ew-rule bg-ew-surface">
+      {parts.documents && <section data-demo="documents" aria-labelledby="documents-heading" className="border border-ew-rule bg-ew-surface">
         <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
           <h2 id="documents-heading" className="font-heading text-sm font-bold text-ew-ink">
             Documents to request
@@ -425,9 +427,9 @@ export default function ApplicantDecision({ borrower, signals }) {
           <p className="mb-2 text-xs text-ew-muted">Ask the applicant for these before credit committee.</p>
           <DocumentList items={documents} />
         </div>
-      </section>
+      </section>}
 
-      {!check && !running ? (
+      {parts.lenders && (!check && !running ? (
         <section aria-labelledby="lenders-heading" className="flex items-center justify-between gap-3 border border-ew-rule bg-ew-surface px-4 py-3">
           <div className="min-w-0">
             <h2 id="lenders-heading" className="font-heading text-sm font-bold text-ew-ink">
@@ -478,9 +480,9 @@ export default function ApplicantDecision({ borrower, signals }) {
             <SearchLog searched={check?.searched} />
           </div>
         </section>
-      )}
+      ))}
 
-      <section aria-labelledby="decision-heading" className="border border-ew-rule bg-ew-surface">
+      {parts.decision && <section aria-labelledby="decision-heading" className="border border-ew-rule bg-ew-surface">
         <div className="px-4 py-3">
           <h2 id="decision-heading" className="font-heading text-sm font-bold text-ew-ink">
             Record a decision
@@ -500,7 +502,7 @@ export default function ApplicantDecision({ borrower, signals }) {
             </div>
           )}
         </div>
-      </section>
+      </section>}
     </>
   );
 }

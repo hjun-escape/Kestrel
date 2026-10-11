@@ -83,7 +83,7 @@ export const DEMO_STEPS = [
   {
     id: "documents",
     route: redApplicantPage,
-    press: "tab-decision",
+    press: "step-documents",
     target: "documents",
     caption: "Before spending a week on the deal, the officer asks for these documents first.",
   },
