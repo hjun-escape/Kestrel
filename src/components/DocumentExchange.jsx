@@ -80,7 +80,7 @@ export function FilePicker({ value, onChange, disabled, id }) {
   );
 }
 
-export default function DocumentExchange({ borrower, signals, onRerunAudit = null }) {
+export default function DocumentExchange({ borrower, signals, onRerunAudit = null, onItemsChange = null }) {
   const [items, setItems] = useState([]);
   const [token, setToken] = useState('');
   const [loading, setLoading] = useState(true);
@@ -94,6 +94,7 @@ export default function DocumentExchange({ borrower, signals, onRerunAudit = nul
     try {
       const data = await call({ action: 'list', borrower_id: borrower.id });
       setItems(data.items || []);
+      onItemsChange?.(data.items || []);
       setToken(data.portal_token || '');
       setError('');
     } catch (e) {
@@ -101,7 +102,7 @@ export default function DocumentExchange({ borrower, signals, onRerunAudit = nul
     } finally {
       setLoading(false);
     }
-  }, [borrower.id]);
+  }, [borrower.id, onItemsChange]);
   useEffect(() => { load(); }, [load]);
   // Pick up what the company sends while the tab is open.
   useEffect(() => {
