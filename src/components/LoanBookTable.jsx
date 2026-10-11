@@ -156,7 +156,12 @@ export function TopSignalSummary({ topSignal }) {
         >
           {topSignal.severity === "strong" ? "Strong" : "Weak"}
         </span>
-        <time dateTime={topSignal.date} className="tabular-nums">
+        <time
+          dateTime={topSignal.date}
+          title={topSignal.date_approx ? "Approximate date" : undefined}
+          className="tabular-nums"
+        >
+          {topSignal.date_approx && "~"}
           {format(parseSignalDate(topSignal.date), "d MMM yyyy")}
         </time>
       </div>

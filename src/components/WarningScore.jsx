@@ -26,7 +26,15 @@ function Line({ line }) {
       <span className="min-w-0 flex-1 text-sm">
         <span className="font-medium text-ew-ink">{type}</span>
         <span className="text-ew-ink-soft">: {s.title}</span>
-        <span className="text-ew-muted"> · {shortDate(s.date)} · {line.note}</span>
+        <span className="text-ew-muted">
+          {" · "}
+          <span title={s.date_approx ? "Approximate date" : undefined}>
+            {s.date_approx && "~"}
+            {shortDate(s.date)}
+          </span>
+          {" · "}
+          {line.note}
+        </span>
         {s.source_url && (
           <>
             {" · "}
