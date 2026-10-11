@@ -31,6 +31,34 @@
   <sub>Built at the <b>Talk to Users Hackathon</b> · SF Tech Week · Group 17</sub>
 </p>
 
+<h3 align="center">Contributors</h3>
+
+<table align="center">
+  <tr>
+    <td align="center" width="140">
+      <a href="https://github.com/comp-Ryan"><img src="https://github.com/comp-Ryan.png?size=120" width="72" height="72" alt="Ryan"><br><b>Ryan</b></a><br>
+      <a href="https://github.com/comp-Ryan"><sub>@comp-Ryan</sub></a>
+    </td>
+    <td align="center" width="140">
+      <a href="https://github.com/RonKat2008"><img src="https://github.com/RonKat2008.png?size=120" width="72" height="72" alt="Ronit Katikaneni"><br><b>Ronit Katikaneni</b></a><br>
+      <a href="https://github.com/RonKat2008"><sub>@RonKat2008</sub></a>
+    </td>
+    <td align="center" width="140">
+      <a href="https://github.com/hjun-escape"><img src="https://github.com/hjun-escape.png?size=120" width="72" height="72" alt="Hyeseong Jun"><br><b>Hyeseong Jun</b></a><br>
+      <a href="https://github.com/hjun-escape"><sub>@hjun-escape</sub></a>
+    </td>
+    <td align="center" width="140">
+      <a href="https://github.com/natephunt"><img src="https://github.com/natephunt.png?size=120" width="72" height="72" alt="Nathan"><br><b>Nathan</b></a><br>
+      <a href="https://github.com/natephunt"><sub>@natephunt</sub></a>
+    </td>
+  </tr>
+</table>
+
+<p align="center">
+  <a href="https://testwithsenseai.com"><img src="public/brand/sense-mark.png" alt="Sense AI" height="18" align="center"></a>
+  User tested with <a href="https://testwithsenseai.com">Sense AI</a>
+</p>
+
 **Catch a borrower's trouble before the quarterly financials do.** Kestrel (formerly Early Warning) watches the public signs that a mid-size
 private company is in trouble (executive exits, lawsuits and layoffs, hiring freezes, employee reviews about missed pay)
 and flags them for a bank's credit officer: before the bank lends, and every day after.
@@ -167,35 +195,6 @@ npx eslint src --quiet && npx vite build && node --test tests/*.test.ts   # Node
 
 CI runs the same checks on every pull request to `main`.
 
-
-## Contributors
-
-<p>
-  <b>Group 17 · Talk to Users Hackathon, SF Tech Week</b><br>
-  <a href="https://testwithsenseai.com"><img src="public/brand/sense-mark.png" alt="Sense AI" height="18" align="center"></a>
-  User tested with <a href="https://testwithsenseai.com">Sense AI</a>
-</p>
-
-<table>
-  <tr>
-    <td align="center" width="140">
-      <a href="https://github.com/comp-Ryan"><img src="https://github.com/comp-Ryan.png?size=120" width="72" height="72" alt="Ryan"><br><b>Ryan</b></a><br>
-      <a href="https://github.com/comp-Ryan"><sub>@comp-Ryan</sub></a>
-    </td>
-    <td align="center" width="140">
-      <a href="https://github.com/RonKat2008"><img src="https://github.com/RonKat2008.png?size=120" width="72" height="72" alt="Ronit Katikaneni"><br><b>Ronit Katikaneni</b></a><br>
-      <a href="https://github.com/RonKat2008"><sub>@RonKat2008</sub></a>
-    </td>
-    <td align="center" width="140">
-      <a href="https://github.com/hjun-escape"><img src="https://github.com/hjun-escape.png?size=120" width="72" height="72" alt="Hyeseong Jun"><br><b>Hyeseong Jun</b></a><br>
-      <a href="https://github.com/hjun-escape"><sub>@hjun-escape</sub></a>
-    </td>
-    <td align="center" width="140">
-      <a href="https://github.com/natephunt"><img src="https://github.com/natephunt.png?size=120" width="72" height="72" alt="Nathan"><br><b>Nathan</b></a><br>
-      <a href="https://github.com/natephunt"><sub>@natephunt</sub></a>
-    </td>
-  </tr>
-</table>
 
 ---
 
