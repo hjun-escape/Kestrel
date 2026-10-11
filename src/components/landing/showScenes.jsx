@@ -179,21 +179,22 @@ export function DecideDemo() {
 const AXIS_DAYS = 152;
 const pos = (month, day) => (((month - 7) * 30.5 + (day - 1)) / AXIS_DAYS) * 100;
 const MONTHS = ["Jul", "Aug", "Sep", "Oct", "Nov"].map((label, i) => ({ label, at: pos(7 + i, 1) }));
-const LINE_Y = 64; // px from the top of the timeline
+const LINE_Y = 96; // px from the top of the timeline
+const TIER = 34; // extra height for every other flag, so close dates never overprint
 
 /** progress: optional 0..1 driver (the presentation passes one); otherwise driven by scroll position. */
 export function LeadTimeline({ progress } = {}) {
   const [ref, scrollP] = useScrollProgress({ start: 0.9, end: 0.4 });
   const p = progress ?? scrollP;
   const flags = [
-    { label: "CFO departure", date: "Sep 10", left: pos(9, 10), at: 0.12 },
-    { label: "WARN notice", date: "Sep 24", left: pos(9, 24), at: 0.32 },
+    { label: "CFO departure", date: "Sep 10", left: pos(9, 10), at: 0.12, tier: 0 },
+    { label: "WARN notice", date: "Sep 24", left: pos(9, 24), at: 0.32, tier: 1 },
   ];
   const fin = pos(11, 14);
   const showFin = p >= 0.52;
   const bracket = Math.min(1, Math.max(0, (p - 0.66) / 0.3));
   return (
-    <div ref={ref} className="relative h-[176px]">
+    <div ref={ref} className="relative h-[208px]">
       {/* Axis with month ticks and labels. */}
       <div className="absolute inset-x-0 h-[2px] rounded bg-[#14202e]/25" style={{ top: LINE_Y }} />
       {MONTHS.map((m) => (
@@ -210,10 +211,11 @@ export function LeadTimeline({ progress } = {}) {
           <div
             key={f.label}
             className="absolute -translate-x-1/2 text-center transition-all duration-500 ease-out"
-            style={{ left: `${f.left}%`, top: LINE_Y - 46, opacity: on ? 1 : 0, transform: `translate(-50%, ${on ? 0 : -14}px)` }}
+            style={{ left: `${f.left}%`, top: LINE_Y - 46 - f.tier * TIER, opacity: on ? 1 : 0, transform: `translate(-50%, ${on ? 0 : -14}px)` }}
           >
             <p className="whitespace-nowrap text-[12.5px] font-semibold text-ew-ink">{f.label}</p>
             <p className="whitespace-nowrap text-[11px] text-ew-muted">{f.date}</p>
+            {f.tier > 0 && <span className="mx-auto mt-1 block w-px bg-[#14202e]/35" style={{ height: f.tier * TIER - 4 }} />}
             <span
               className="mx-auto mt-1 block h-3.5 w-3.5 rounded-full bg-ew-red"
               style={{ boxShadow: "0 0 0 4px rgba(185, 28, 28, 0.18)" }}
