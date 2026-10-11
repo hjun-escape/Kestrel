@@ -1,3 +1,5 @@
+import { checkInternalToken, INTERNAL_TOKEN_ENV } from "./internalToken.ts";
+
 // reviewSignals (P3): Glassdoor employee reviews -> review_distress signals.
 //
 // Input:  { borrower: Borrower, today?: "YYYY-MM-DD", snapshot_id?: string }  (refreshBorrower sends { borrower })
@@ -432,8 +434,6 @@ export async function fetchOverallRating(b: Borrower, apiKey: string): Promise<n
 // A snapshot that is still building returns 503 with its snapshot_id. refreshBorrower saves it in
 // Borrower.pending_snapshots and passes it back on the next refresh. Glassdoor takes ~6 min, so the first
 // refresh of a company shows Reviews as unavailable and a refresh a few minutes later collects the result.
-import { checkInternalToken, INTERNAL_TOKEN_ENV } from "./internalToken.ts";
-
 declare const Deno: { env: { get(k: string): string | undefined } };
 
 export default async function (req: Request): Promise<Response> {

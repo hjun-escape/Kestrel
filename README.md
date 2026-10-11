@@ -209,6 +209,20 @@ base44 dev --remote
 
 ⚠️ In this mode writes go to your app's **production data** — plain `base44 dev` keeps everything local.
 
+## Secrets and access
+
+Secrets are set in the Base44 dashboard (app settings → secrets; `base44 secrets set KEY=VALUE` on newer CLIs) and read by backend functions with `Deno.env.get`. Never put a key in code; `.env.local` is gitignored.
+
+| Secret | Required | Purpose |
+|---|---|---|
+| `BRIGHTDATA_API_KEY` | yes | All live checks (news, jobs, reviews, lender check, page lookup) |
+| `INTERNAL_FUNCTION_TOKEN` | yes | Random 16+ chars (`openssl rand -hex 24`); refreshBorrower hands it to the signal functions so clients cannot call them directly |
+| `DEVIN_SERVICE_KEY` | no | Devin review integration |
+| `DAYTONA_API_KEY` | no | Cash-flow statement parsing in a sandbox |
+| `ALLOWED_FILE_HOSTS` | no | Override of the upload-host allow-list |
+
+Access model: the app opens without login and shows the shared demo book; signed-in users see only companies they added. Entities are closed to clients (`rls` false); all reads go through `readData` and writes through backend functions that apply `access.ts`.
+
 ## Publish Your Changes
 
 After pushing your changes to git, open the Base44 dashboard and publish the app:

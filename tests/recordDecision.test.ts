@@ -67,3 +67,19 @@ test("cleanDecision rejects non-string note and oversized document lists", () =>
   assert.equal("error" in cleanDecision({ decision: "proceed", note: 42 }), true);
   assert.equal("error" in cleanDecision({ decision: "request_documents", documents_requested: Array(51).fill({ item: "x" }) }), true);
 });
+
+test("a non-http source_url on a document is dropped; item and reason stay", async () => {
+  const { db, created } = fakeDb();
+  await recordDecision(db, BORROWER, USER, {
+    decision: "request_documents",
+    documents_requested: [
+      { item: "Bank statements", reason: "cash flow", source_url: "javascript:alert(1)" },
+      { item: "UCC filing", reason: "liens", source_url: "https://x.com/u" },
+      { item: "No link", reason: "r", source_url: "not a url" },
+    ],
+  }, NOW);
+  const docs = created[0].documents_requested as Record<string, unknown>[];
+  assert.deepEqual(docs[0], { item: "Bank statements", reason: "cash flow" });
+  assert.deepEqual(docs[1], { item: "UCC filing", reason: "liens", source_url: "https://x.com/u" });
+  assert.deepEqual(docs[2], { item: "No link", reason: "r" });
+});

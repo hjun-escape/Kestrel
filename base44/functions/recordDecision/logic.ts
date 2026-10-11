@@ -31,6 +31,15 @@ function cleanDocument(value: unknown): Patch | null {
     if (typeof v !== 'string' || v.length > MAX_FIELD) return null;
     out[k] = v;
   }
+  // The audit trail renders source_url as a link, so it must be http(s); a bad one is dropped alone.
+  if (typeof out.source_url === 'string') {
+    try {
+      const u = new URL(out.source_url);
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') delete out.source_url;
+    } catch {
+      delete out.source_url;
+    }
+  }
   return out;
 }
 
