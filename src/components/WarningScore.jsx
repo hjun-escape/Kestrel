@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { SIGNAL_TYPES } from "@/lib/signalTypes";
+import { TYPE_LABELS } from "@/components/company/plainLabels";
 import { warningScore, BANDS, POINTS, MAX_WEAK_COUNTED } from "@/lib/warningScore.ts";
 
 // Warning score 0-100 with the reason behind every point. Display only; its band always equals the
@@ -17,7 +18,7 @@ function shortDate(iso) {
 
 function Line({ line }) {
   const s = line.signal;
-  const type = SIGNAL_TYPES[s.type]?.label || s.type;
+  const type = TYPE_LABELS[s.type] || SIGNAL_TYPES[s.type]?.label || s.type;
   return (
     <li className="flex items-baseline gap-3 py-1.5">
       <span className={`w-10 shrink-0 text-right font-mono text-sm ${line.points ? "font-semibold text-ew-ink" : "text-ew-muted"}`}>
@@ -60,7 +61,7 @@ export default function WarningScore({ borrower, signals }) {
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <h2 id="warning-score-heading" className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.06em] text-ew-muted">
-            Warning score
+            Points
           </h2>
           <span className="whitespace-nowrap">
             <span className="font-mono text-2xl font-semibold text-ew-ink">{ws.score}</span>
@@ -68,13 +69,13 @@ export default function WarningScore({ borrower, signals }) {
           </span>
           <span className={`ml-1 rounded-sm px-1.5 py-0.5 text-xs font-semibold ${band.cell} ${band.text}`}>{band.label}</span>
           {/* Say up front that the score cannot disagree with the status: its bands are the status rules. */}
-          <span className="w-full text-xs text-ew-muted sm:w-auto">Same rules as the status, counted in points</span>
+          <span className="w-full text-xs text-ew-muted sm:w-auto">Same rules as the status, counted in points. Not a separate rating.</span>
         </div>
 
         <div className="min-w-[220px] flex-1">
           <div
             role="meter"
-            aria-label="Warning score"
+            aria-label="Points"
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={ws.score}
@@ -98,18 +99,18 @@ export default function WarningScore({ borrower, signals }) {
           aria-expanded={open}
           className="rounded-sm text-xs font-semibold text-ew-ink underline decoration-ew-rule underline-offset-2 hover:decoration-ew-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-ew-focus"
         >
-          {open ? "Hide reasons" : "Why this score"}
+          {open ? "Hide the breakdown" : "Show each warning sign"}
         </button>
       </div>
 
       {open && (
         <div className="mt-3 border-t border-ew-rule-soft pt-2">
           <p className="text-xs text-ew-muted">
-            Last 90 days only. Strong signal +{POINTS.strong}, weak signal +{POINTS.weak} (up to {MAX_WEAK_COUNTED}), capped at 100.
+            Last 90 days only. Strong warning sign +{POINTS.strong}, weak warning sign +{POINTS.weak} (up to {MAX_WEAK_COUNTED}), capped at 100.
             Yellow from {BANDS.yellow}, Red from {BANDS.red}: the same lines as the status rules. {ws.why}
           </p>
           {ws.counted.length === 0 ? (
-            <p className="mt-2 text-sm text-ew-muted">No warning signals in the last 90 days.</p>
+            <p className="mt-2 text-sm text-ew-muted">No warning signs in the last 90 days.</p>
           ) : (
             <ul className="mt-1 divide-y divide-ew-rule-soft">
               {ws.counted.map((l, i) => (

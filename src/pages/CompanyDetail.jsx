@@ -246,8 +246,8 @@ export default function CompanyDetail() {
         newIds={newIds}
         autoResume={running ? null : autoResume}
         onStopAutoResume={stopAutoResume}
+        auditTrail={<AuditTrail key={`audit-${borrower.id}`} borrower={borrower} signals={signals} />}
       />
-      <AuditTrail key={`audit-${borrower.id}`} borrower={borrower} signals={signals} />
       <EditCompanyDialog
         borrower={borrower}
         open={editOpen}
@@ -273,7 +273,7 @@ function DetailShell({ children }) {
   return (
     <div className="min-h-screen bg-ew-paper text-ew-ink">
       <AppHeader />
-      <main className="mx-auto max-w-[1360px] px-6 pb-16 pt-4">
+      <main className="mx-auto max-w-[1360px] px-4 pb-16 pt-4 sm:px-6">
         <nav aria-label="Breadcrumb" className="mb-3">
           <Link
             to="/"
@@ -294,10 +294,9 @@ function DetailSkeleton() {
     <div className="border border-ew-rule bg-ew-surface p-5" aria-busy="true" aria-label="Loading company">
       <div className="h-7 w-1/3 animate-pulse rounded-sm bg-ew-rule-soft" />
       <div className="mt-4 h-4 w-2/3 animate-pulse rounded-sm bg-ew-rule-soft" />
-      <div className="mt-6 grid grid-cols-6 gap-6">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="h-8 animate-pulse rounded-sm bg-ew-rule-soft" />
-        ))}
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <div className="h-24 animate-pulse rounded-sm bg-ew-rule-soft" />
+        <div className="h-24 animate-pulse rounded-sm bg-ew-rule-soft" />
       </div>
     </div>
   );

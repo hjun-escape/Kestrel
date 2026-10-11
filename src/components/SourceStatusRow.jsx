@@ -1,14 +1,7 @@
 import React, { useEffect, useState } from "react";
-import SourceChip from "@/components/SourceChip";
+import SourceCard from "@/components/company/SourceCard";
 import { SOURCES } from "@/lib/signalTypes";
 import { sourceNote, sourceOfSignal } from "@/lib/borrowerUtils";
-
-const DESCRIPTIONS = {
-  News: "Executive departures",
-  Legal: "Lawsuits, layoffs, liens",
-  Jobs: "Hiring activity",
-  Reviews: "Employee reviews",
-};
 
 // Elapsed seconds since startedAt, ticking once a second while a check runs.
 function useElapsed(startedAt, running) {
@@ -21,7 +14,7 @@ function useElapsed(startedAt, running) {
   return startedAt ? Math.max(0, Math.round((now - startedAt) / 1000)) : null;
 }
 
-// Four sources side by side with their state. While a check runs, a progress
+// Four sources side by side, named by what was searched with their state. While a check runs, a progress
 // bar shows how many sources have answered and how long the check has run.
 export default function SourceStatusRow({ borrower, states, recentSignals, running, startedAt }) {
   const answered = SOURCES.filter((s) => states[s] !== "checking").length;
@@ -30,9 +23,9 @@ export default function SourceStatusRow({ borrower, states, recentSignals, runni
   return (
     <section data-demo="sources" aria-labelledby="sources-heading">
       <div className="flex items-baseline justify-between px-5 pb-2 pt-4">
-        <h2 id="sources-heading" className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ew-muted">
-          Sources
-        </h2>
+        <h3 id="sources-heading" className="text-xs font-semibold text-ew-muted">
+          Four sources, searched for the last 90 days
+        </h3>
         <p aria-live="polite" className="sr-only">
           {running ? `${answered} of ${SOURCES.length} answered` : ""}
         </p>
@@ -62,10 +55,9 @@ export default function SourceStatusRow({ borrower, states, recentSignals, runni
       )}
       <ul className="grid grid-cols-2 gap-px border-t border-ew-rule bg-ew-rule md:grid-cols-4">
         {SOURCES.map((src) => (
-          <SourceChip
+          <SourceCard
             key={src}
             source={src}
-            description={DESCRIPTIONS[src]}
             state={states[src]}
             recentCount={recentSignals.filter((s) => sourceOfSignal(s) === src).length}
             note={sourceNote(borrower, src)?.note}

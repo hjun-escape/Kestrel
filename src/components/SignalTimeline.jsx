@@ -2,6 +2,7 @@ import React from "react";
 import { ExternalLink } from "lucide-react";
 import { format } from "date-fns";
 import { SIGNAL_TYPES } from "@/lib/signalTypes";
+import { TYPE_LABELS } from "@/components/company/plainLabels";
 import { groupSignalsByMonth, parseSignalDate, splitByRecency, RECENT_DAYS } from "@/lib/borrowerUtils";
 
 // Evidence timeline, newest first, grouped by month. Signals from the last 90
@@ -9,7 +10,7 @@ import { groupSignalsByMonth, parseSignalDate, splitByRecency, RECENT_DAYS } fro
 // "Outside the last 90 days".
 // Each item: type, severity, date, title, the exact snippet as a quote, a
 // source link (new tab) and a follow-up question.
-export default function SignalTimeline({ signals, neverRefreshed, checking, newIds }) {
+export default function SignalTimeline({ signals, neverRefreshed, checking, newIds, isApplicant = true }) {
   const { recent, older } = splitByRecency(signals);
 
   if (recent.length === 0 && older.length === 0) {
@@ -20,10 +21,10 @@ export default function SignalTimeline({ signals, neverRefreshed, checking, newI
     <div>
       {recent.length === 0 ? (
         <p className="border border-ew-rule bg-ew-surface px-4 py-4 text-sm text-ew-muted">
-          No signals in the last {RECENT_DAYS} days.
+          No warning signs in the last {RECENT_DAYS} days.
         </p>
       ) : (
-        <MonthGroups signals={recent} newIds={newIds} />
+        <MonthGroups signals={recent} newIds={newIds} isApplicant={isApplicant} />
       )}
 
       {older.length > 0 && (
@@ -34,14 +35,14 @@ export default function SignalTimeline({ signals, neverRefreshed, checking, newI
             </h3>
             <span className="text-xs text-ew-muted">Not counted in status</span>
           </div>
-          <MonthGroups signals={older} dimmed newIds={newIds} />
+          <MonthGroups signals={older} dimmed newIds={newIds} isApplicant={isApplicant} />
         </section>
       )}
     </div>
   );
 }
 
-function MonthGroups({ signals, dimmed = false, newIds }) {
+function MonthGroups({ signals, dimmed = false, newIds, isApplicant }) {
   return groupSignalsByMonth(signals).map((group) => (
     <section key={group.key} aria-label={group.label} className="mb-5 last:mb-0">
       <h3 className={`mb-1.5 flex items-baseline gap-2 text-[11px] font-semibold uppercase tracking-[0.06em] ${dimmed ? "text-ew-muted" : "text-ew-ink-soft"}`}>
@@ -50,7 +51,7 @@ function MonthGroups({ signals, dimmed = false, newIds }) {
       </h3>
       <ol className={`border ${dimmed ? "border-dashed border-ew-rule bg-ew-hover" : "border-ew-rule bg-ew-surface"}`}>
         {group.items.map((s, i) => (
-          <SignalItem key={s.id || `${s.type}-${s.date}-${i}`} signal={s} dimmed={dimmed} isNew={!!newIds?.has(s.id)} />
+          <SignalItem key={s.id || `${s.type}-${s.date}-${i}`} signal={s} dimmed={dimmed} isNew={!!newIds?.has(s.id)} isApplicant={isApplicant} />
         ))}
       </ol>
     </section>
@@ -66,8 +67,9 @@ function safeUrl(url) {
   }
 }
 
-function SignalItem({ signal: s, dimmed, isNew }) {
+function SignalItem({ signal: s, dimmed, isNew, isApplicant }) {
   const type = SIGNAL_TYPES[s.type] || { label: s.type, whatToAsk: "" };
+  const typeLabel = TYPE_LABELS[s.type] || type.label;
   const isStrong = s.severity === "strong";
   const date = parseSignalDate(s.date);
   const url = safeUrl(s.source_url);
@@ -82,18 +84,18 @@ function SignalItem({ signal: s, dimmed, isNew }) {
       >
         <span className={`block font-mono text-[15px] font-semibold ${dimmed ? "text-ew-muted" : "text-ew-ink"}`}>{format(date, "d")}</span>
         <span className="block text-[11px] uppercase tracking-[0.06em] text-ew-muted">{format(date, "MMM")}</span>
-        {s.date_approx && <span className="block text-[11px] text-ew-muted">approx.</span>}
+        {s.date_approx && <span className="block text-[11px] text-ew-muted">around</span>}
       </time>
       <article className="min-w-0 px-4 py-3">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span className="text-xs font-semibold text-ew-ink-soft">{type.label}</span>
+          <span className="text-xs font-semibold text-ew-ink-soft">{typeLabel}</span>
           <span
             className={`rounded-sm border px-1.5 text-[11px] font-semibold leading-[18px] ${
               isStrong ? "border-ew-ink bg-ew-ink text-white" : "border-ew-rule text-ew-ink-soft"
             }`}
           >
             {isStrong ? "Strong" : "Weak"}
-            <span className="sr-only"> signal</span>
+            <span className="sr-only"> warning sign</span>
           </span>
           {isNew && (
             <span className="rounded-sm border border-ew-focus px-1.5 text-[11px] font-semibold leading-[18px] text-ew-focus">
@@ -126,7 +128,7 @@ function SignalItem({ signal: s, dimmed, isNew }) {
           )}
           {type.whatToAsk && !dimmed && (
             <p className="min-w-0 basis-full text-xs leading-relaxed text-ew-muted sm:basis-0 sm:flex-1">
-              <span className="font-semibold text-ew-ink-soft">Ask: </span>
+              <span className="font-semibold text-ew-ink-soft">{isApplicant ? "Ask the applicant: " : "Ask the borrower: "}</span>
               {type.whatToAsk}
             </p>
           )}
@@ -141,7 +143,7 @@ function EmptyTimeline({ neverRefreshed, checking }) {
     return (
       <div className="border border-ew-rule bg-ew-surface" aria-busy="true">
         <p className="border-b border-ew-rule-soft px-4 py-3 text-sm text-ew-ink-soft">
-          Checking sources. Signals appear here as each source answers.
+          Checking sources. Warning signs appear here as each source answers.
         </p>
         {[0, 1, 2].map((i) => (
           <div key={i} className="grid grid-cols-[64px_minmax(0,1fr)] border-b border-ew-rule-soft last:border-0" aria-hidden="true">
@@ -161,7 +163,7 @@ function EmptyTimeline({ neverRefreshed, checking }) {
   return (
     <p className="border border-ew-rule bg-ew-surface px-4 py-6 text-sm text-ew-muted">
       {neverRefreshed
-        ? "Not checked yet. Run a refresh to look for warning signs."
+        ? "Not checked yet. Run the first check to look for warning signs."
         : "No warning signs found in any source."}
     </p>
   );

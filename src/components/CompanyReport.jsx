@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
-import { ChevronRight, ExternalLink } from "lucide-react";
-import CompanyHeader from "@/components/CompanyHeader";
+import { ExternalLink } from "lucide-react";
+import VerdictCard from "@/components/company/VerdictCard";
+import ReportSection from "@/components/company/ReportSection";
 import SourceStatusRow from "@/components/SourceStatusRow";
 import SignalTimeline from "@/components/SignalTimeline";
 import ApplicantDecision from "@/components/ApplicantDecision";
@@ -13,24 +14,31 @@ import ReportAudit from "@/components/ReportAudit";
 import { useAuth } from "@/lib/AuthContext";
 import { createSessionAudit } from "@/lib/sessionAudit";
 import { Dialog, DialogContent as SharedDialogContent, DialogTitle as SharedDialogTitle, DialogDescription as SharedDialogDescription } from "@/components/ui/dialog";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { formatTimeToFlag, timeToFirstFlag } from "@/lib/timeToFlag.ts";
 import { filterRecentSignals } from "@/lib/borrowerUtils";
 
 const DialogContent = /** @type {React.ComponentType<any>} */ (SharedDialogContent);
 const DialogTitle = /** @type {React.ComponentType<any>} */ (SharedDialogTitle);
 const DialogDescription = /** @type {React.ComponentType<any>} */ (SharedDialogDescription);
 
-// The company report: everything shown for one company once it has been checked (status, sources,
-// warning score, how it was checked, evidence, cash flow, decision, analyst brief, profiles).
+// The company report, banker first: the verdict card (status, why, next step, key evidence) on top,
+// then one scrolling report with a heading per section. Detail-heavy sections start collapsed.
 // CompanyDetail renders it with live data; /dev/progression renders it for its example company.
 // Mount with key={borrower.id} so per-company state resets when the company changes.
-const SECTIONS = [
-  ["evidence", "Evidence"],
-  ["cashflow", "Cash flow"],
-  ["decision", "Other lenders & decision"],
-  ["brief", "Analyst brief"],
-];
+const DEFAULT_OPEN = { evidence: false, review: true, sources: false, score: false, brief: false, doublecheck: false };
+
+function prefersReducedMotion() {
+  return typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+}
+
+// Scroll to an element once the section holding it has rendered open, and move focus there.
+function revealLater(targetId) {
+  requestAnimationFrame(() => {
+    const el = document.getElementById(targetId);
+    if (!el) return;
+    el.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "start" });
+    el.focus({ preventScroll: true });
+  });
+}
 
 export default function CompanyReport({
   borrower,
@@ -48,142 +56,193 @@ export default function CompanyReport({
   newIds = null,
   autoResume = null,
   onStopAutoResume,
+  auditTrail = null,
 }) {
-  const [cashflowReview, setCashflowReview] = useState(null);
-  const [reviewView, setReviewView] = useState('report');
-  const [section, setSection] = useState("evidence");
-  const { isAuthenticated } = useAuth();
+  const [open, setOpen] = useState(DEFAULT_OPEN);
+  const [auditView, setAuditView] = useState("summary");
   const [actionsOpen, setActionsOpen] = useState(false);
   const [runRequest, setRunRequest] = useState(0);
-  const [confidence, setConfidence] = useState(null);
+  const { isAuthenticated } = useAuth();
   const sessionRequest = useMemo(() => createSessionAudit(borrower, signals, checkRun), [borrower.id, borrower.last_refreshed, signals, checkRun]);
-  function openReview(view) {
-    setReviewView(view);
-  }
-  function startAudit() { setActionsOpen(false); setReviewView('summary'); setRunRequest(n => n + 1); }
   const recentSignals = filterRecentSignals(signals);
   const olderCount = signals.length - recentSignals.length;
   const isApplicant = borrower.stage === "applicant";
-  const flagLine = formatTimeToFlag(timeToFirstFlag(borrower, signals, cashflowReview ? [cashflowReview] : []));
+
+  const toggle = (key) => setOpen((prev) => ({ ...prev, [key]: !prev[key] }));
+  const reveal = (key, targetId) => {
+    setOpen((prev) => ({ ...prev, [key]: true }));
+    revealLater(targetId);
+  };
+  // ReportAudit only knows its own views; "report" was the old tab and means "show the summary" here.
+  const changeAuditView = (view) => setAuditView(view === "report" || !view ? "summary" : view);
+
+  function startAudit() {
+    setActionsOpen(false);
+    setAuditView("summary");
+    setRunRequest((n) => n + 1);
+    reveal("doublecheck", "doublecheck");
+  }
 
   return (
     <>
-      <div className="border border-ew-rule bg-ew-surface">
-        <CompanyHeader
-          borrower={borrower}
-          signals={signals}
-          sourceStates={sourceStates}
-          running={running}
-          refreshError={refreshError}
-          onRefresh={onRefresh}
-          onEdit={onEdit}
-          onDelete={onDelete}
-          onRunActions={() => setActionsOpen(true)}
-          confidence={confidence}
-        />
-        {notice && (
-          <p role="status" className="border-t border-ew-rule-soft px-5 py-2 text-xs text-ew-ink-soft">
-            {notice}
-          </p>
-        )}
-        <nav aria-label="Company report sections" className="flex flex-wrap gap-1 border-t border-ew-rule-soft px-5">
-          {[['report', 'Company report'], ['summary', 'Audit report']].map(([view, label]) => <button key={view} type="button" aria-current={reviewView === view ? 'page' : undefined} onClick={() => openReview(view)} className={`border-b-2 px-3 py-3 text-sm font-medium focus-visible:outline-ew-focus ${reviewView === view ? 'border-ew-ink text-ew-ink' : 'border-transparent text-ew-muted hover:text-ew-ink'}`}>{label}</button>)}
-        </nav>
-        <div hidden={reviewView !== 'report'}>
-        <SourceStatusRow borrower={borrower} states={sourceStates} recentSignals={recentSignals} running={running} startedAt={startedAt} />
-        <AutoResumeNote state={autoResume} onStop={onStopAutoResume} />
-        <WarningScore borrower={borrower} signals={signals} />
-        <CheckTrace run={checkRun} refreshing={running} stale={checkRunStale} />
-        {flagLine && (
-          <p className="border-t border-ew-rule-soft px-5 py-2 text-xs text-ew-ink-soft">{flagLine}</p>
-        )}
-        </div>
-      </div>
+      <VerdictCard
+        borrower={borrower}
+        signals={signals}
+        sourceStates={sourceStates}
+        running={running}
+        refreshError={refreshError}
+        onRefresh={onRefresh}
+        onRecheck={() => setActionsOpen(true)}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        evidenceCount={recentSignals.length}
+        onShowAllEvidence={() => reveal("evidence", "evidence")}
+        onNextStep={(kind) => (kind === "documents" ? reveal("review", "applicant-documents") : reveal("review", "review"))}
+      />
+      {notice && (
+        <p role="status" className="mt-2 border-l-2 border-ew-ink bg-ew-surface px-3 py-2 text-xs text-ew-ink-soft">
+          {notice}
+        </p>
+      )}
+      <AutoResumeNote state={autoResume} onStop={onStopAutoResume} />
 
       <Dialog open={actionsOpen} onOpenChange={setActionsOpen}>
         <DialogContent className="rounded-sm border-ew-rule bg-ew-surface text-ew-ink sm:rounded-sm">
-          <DialogTitle>Run checks for {borrower.name}</DialogTitle>
-          <DialogDescription>Choose how to update or review this report. The original report stays intact when auditing.</DialogDescription>
+          <DialogTitle>Re-check {borrower.name}</DialogTitle>
+          <DialogDescription>Update the report from its sources, or double-check the report you have. Double-checking never changes the original.</DialogDescription>
           <div className="space-y-2">
-            <button type="button" disabled={running} onClick={() => { setActionsOpen(false); setReviewView('report'); onRefresh(); }} className="w-full rounded-sm border border-ew-rule p-4 text-left hover:bg-ew-hover disabled:opacity-50"><span className="block text-sm font-semibold">Refresh source data</span><span className="mt-1 block text-xs text-ew-muted">Collect current signals and update the company report.</span></button>
-            <button type="button" disabled={running} onClick={startAudit} className="w-full rounded-sm border border-ew-rule p-4 text-left hover:bg-ew-hover disabled:opacity-50"><span className="block text-sm font-semibold">Audit this report</span><span className="mt-1 block text-xs text-ew-muted">Run evidence checks, then view progression and activity logs.</span></button>
-            <button type="button" disabled={running} onClick={() => { setActionsOpen(false); setReviewView('considerations'); }} className="w-full rounded-sm border border-ew-rule p-4 text-left hover:bg-ew-hover disabled:opacity-50"><span className="block text-sm font-semibold">Rerun with considerations</span><span className="mt-1 block text-xs text-ew-muted">Apply or skip instructions and choose evidence to test.</span></button>
+            <ActionChoice
+              disabled={running}
+              title="Re-check sources"
+              detail="Look again at news, court records, job postings and employee reviews, and update this report."
+              onClick={() => { setActionsOpen(false); onRefresh(); }}
+            />
+            <ActionChoice
+              disabled={running}
+              title="Double-check this report"
+              detail="Confirm each quote, date and company match against its source."
+              onClick={startAudit}
+            />
+            <ActionChoice
+              disabled={running}
+              title="Double-check with your notes"
+              detail="Choose which evidence to test and add instructions before double-checking."
+              onClick={() => { setActionsOpen(false); setAuditView("considerations"); }}
+            />
           </div>
         </DialogContent>
       </Dialog>
-      <div hidden={reviewView === 'report'}><ReportAudit borrower={borrower} currentSignals={signals} refreshing={running} view={reviewView} onViewChange={openReview} request={isAuthenticated ? undefined : sessionRequest} sessionOnly={!isAuthenticated} runRequest={runRequest} onConfidenceChange={setConfidence} /></div>
 
-      {/* Below the header, one section at a time: evidence first (the signals behind the status, each with its
-          source and what to ask), then cash flow, other lenders and the decision, and the analyst brief.
-          Inactive tabs stay mounted (hidden) so their state survives switching. */}
-      <div hidden={reviewView !== 'report'} className="mt-6">
-        <div role="tablist" aria-label="Report sections" className="flex flex-wrap gap-x-6 border-b border-ew-rule">
-          {SECTIONS.map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              role="tab"
-              id={`section-tab-${key}`}
-              data-demo={`tab-${key}`}
-              aria-selected={section === key}
-              aria-controls={`section-panel-${key}`}
-              onClick={() => setSection(key)}
-              className={`-mb-px border-b-2 py-2.5 text-sm font-medium focus-visible:outline-ew-focus ${section === key ? "border-ew-ink text-ew-ink" : "border-transparent text-ew-muted hover:text-ew-ink"}`}
-            >
-              {label}
-              {key === "evidence" && <span className="ml-1.5 tabular-nums text-ew-muted">{recentSignals.length}</span>}
-            </button>
-          ))}
-        </div>
-
-        <section role="tabpanel" id="section-panel-evidence" aria-labelledby="section-tab-evidence" hidden={section !== "evidence"} className="pt-5">
-          <div data-demo="evidence">
-            <div className="mb-3 flex items-baseline justify-between gap-4">
-              <h2 id="evidence-heading" className="font-heading text-xl font-bold tracking-tight text-ew-ink">
-                Evidence
-              </h2>
-              <p className="text-xs tabular-nums text-ew-muted">
-                {recentSignals.length} in the last 90 days{olderCount > 0 ? `, ${olderCount} older` : ""}
-              </p>
-            </div>
-            <SignalTimeline
-              signals={signals}
-              neverRefreshed={!borrower.last_refreshed}
-              checking={running}
-              newIds={newIds}
-            />
+      <div className="mt-8 border-t border-ew-rule">
+        <ReportSection
+          id="evidence"
+          demoId="tab-evidence"
+          title={`All warning signs (${recentSignals.length})`}
+          summary={`Last 90 days${olderCount > 0 ? `, plus ${olderCount} older` : ""}`}
+          open={open.evidence}
+          onToggle={() => toggle("evidence")}
+        >
+          <div data-demo="evidence" tabIndex={-1} className="outline-none">
+            <SignalTimeline signals={signals} neverRefreshed={!borrower.last_refreshed} checking={running} newIds={newIds} isApplicant={isApplicant} />
           </div>
-        </section>
+        </ReportSection>
 
-        <section role="tabpanel" id="section-panel-cashflow" aria-labelledby="section-tab-cashflow" hidden={section !== "cashflow"} className="max-w-3xl pt-5">
-          {isApplicant ? (
-            <CashflowReview borrower={borrower} onReviewChange={setCashflowReview} />
-          ) : (
-            <Collapsible className="border border-ew-rule bg-ew-surface">
-              <CollapsibleTrigger className="group flex w-full items-center gap-2 px-4 py-3 text-left font-heading text-sm font-bold text-ew-ink">
-                <ChevronRight aria-hidden="true" className="h-4 w-4 transition-transform group-data-[state=open]:rotate-90" />
-                Upload latest statement
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <CashflowReview borrower={borrower} onReviewChange={setCashflowReview} />
-              </CollapsibleContent>
-            </Collapsible>
-          )}
-        </section>
+        <ReportSection
+          id="review"
+          demoId="tab-decision"
+          title={isApplicant ? "Applicant review" : "Borrower review"}
+          summary="Documents, cash flow, other lenders, decision"
+          open={open.review}
+          onToggle={() => toggle("review")}
+        >
+          <div className="grid max-w-3xl gap-4">
+            <div id="applicant-documents" tabIndex={-1} className="scroll-mt-4 outline-none">
+              <ApplicantDecision key={borrower.id} borrower={borrower} signals={signals} />
+            </div>
+            <div data-demo="tab-cashflow">
+              <h3 className="mb-2 font-heading text-sm font-bold text-ew-ink">Cash flow</h3>
+              <CashflowReview borrower={borrower} />
+            </div>
+          </div>
+        </ReportSection>
 
-        <section role="tabpanel" id="section-panel-decision" aria-labelledby="section-tab-decision" hidden={section !== "decision"} className="max-w-3xl pt-5">
-          <ApplicantDecision key={borrower.id} borrower={borrower} signals={signals} />
-        </section>
+        <ReportSection
+          id="sources"
+          title="Sources searched"
+          summary="What was checked and what was found"
+          open={open.sources || running}
+          onToggle={() => toggle("sources")}
+        >
+          <div className="border border-ew-rule bg-ew-surface">
+            <SourceStatusRow borrower={borrower} states={sourceStates} recentSignals={recentSignals} running={running} startedAt={startedAt} />
+            <CheckTrace run={checkRun} refreshing={running} stale={checkRunStale} />
+          </div>
+          <div className="mt-4 max-w-3xl">
+            <CompanyLinks borrower={borrower} />
+          </div>
+        </ReportSection>
 
-        <section role="tabpanel" id="section-panel-brief" aria-labelledby="section-tab-brief" hidden={section !== "brief"} className="max-w-3xl pt-5">
-          <AnalystBrief borrower={borrower} />
-        </section>
+        <ReportSection
+          id="score"
+          title="How the status was counted"
+          summary="Every warning sign and what it adds"
+          open={open.score}
+          onToggle={() => toggle("score")}
+        >
+          <div className="border border-ew-rule bg-ew-surface">
+            <WarningScore borrower={borrower} signals={signals} />
+          </div>
+        </ReportSection>
 
-        <div className="mt-6 max-w-3xl">
-          <CompanyLinks borrower={borrower} />
-        </div>
+        <ReportSection
+          id="brief"
+          demoId="tab-brief"
+          title="AI news summary"
+          summary="Optional, not used for status"
+          open={open.brief}
+          onToggle={() => toggle("brief")}
+        >
+          <div className="max-w-3xl">
+            <AnalystBrief borrower={borrower} />
+          </div>
+        </ReportSection>
+
+        <ReportSection
+          id="doublecheck"
+          title="Double-check"
+          summary="Each quote, date and company match, checked again"
+          open={open.doublecheck}
+          onToggle={() => toggle("doublecheck")}
+        >
+          <ReportAudit
+            borrower={borrower}
+            currentSignals={signals}
+            refreshing={running}
+            view={auditView}
+            onViewChange={changeAuditView}
+            request={isAuthenticated ? undefined : sessionRequest}
+            sessionOnly={!isAuthenticated}
+            runRequest={runRequest}
+          />
+        </ReportSection>
+
       </div>
+      {auditTrail && <div className="max-w-3xl">{auditTrail}</div>}
     </>
+  );
+}
+
+function ActionChoice({ title, detail, onClick, disabled }) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className="w-full rounded-sm border border-ew-rule p-4 text-left hover:bg-ew-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-ew-focus disabled:opacity-50"
+    >
+      <span className="block text-sm font-semibold">{title}</span>
+      <span className="mt-1 block text-xs text-ew-muted">{detail}</span>
+    </button>
   );
 }
 
@@ -200,10 +259,10 @@ function CompanyLinks({ borrower }) {
     lookup.glassdoor === "found" && borrower.glassdoor_url ? "Glassdoor" : null,
   ].filter(Boolean);
   return (
-    <section aria-labelledby="links-heading" className="border border-ew-rule bg-ew-surface px-4 py-3">
-      <h2 id="links-heading" className="text-xs font-semibold text-ew-muted">
-        Company profiles
-      </h2>
+    <section aria-labelledby="links-heading">
+      <h3 id="links-heading" className="text-xs font-semibold text-ew-muted">
+        Company links
+      </h3>
       <ul className="mt-2 flex flex-wrap gap-2">
         {links.map((l) => (
           <li key={l.label}>
@@ -212,7 +271,7 @@ function CompanyLinks({ borrower }) {
               target="_blank"
               rel="noopener noreferrer"
               aria-label={`${l.label} (opens in a new tab)`}
-              className="inline-flex items-center gap-1.5 rounded-sm border border-ew-rule px-2 py-1 text-xs font-medium text-ew-ink hover:border-ew-ink-soft hover:bg-ew-hover"
+              className="inline-flex items-center gap-1.5 rounded-sm border border-ew-rule bg-ew-surface px-2 py-1 text-xs font-medium text-ew-ink hover:border-ew-ink-soft hover:bg-ew-hover"
             >
               {l.label}
               <ExternalLink aria-hidden="true" className="h-3 w-3" />
